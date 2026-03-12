@@ -1,33 +1,29 @@
-# KEYENCE KV HOST LINK Protocol Notes
+﻿# KEYENCE KV HOST LINK Protocol Notes
 
 ## 1. Communication Overview
 
-- Roles: PLC Ethernet unit is the server, PC application is the client.
+- Roles:
+  - PLC Ethernet unit: server
+  - PC application: client
 - Transport: `TCP/IP` or `UDP/IP`
-- Port: `8501` (changeable in unit settings)
+- Port: `8501` (configurable)
 - Encoding: `ASCII`
-- Terminators:
-  - Command: `CR` (`0x0D`) required, optional `LF` (`0x0A`)
-  - Response: `CR LF`
 
-## 2. Frame Format
+## 2. Frame Rules
 
-### 2.1 Command
+### 2.1 Command frame
 
 ```text
 <COMMAND> [<PARAM> ...] CR
 ```
 
-Example:
+- `CR` (`0x0D`) is the command separator.
+- Optional `LF` (`0x0A`) after `CR` is accepted by the PLC.
+
+### 2.2 Response frame
 
 ```text
-RDS R100 4\r
-```
-
-### 2.2 Response
-
-```text
-<DATA or OK or E*> CR LF
+<DATA | OK | E*> CR LF
 ```
 
 Examples:
@@ -40,104 +36,149 @@ E1\r\n
 
 ## 3. Data Format Suffixes
 
-- `.U`: 16-bit unsigned decimal
-- `.S`: 16-bit signed decimal
-- `.D`: 32-bit unsigned decimal
-- `.L`: 32-bit signed decimal
+- `.U`: unsigned 16-bit decimal
+- `.S`: signed 16-bit decimal
+- `.D`: unsigned 32-bit decimal
+- `.L`: signed 32-bit decimal
 - `.H`: 16-bit hexadecimal
 
-## 4. Main Device Ranges (used in the library)
+## 4. Device Range Table
 
-- `R`: 0..199915
-- `B`: 0..7FFF
-- `MR`: 0..399915
-- `LR`: 0..99915
-- `CR`: 0..7915
-- `DM`: 0..65534
-- `EM`: 0..65534
-- `FM`: 0..32767
-- `ZF`: 0..524287
-- `W`: 0..7FFF
-- `TM`: 0..511
-- `Z`: 1..12
-- `T/TC/TS/C/CC/CS`: 0..3999
-- `CM`: 0..7599
-- `VM`: 0..589823
+| Device | Range |
+| --- | --- |
+| R | 0..199915 |
+| B | 0..7FFF |
+| MR | 0..399915 |
+| LR | 0..99915 |
+| CR | 0..7915 |
+| VB | 0..F9FF |
+| DM | 0..65534 |
+| EM | 0..65534 |
+| FM | 0..32767 |
+| ZF | 0..524287 |
+| W | 0..7FFF |
+| TM | 0..511 |
+| Z | 1..12 |
+| T / TC / TS | 0..3999 |
+| C / CC / CS | 0..3999 |
+| AT | 0..7 |
+| CM | 0..7599 |
+| VM | 0..589823 |
 
-Notes:
+XYM aliases supported by protocol:
 
-- Some ranges vary by CPU series/version.
-- XYM aliases (`X/Y/M/L/D/E/F`) are also supported by specification.
+- `X` (relay), `Y` (internal auxiliary), `M` (latch), `L` (data memory), `D` (extended data memory), `E` (file register), `F` (file register)
 
-## 5. Error Responses
+## 5. Exception Responses
 
-- `E0`: Abnormal device No.
-- `E1`: Abnormal command
-- `E2`: Program not registered
-- `E4`: Write disabled
-- `E5`: Unit error
-- `E6`: No comments (mainly for `RDC`)
+| Code | Meaning |
+| --- | --- |
+| E0 | Abnormal device No. |
+| E1 | Abnormal command |
+| E2 | Program not registered |
+| E4 | Write disabled |
+| E5 | Unit error |
+| E6 | No comments |
 
-## 6. Full Command List
+## 6. Command Reference
 
-### 6.1 Operation Commands
+### 6.1 Operation
 
-- `M0` / `M1` (change mode: PROGRAM / RUN)
-- `ER` (clear error)
-- `?E` (check error number)
-- `?K` (query model code)
-- `?M` (confirm operating mode)
-- `WRT YY MM DD hh mm ss w` (set time, `w`: `0=Sun` to `6=Sat`)
+- `M0` / `M1`
+  - `M0`: PROGRAM mode
+  - `M1`: RUN mode
+- `ER`
+- `?E`
+- `?K`
+- `?M`
+- `WRT YY MM DD hh mm ss w`
+  - `w`: `0=Sun ... 6=Sat`
 
 ### 6.2 Forced ON/OFF
 
-- `ST <device>` (forced set)
-- `RS <device>` (forced reset)
-- `STS <device> <count>` (continuous forced set)
-- `RSS <device> <count>` (continuous forced reset)
-- `count` range: 1..16
+- `ST <device>`
+- `RS <device>`
+- `STS <device> <count>`
+- `RSS <device> <count>`
+
+Allowed device types for forced commands:
+
+- `R, B, MR, LR, CR, T, C, VB`
+
+`count` range for `STS/RSS`: `1..16`
 
 ### 6.3 Read
 
 - `RD <device[.fmt]>`
 - `RDS <device[.fmt]> <count>`
-- `RDE <device[.fmt]> <count>` (legacy-compatible, same behavior as `RDS`)
+- `RDE <device[.fmt]> <count>` (legacy-compatible with `RDS`)
 
 ### 6.4 Write
 
 - `WR <device[.fmt]> <value>`
 - `WRS <device[.fmt]> <count> <v1> ... <vn>`
-- `WRE <device[.fmt]> <count> <v1> ... <vn>` (legacy-compatible, same behavior as `WRS`)
+- `WRE <device[.fmt]> <count> <v1> ... <vn>` (legacy-compatible with `WRS`)
 - `WS <device[.fmt]> <value>`
 - `WSS <device[.fmt]> <count> <v1> ... <vn>`
 
-Notes:
+`WS/WSS` device type restriction:
 
-- `WS/WSS` are KV-LE20A compatible commands for timer/counter set values.
-- On unsupported CPU families, `WS/WSS` may return `E1`.
+- only `T` or `C`
 
 ### 6.5 Monitor
 
-- `MBS <dev1> <dev2> ...` (register bit monitor table, max 120)
-- `MWS <dev1[.fmt]> <dev2[.fmt]> ...` (register word monitor table, max 120)
-- `MBR` (read bit monitor table)
-- `MWR` (read word monitor table)
+- `MBS <dev1> <dev2> ...`
+- `MWS <dev1[.fmt]> <dev2[.fmt]> ...`
+- `MBR`
+- `MWR`
 
-### 6.6 Other
+Monitor register size limit:
 
-- `RDC <device>` (read comment, up to 32 characters)
-- `BE <bank_no>` (file register bank switch, 0..15)
+- up to `120` devices
+
+`MBS` allowed types:
+
+- `R, B, MR, LR, CR, T, C, VB`
+
+`MWS` allowed types:
+
+- `R, B, MR, LR, CR, VB, DM, EM, FM, W, TM, Z, TC, TS, CC, CS, CM, VM`
+
+### 6.6 Others
+
+- `RDC <device>`
+- `BE <bank_no>` (`0..15`)
 - `URD <unit_no> <address> [.fmt] <count>`
-  - `unit_no`: 00..48
-  - `address`: 0..59999
 - `UWR <unit_no> <address> [.fmt] <count> <v1> ... <vn>`
-  - `unit_no`: 00..48
-  - `address`: 0..59999
 
-## 7. Implementation Notes
+`RDC` allowed types:
 
-- Always send/receive ASCII text frames.
-- Parse responses by frame terminator (`CR/LF`) and process one frame at a time.
-- For TCP streams, buffer until terminator is found.
-- Treat `E*` responses as exceptions in client logic.
-- `.D/.L` (32-bit) requires attention to data simultaneity rules.
+- `R, B, MR, LR, CR, DM, EM, FM, ZF, W, TM, Z, T, C, CM`
+
+Expansion unit parameters:
+
+- `unit_no`: `0..48`
+- `address`: `0..59999`
+
+## 7. Consecutive Count Limits
+
+For `RDS/RDE/WRS/WRE`:
+
+| Device family | `.U/.S/.H` or bit/omitted | `.D/.L` |
+| --- | --- | --- |
+| R, B, MR, LR, CR, VB, DM, EM, FM, ZF, W, CM, VM, X, Y, M, L, D, E, F | 1..1000 | 1..500 |
+| TM | 1..512 | 1..256 |
+| Z | 1..12 | 1..12 |
+| T, TC, TS, C, CC, CS | 1..120 | 1..120 |
+| AT | 1..8 | 1..8 |
+
+For `URD/UWR`:
+
+- `.U/.S/.H` or omitted: `1..1000`
+- `.D/.L`: `1..500`
+
+## 8. Implementation Notes
+
+- TCP receive should be stream-oriented and split by CR/LF delimiters.
+- `E*` responses should be handled as errors/exceptions.
+- For `.D/.L` access, 32-bit pairing constraints apply on PLC side.

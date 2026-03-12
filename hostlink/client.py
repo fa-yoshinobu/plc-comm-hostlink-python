@@ -7,7 +7,22 @@ from datetime import datetime
 import socket
 from typing import Iterable, Sequence
 
-from .device import DeviceAddress, normalize_suffix, parse_device, parse_device_text, validate_range
+from .device import (
+    FORCE_DEVICE_TYPES,
+    MBS_DEVICE_TYPES,
+    MWS_DEVICE_TYPES,
+    RDC_DEVICE_TYPES,
+    WS_DEVICE_TYPES,
+    DeviceAddress,
+    normalize_suffix,
+    parse_device,
+    parse_device_text,
+    resolve_effective_format,
+    validate_device_count,
+    validate_device_type,
+    validate_expansion_buffer_count,
+    validate_range,
+)
 from .errors import HostLinkConnectionError, HostLinkProtocolError
 from .protocol import (
     build_frame,
@@ -177,17 +192,25 @@ class HostLinkClient:
     # --- Forced set/reset ----------------------------------------------
 
     def forced_set(self, device: str) -> None:
+        addr = parse_device(device)
+        validate_device_type("ST", addr.device_type, FORCE_DEVICE_TYPES)
         self._expect_ok(f"ST {self._device_token(device, drop_suffix=True)}")
 
     def forced_reset(self, device: str) -> None:
+        addr = parse_device(device)
+        validate_device_type("RS", addr.device_type, FORCE_DEVICE_TYPES)
         self._expect_ok(f"RS {self._device_token(device, drop_suffix=True)}")
 
     def forced_set_consecutive(self, device: str, count: int) -> None:
         validate_range("count", count, 1, 16)
+        addr = parse_device(device)
+        validate_device_type("STS", addr.device_type, FORCE_DEVICE_TYPES)
         self._expect_ok(f"STS {self._device_token(device, drop_suffix=True)} {count}")
 
     def forced_reset_consecutive(self, device: str, count: int) -> None:
         validate_range("count", count, 1, 16)
+        addr = parse_device(device)
+        validate_device_type("RSS", addr.device_type, FORCE_DEVICE_TYPES)
         self._expect_ok(f"RSS {self._device_token(device, drop_suffix=True)} {count}")
 
     # --- Read/write -----------------------------------------------------
@@ -201,14 +224,18 @@ class HostLinkClient:
         return values
 
     def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        validate_range("count", count, 1, 1000)
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, count)
         response = self.send_raw(f"RDS {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
     def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        validate_range("count", count, 1, 1000)
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, count)
         response = self.send_raw(f"RDE {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
@@ -227,6 +254,9 @@ class HostLinkClient:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
         self._expect_ok(f"WRS {token} {len(values)} {payload}")
 
@@ -240,6 +270,9 @@ class HostLinkClient:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
         self._expect_ok(f"WRE {token} {len(values)} {payload}")
 
@@ -271,7 +304,11 @@ class HostLinkClient:
             raise HostLinkProtocolError("At least one device is required")
         if len(targets) > 120:
             raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens = [self._device_token(d, drop_suffix=True) for d in targets]
+        tokens: list[str] = []
+        for device in targets:
+            addr = parse_device(device)
+            validate_device_type("MBS", addr.device_type, MBS_DEVICE_TYPES)
+            tokens.append(self._device_token(device, drop_suffix=True))
         self._expect_ok("MBS " + " ".join(tokens))
 
     def register_monitor_words(self, *devices: str) -> None:
@@ -280,7 +317,11 @@ class HostLinkClient:
             raise HostLinkProtocolError("At least one device is required")
         if len(targets) > 120:
             raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens = [self._device_token(d) for d in targets]
+        tokens: list[str] = []
+        for device in targets:
+            addr = parse_device(device)
+            validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
+            tokens.append(self._device_token(device))
         self._expect_ok("MWS " + " ".join(tokens))
 
     def read_monitor_bits(self) -> list[int | str]:
@@ -294,6 +335,8 @@ class HostLinkClient:
     # --- Others ---------------------------------------------------------
 
     def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
+        addr = parse_device(device)
+        validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
         token = self._device_token(device, drop_suffix=True)
         response = self.send_raw(f"RDC {token}")
         return response.rstrip(" ") if strip_padding else response
@@ -312,8 +355,8 @@ class HostLinkClient:
     ) -> list[int | str]:
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
-        validate_range("count", count, 1, 1000)
         suffix = normalize_suffix(data_format)
+        validate_expansion_buffer_count(suffix or ".U", count)
         parts = ["URD", f"{unit_no:02d}", str(address)]
         if suffix:
             parts.append(suffix)
@@ -333,8 +376,8 @@ class HostLinkClient:
             raise HostLinkProtocolError("values must not be empty")
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
-        validate_range("count", len(values), 1, 1000)
         suffix = normalize_suffix(data_format)
+        validate_expansion_buffer_count(suffix or ".U", len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
         parts = ["UWR", f"{unit_no:02d}", str(address)]
         if suffix:
@@ -365,8 +408,7 @@ class HostLinkClient:
     def _ensure_timer_or_counter(self, device: str, data_format: str | None) -> str:
         token = parse_device_text(device, default_suffix=data_format or "")
         device_type = parse_device(token).device_type
-        if device_type not in {"T", "TC", "TS", "C", "CC", "CS"}:
-            raise HostLinkProtocolError("WS/WSS supports timer/counter devices only (T/C family)")
+        validate_device_type("WS/WSS", device_type, WS_DEVICE_TYPES)
         return token
 
     @staticmethod
@@ -420,4 +462,3 @@ class HostLinkClient:
                     return line
                 raise HostLinkConnectionError("Connection closed by PLC")
             self._rx_buffer += chunk
-

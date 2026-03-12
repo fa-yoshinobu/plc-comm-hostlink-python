@@ -128,9 +128,13 @@ Send `RD`.
 
 Send `RDS`.
 
+- `count` is validated by device family and format.
+
 #### `read_consecutive_legacy(device: str, count: int, *, data_format: str | None = None) -> list[int | str]`
 
 Send `RDE` (legacy-compatible).
+
+- `count` is validated by device family and format.
 
 ### Write Commands
 
@@ -142,21 +146,25 @@ Send `WR`.
 
 Send `WRS`.
 
+- Number of values is validated by device family and format.
+
 #### `write_consecutive_legacy(device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None`
 
 Send `WRE` (legacy-compatible).
+
+- Number of values is validated by device family and format.
 
 #### `write_set_value(device: str, value: int | str, *, data_format: str | None = None) -> None`
 
 Send `WS`.
 
-- Allowed device families: `T/TC/TS/C/CC/CS`
+- Allowed device families: `T` or `C`
 
 #### `write_set_value_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None`
 
 Send `WSS`.
 
-- Allowed device families: `T/TC/TS/C/CC/CS`
+- Allowed device families: `T` or `C`
 
 ### Monitor Commands
 
@@ -200,6 +208,9 @@ Send `URD`.
 
 - `unit_no` range: `0..48`
 - `address` range: `0..59999`
+- `count` range:
+  - `1..1000` for `\"\"/.U/.S/.H`
+  - `1..500` for `.D/.L`
 
 #### `write_expansion_unit_buffer(unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -> None`
 
@@ -207,6 +218,9 @@ Send `UWR`.
 
 - `unit_no` range: `0..48`
 - `address` range: `0..59999`
+- Number of values range:
+  - `1..1000` for `\"\"/.U/.S/.H`
+  - `1..500` for `.D/.L`
 
 ## Supported Data Format Values
 
@@ -229,4 +243,3 @@ with HostLinkClient("192.168.0.10", transport="tcp") as plc:
     values = plc.read_consecutive("R100", 4)
     print(current, values)
 ```
-

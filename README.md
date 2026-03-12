@@ -7,6 +7,7 @@ Python library for KEYENCE KV-XLE02 Host Link communication.
 - `hostlink/`: library implementation
 - `docs/host_link_protocol.md`: protocol reference
 - `docs/api_reference.md`: API reference for `HostLinkClient`
+- `docs/spec_coverage.md`: specification coverage matrix
 
 ## Quick Start
 
