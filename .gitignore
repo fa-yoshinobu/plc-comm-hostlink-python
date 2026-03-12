@@ -1,0 +1,7 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local manual/assets used during development only
+marker_manual/
+
