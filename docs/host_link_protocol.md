@@ -1,38 +1,36 @@
-# KEYENCE KV HOST LINK プロトコル整理（KV-XLE02）
+# KEYENCE KV HOST LINK Protocol Notes
 
-`marker_manual/HOST LINK.pdf`（13章）をもとに、Python 実装向けに整理した仕様です。
+## 1. Communication Overview
 
-## 1. 通信概要
+- Roles: PLC Ethernet unit is the server, PC application is the client.
+- Transport: `TCP/IP` or `UDP/IP`
+- Port: `8501` (changeable in unit settings)
+- Encoding: `ASCII`
+- Terminators:
+  - Command: `CR` (`0x0D`) required, optional `LF` (`0x0A`)
+  - Response: `CR LF`
 
-- 通信相手: PLC 側 Ethernet ユニット（サーバ）と PC 側アプリ（クライアント）
-- 伝送: `TCP/IP` または `UDP/IP`
-- ポート: `8501`（変更可能）
-- 文字コード: `ASCII`
-- 終端:
-  - コマンド: `CR`（`0x0D`）必須、`LF`（`0x0A`）は付与可
-  - 応答: `CR LF`
+## 2. Frame Format
 
-## 2. フレーム形式
-
-### 2.1 コマンド
+### 2.1 Command
 
 ```text
 <COMMAND> [<PARAM> ...] CR
 ```
 
-例:
+Example:
 
 ```text
 RDS R100 4\r
 ```
 
-### 2.2 応答
+### 2.2 Response
 
 ```text
 <DATA or OK or E*> CR LF
 ```
 
-例:
+Examples:
 
 ```text
 OK\r\n
@@ -40,15 +38,15 @@ OK\r\n
 E1\r\n
 ```
 
-## 3. データ形式サフィックス
+## 3. Data Format Suffixes
 
-- `.U`: 16bit unsigned decimal
-- `.S`: 16bit signed decimal
-- `.D`: 32bit unsigned decimal
-- `.L`: 32bit signed decimal
-- `.H`: 16bit hex
+- `.U`: 16-bit unsigned decimal
+- `.S`: 16-bit signed decimal
+- `.D`: 32-bit unsigned decimal
+- `.L`: 32-bit signed decimal
+- `.H`: 16-bit hexadecimal
 
-## 4. 代表デバイス範囲（実装採用）
+## 4. Main Device Ranges (used in the library)
 
 - `R`: 0..199915
 - `B`: 0..7FFF
@@ -66,70 +64,69 @@ E1\r\n
 - `CM`: 0..7599
 - `VM`: 0..589823
 
-補足:
+Notes:
 
-- 一部デバイスは CPU シリーズや機能バージョンで上限が変わる記述あり（13-17, 13-22）。
-- `X/Y/M/L/D/E/F` の XYM 表記も仕様上利用可。
+- Some ranges vary by CPU series/version.
+- XYM aliases (`X/Y/M/L/D/E/F`) are also supported by specification.
 
-## 5. エラー応答
+## 5. Error Responses
 
-- `E0`: Device No. 異常
-- `E1`: Command 異常
-- `E2`: Program 未登録
-- `E4`: 書き込み禁止
-- `E5`: Unit/PLC エラー
-- `E6`: コメント無し（主に `RDC`）
+- `E0`: Abnormal device No.
+- `E1`: Abnormal command
+- `E2`: Program not registered
+- `E4`: Write disabled
+- `E5`: Unit error
+- `E6`: No comments (mainly for `RDC`)
 
-## 6. 全コマンド仕様
+## 6. Full Command List
 
-### 6.1 運用系
+### 6.1 Operation Commands
 
-- `M`（モード変更）
-  - `M0` = PROGRAM
-  - `M1` = RUN
-- `ER`（エラークリア）
-- `?E`（エラー番号照会）
-- `?K`（機種コード照会）
-- `?M`（動作モード照会）
-- `WRT`（時刻設定）
-  - `WRT YY MM DD hh mm ss w`
-  - `w`: `0=Sun ... 6=Sat`
+- `M0` / `M1` (change mode: PROGRAM / RUN)
+- `ER` (clear error)
+- `?E` (check error number)
+- `?K` (query model code)
+- `?M` (confirm operating mode)
+- `WRT YY MM DD hh mm ss w` (set time, `w`: `0=Sun` to `6=Sat`)
 
-### 6.2 強制 ON/OFF
+### 6.2 Forced ON/OFF
 
-- `ST <device>`（強制セット）
-- `RS <device>`（強制リセット）
-- `STS <device> <count>`（連続強制セット）
-- `RSS <device> <count>`（連続強制リセット）
-  - `count` は 1..16
+- `ST <device>` (forced set)
+- `RS <device>` (forced reset)
+- `STS <device> <count>` (continuous forced set)
+- `RSS <device> <count>` (continuous forced reset)
+- `count` range: 1..16
 
-### 6.3 読み出し
+### 6.3 Read
 
 - `RD <device[.fmt]>`
 - `RDS <device[.fmt]> <count>`
-- `RDE <device[.fmt]> <count>`（互換コマンド、動作は `RDS` と同等）
+- `RDE <device[.fmt]> <count>` (legacy-compatible, same behavior as `RDS`)
 
-### 6.4 書き込み
+### 6.4 Write
 
 - `WR <device[.fmt]> <value>`
 - `WRS <device[.fmt]> <count> <v1> ... <vn>`
-- `WRE <device[.fmt]> <count> <v1> ... <vn>`（互換コマンド、動作は `WRS` と同等）
+- `WRE <device[.fmt]> <count> <v1> ... <vn>` (legacy-compatible, same behavior as `WRS`)
 - `WS <device[.fmt]> <value>`
 - `WSS <device[.fmt]> <count> <v1> ... <vn>`
-  - `WS/WSS` は KV-LE20A 互換。`T/C` 系の set 値書き込み用途。
-  - KV-8000/7000 以外では `E1` になる記述あり。
 
-### 6.5 モニタ
+Notes:
 
-- `MBS <dev1> <dev2> ...`（bit monitor 登録、最大 120）
-- `MWS <dev1[.fmt]> <dev2[.fmt]> ...`（word monitor 登録、最大 120）
-- `MBR`（bit monitor 読み出し）
-- `MWR`（word monitor 読み出し）
+- `WS/WSS` are KV-LE20A compatible commands for timer/counter set values.
+- On unsupported CPU families, `WS/WSS` may return `E1`.
 
-### 6.6 その他
+### 6.5 Monitor
 
-- `RDC <device>`（コメント読み出し、最大32文字）
-- `BE <bank_no>`（ファイルレジスタ BANK 切替、0..15）
+- `MBS <dev1> <dev2> ...` (register bit monitor table, max 120)
+- `MWS <dev1[.fmt]> <dev2[.fmt]> ...` (register word monitor table, max 120)
+- `MBR` (read bit monitor table)
+- `MWR` (read word monitor table)
+
+### 6.6 Other
+
+- `RDC <device>` (read comment, up to 32 characters)
+- `BE <bank_no>` (file register bank switch, 0..15)
 - `URD <unit_no> <address> [.fmt] <count>`
   - `unit_no`: 00..48
   - `address`: 0..59999
@@ -137,11 +134,10 @@ E1\r\n
   - `unit_no`: 00..48
   - `address`: 0..59999
 
-## 7. 実装上の注意
+## 7. Implementation Notes
 
-- すべて ASCII テキストで送受信する。
-- 受信は `CR/LF` 区切りで 1 応答フレームずつ処理する。
-- `TCP` はストリームなので、終端までバッファリングして切り出す。
-- `E*` 応答は例外として扱い、上位でリトライやログを実施する。
-- `.D/.L`（32bit）はデバイス境界の同時性注意（13-33）。
-
+- Always send/receive ASCII text frames.
+- Parse responses by frame terminator (`CR/LF`) and process one frame at a time.
+- For TCP streams, buffer until terminator is found.
+- Treat `E*` responses as exceptions in client logic.
+- `.D/.L` (32-bit) requires attention to data simultaneity rules.

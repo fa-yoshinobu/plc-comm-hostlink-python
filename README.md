@@ -1,13 +1,14 @@
 # Pr_HOST-LINK-COMMUNICATION-FUNCTION
 
-KEYENCE KV-XLE02 Host Link 通信ライブラリ（Python）です。
+Python library for KEYENCE KV-XLE02 Host Link communication.
 
-## 構成
+## Structure
 
-- `hostlink/`: ライブラリ本体
-- `docs/host_link_protocol.md`: マニュアル整理資料
+- `hostlink/`: library implementation
+- `docs/host_link_protocol.md`: protocol reference
+- `docs/api_reference.md`: API reference for `HostLinkClient`
 
-## クイックスタート
+## Quick Start
 
 ```python
 from hostlink import HostLinkClient

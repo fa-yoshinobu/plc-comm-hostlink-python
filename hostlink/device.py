@@ -10,7 +10,7 @@ from .errors import HostLinkProtocolError
 
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 
-# KEYENCE expression + XYM expression (manual page 13-33)
+# KEYENCE expression + XYM expression
 DEVICE_RANGES = {
     "R": (0, 199915, 10),
     "B": (0, 0x7FFF, 16),
@@ -106,4 +106,3 @@ def parse_device_text(text: str, *, default_suffix: str = "") -> str:
 def validate_range(name: str, value: int, lo: int, hi: int) -> None:
     if value < lo or value > hi:
         raise HostLinkProtocolError(f"{name} out of range: {value} (allowed: {lo}..{hi})")
-
