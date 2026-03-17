@@ -1,6 +1,6 @@
 """KEYENCE KV Host Link communication library."""
 
-from .client import HostLinkClient, ModelInfo
+from .client import AsyncHostLinkClient, HostLinkClient, ModelInfo
 from .errors import (
     HostLinkConnectionError,
     HostLinkError,
@@ -10,6 +10,7 @@ from .errors import (
 
 __all__ = [
     "HostLinkClient",
+    "AsyncHostLinkClient",
     "ModelInfo",
     "HostLinkConnectionError",
     "HostLinkError",

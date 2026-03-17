@@ -2,6 +2,6 @@
 __pycache__/
 *.py[cod]
 
-# Local manual/assets used during development only
-marker_manual/
+# Local files
+local_folder/
 
