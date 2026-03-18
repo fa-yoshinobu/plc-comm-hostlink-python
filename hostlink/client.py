@@ -107,7 +107,9 @@ class HostLinkBase:
             raise HostLinkProtocolError("mode must be 0/1 or PROGRAM/RUN")
         return f"M{mode_no}"
 
-    def _get_set_time_cmd(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> str:
+    def _get_set_time_cmd(
+        self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None
+    ) -> str:
         if value is None:
             now = datetime.now()
             year = now.year % 100
@@ -154,9 +156,13 @@ class HostLinkBase:
             addr = DeviceAddress(addr.device_type, addr.number, "")
         return addr.to_text()
 
-    def _device_with_format(self, device: str, data_format: str | None) -> tuple[str, str]:
+    def _device_with_format(
+        self, device: str, data_format: str | None
+    ) -> tuple[str, str]:
         addr = parse_device(device)
-        suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
+        suffix = (
+            normalize_suffix(data_format) if data_format is not None else addr.suffix
+        )
         # If still no suffix, resolve effective default for the device type
         if not suffix:
             suffix = resolve_effective_format(addr.device_type, "")
@@ -174,7 +180,9 @@ class HostLinkBase:
         return addr.to_text()
 
     @staticmethod
-    def _flatten_devices(devices: Iterable[str] | tuple[Iterable[str], ...]) -> list[str]:
+    def _flatten_devices(
+        devices: Iterable[str] | tuple[Iterable[str], ...],
+    ) -> list[str]:
         if len(devices) == 1 and isinstance(next(iter(devices)), (list, tuple)):
             return list(next(iter(devices)))
         return list(devices)  # type: ignore[arg-type]
@@ -223,14 +231,18 @@ class HostLinkClient(HostLinkBase):
         with self._lock:
             if self._sock is not None:
                 return
-            sock_type = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
+            sock_type = (
+                socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
+            )
             sock = socket.socket(socket.AF_INET, sock_type)
             sock.settimeout(self.timeout)
             try:
                 sock.connect((self.host, self.port))
             except OSError as exc:
                 sock.close()
-                raise HostLinkConnectionError(f"Failed to connect to {self.host}:{self.port}") from exc
+                raise HostLinkConnectionError(
+                    f"Failed to connect to {self.host}:{self.port}"
+                ) from exc
             self._sock = sock
             self._rx_buffer = b""
 
@@ -252,12 +264,16 @@ class HostLinkClient(HostLinkBase):
     def _expect_ok(self, body: str) -> None:
         response = self.send_raw(body)
         if response != "OK":
-            raise HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
+            raise HostLinkProtocolError(
+                f"Expected 'OK' but received {response!r} for command {body!r}"
+            )
 
     def _exchange(self, payload: bytes) -> bytes:
         # Note: This is called within self._lock in send_raw
         if self._sock is None:
-            sock_type = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
+            sock_type = (
+                socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
+            )
             self._sock = socket.socket(socket.AF_INET, sock_type)
             self._sock.settimeout(self.timeout)
             self._sock.connect((self.host, self.port))
@@ -268,7 +284,9 @@ class HostLinkClient(HostLinkBase):
                 return self._sock.recv(self.buffer_size)
             return self._recv_tcp_line()
         except TimeoutError as exc:
-            raise HostLinkConnectionError("Timeout while waiting response from PLC") from exc
+            raise HostLinkConnectionError(
+                "Timeout while waiting response from PLC"
+            ) from exc
         except OSError as exc:
             raise HostLinkConnectionError("Socket communication failed") from exc
 
@@ -314,7 +332,9 @@ class HostLinkClient(HostLinkBase):
     def confirm_operating_mode(self) -> int:
         return int(self.send_raw("?M"))
 
-    def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
+    def set_time(
+        self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None
+    ) -> None:
         self._expect_ok(self._get_set_time_cmd(value))
 
     def forced_set(self, device: str) -> None:
@@ -339,7 +359,9 @@ class HostLinkClient(HostLinkBase):
         validate_device_type("RSS", addr.device_type, FORCE_DEVICE_TYPES)
         self._expect_ok(f"RSS {self._device_token(device, drop_suffix=True)} {count}")
 
-    def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
+    def read(
+        self, device: str, *, data_format: str | None = None
+    ) -> int | str | list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         response = self.send_raw(f"RD {token}")
         values = parse_data_tokens(split_data_tokens(response), data_format=suffix)
@@ -347,7 +369,9 @@ class HostLinkClient(HostLinkBase):
             return values[0]
         return values
 
-    def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+    def read_consecutive(
+        self, device: str, count: int, *, data_format: str | None = None
+    ) -> list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
@@ -355,7 +379,9 @@ class HostLinkClient(HostLinkBase):
         response = self.send_raw(f"RDS {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+    def read_consecutive_legacy(
+        self, device: str, count: int, *, data_format: str | None = None
+    ) -> list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
@@ -363,12 +389,20 @@ class HostLinkClient(HostLinkBase):
         response = self.send_raw(f"RDE {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+    def write(
+        self, device: str, value: int | str, *, data_format: str | None = None
+    ) -> None:
         token, suffix = self._device_with_format(device, data_format)
         payload = self._format_value(value, suffix)
         self._expect_ok(f"WR {token} {payload}")
 
-    def write_consecutive(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    def write_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
@@ -378,7 +412,13 @@ class HostLinkClient(HostLinkBase):
         payload = " ".join(self._format_value(v, suffix) for v in values)
         self._expect_ok(f"WRS {token} {len(values)} {payload}")
 
-    def write_consecutive_legacy(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    def write_consecutive_legacy(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
@@ -388,13 +428,21 @@ class HostLinkClient(HostLinkBase):
         payload = " ".join(self._format_value(v, suffix) for v in values)
         self._expect_ok(f"WRE {token} {len(values)} {payload}")
 
-    def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+    def write_set_value(
+        self, device: str, value: int | str, *, data_format: str | None = None
+    ) -> None:
         token = self._ensure_timer_or_counter(device, data_format)
         suffix = parse_device(token).suffix
         payload = self._format_value(value, suffix)
         self._expect_ok(f"WS {token} {payload}")
 
-    def write_set_value_consecutive(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    def write_set_value_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token = self._ensure_timer_or_counter(device, data_format)
@@ -448,7 +496,9 @@ class HostLinkClient(HostLinkBase):
         validate_range("bank_no", bank_no, 0, 15)
         self._expect_ok(f"BE {bank_no}")
 
-    def read_expansion_unit_buffer(self, unit_no: int, address: int, count: int, *, data_format: str = "") -> list[int | str]:
+    def read_expansion_unit_buffer(
+        self, unit_no: int, address: int, count: int, *, data_format: str = ""
+    ) -> list[int | str]:
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
@@ -460,7 +510,14 @@ class HostLinkClient(HostLinkBase):
         response = self.send_raw(" ".join(parts))
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    def write_expansion_unit_buffer(self, unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -> None:
+    def write_expansion_unit_buffer(
+        self,
+        unit_no: int,
+        address: int,
+        values: Sequence[int | str],
+        *,
+        data_format: str = "",
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         validate_range("unit_no", unit_no, 0, 48)
@@ -522,7 +579,9 @@ class AsyncHostLinkClient(HostLinkBase):
                     timeout=self.timeout,
                 )
             except (asyncio.TimeoutError, OSError) as exc:
-                raise HostLinkConnectionError(f"Failed to connect to {self.host}:{self.port}") from exc
+                raise HostLinkConnectionError(
+                    f"Failed to connect to {self.host}:{self.port}"
+                ) from exc
         else:
             loop = asyncio.get_running_loop()
             self._udp_protocol = _HostLinkUDPProtocol()
@@ -535,7 +594,9 @@ class AsyncHostLinkClient(HostLinkBase):
                     timeout=self.timeout,
                 )
             except (asyncio.TimeoutError, OSError) as exc:
-                raise HostLinkConnectionError(f"Failed to setup UDP endpoint for {self.host}:{self.port}") from exc
+                raise HostLinkConnectionError(
+                    f"Failed to setup UDP endpoint for {self.host}:{self.port}"
+                ) from exc
 
     async def close(self) -> None:
         async with self._lock:
@@ -560,7 +621,9 @@ class AsyncHostLinkClient(HostLinkBase):
     async def _expect_ok(self, body: str) -> None:
         response = await self.send_raw(body)
         if response != "OK":
-            raise HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
+            raise HostLinkProtocolError(
+                f"Expected 'OK' but received {response!r} for command {body!r}"
+            )
 
     async def _exchange(self, payload: bytes) -> bytes:
         # Note: This is called within self._lock in send_raw
@@ -573,15 +636,21 @@ class AsyncHostLinkClient(HostLinkBase):
                 assert self._reader is not None
                 self._writer.write(payload)
                 await self._writer.drain()
-                return await asyncio.wait_for(self._recv_tcp_line(), timeout=self.timeout)
+                return await asyncio.wait_for(
+                    self._recv_tcp_line(), timeout=self.timeout
+                )
             else:
                 assert self._udp_transport is not None
                 assert self._udp_protocol is not None
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
-                return await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=self.timeout)
+                return await asyncio.wait_for(
+                    self._udp_protocol.wait_response(), timeout=self.timeout
+                )
         except asyncio.TimeoutError as exc:
-            raise HostLinkConnectionError("Timeout while waiting response from PLC") from exc
+            raise HostLinkConnectionError(
+                "Timeout while waiting response from PLC"
+            ) from exc
         except OSError as exc:
             raise HostLinkConnectionError("Socket communication failed") from exc
 
@@ -614,7 +683,9 @@ class AsyncHostLinkClient(HostLinkBase):
     async def confirm_operating_mode(self) -> int:
         return int(await self.send_raw("?M"))
 
-    async def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
+    async def set_time(
+        self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None
+    ) -> None:
         await self._expect_ok(self._get_set_time_cmd(value))
 
     async def forced_set(self, device: str) -> None:
@@ -631,15 +702,21 @@ class AsyncHostLinkClient(HostLinkBase):
         validate_range("count", count, 1, 16)
         addr = parse_device(device)
         validate_device_type("STS", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"STS {self._device_token(device, drop_suffix=True)} {count}")
+        await self._expect_ok(
+            f"STS {self._device_token(device, drop_suffix=True)} {count}"
+        )
 
     async def forced_reset_consecutive(self, device: str, count: int) -> None:
         validate_range("count", count, 1, 16)
         addr = parse_device(device)
         validate_device_type("RSS", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"RSS {self._device_token(device, drop_suffix=True)} {count}")
+        await self._expect_ok(
+            f"RSS {self._device_token(device, drop_suffix=True)} {count}"
+        )
 
-    async def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
+    async def read(
+        self, device: str, *, data_format: str | None = None
+    ) -> int | str | list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         response = await self.send_raw(f"RD {token}")
         values = parse_data_tokens(split_data_tokens(response), data_format=suffix)
@@ -647,7 +724,9 @@ class AsyncHostLinkClient(HostLinkBase):
             return values[0]
         return values
 
-    async def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+    async def read_consecutive(
+        self, device: str, count: int, *, data_format: str | None = None
+    ) -> list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
@@ -655,7 +734,9 @@ class AsyncHostLinkClient(HostLinkBase):
         response = await self.send_raw(f"RDS {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    async def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+    async def read_consecutive_legacy(
+        self, device: str, count: int, *, data_format: str | None = None
+    ) -> list[int | str]:
         token, suffix = self._device_with_format(device, data_format)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
@@ -663,12 +744,20 @@ class AsyncHostLinkClient(HostLinkBase):
         response = await self.send_raw(f"RDE {token} {count}")
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    async def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+    async def write(
+        self, device: str, value: int | str, *, data_format: str | None = None
+    ) -> None:
         token, suffix = self._device_with_format(device, data_format)
         payload = self._format_value(value, suffix)
         await self._expect_ok(f"WR {token} {payload}")
 
-    async def write_consecutive(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    async def write_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
@@ -678,7 +767,13 @@ class AsyncHostLinkClient(HostLinkBase):
         payload = " ".join(self._format_value(v, suffix) for v in values)
         await self._expect_ok(f"WRS {token} {len(values)} {payload}")
 
-    async def write_consecutive_legacy(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    async def write_consecutive_legacy(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format)
@@ -688,13 +783,21 @@ class AsyncHostLinkClient(HostLinkBase):
         payload = " ".join(self._format_value(v, suffix) for v in values)
         await self._expect_ok(f"WRE {token} {len(values)} {payload}")
 
-    async def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+    async def write_set_value(
+        self, device: str, value: int | str, *, data_format: str | None = None
+    ) -> None:
         token = self._ensure_timer_or_counter(device, data_format)
         suffix = parse_device(token).suffix
         payload = self._format_value(value, suffix)
         await self._expect_ok(f"WS {token} {payload}")
 
-    async def write_set_value_consecutive(self, device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None:
+    async def write_set_value_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         token = self._ensure_timer_or_counter(device, data_format)
@@ -748,7 +851,9 @@ class AsyncHostLinkClient(HostLinkBase):
         validate_range("bank_no", bank_no, 0, 15)
         await self._expect_ok(f"BE {bank_no}")
 
-    async def read_expansion_unit_buffer(self, unit_no: int, address: int, count: int, *, data_format: str = "") -> list[int | str]:
+    async def read_expansion_unit_buffer(
+        self, unit_no: int, address: int, count: int, *, data_format: str = ""
+    ) -> list[int | str]:
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
@@ -760,7 +865,14 @@ class AsyncHostLinkClient(HostLinkBase):
         response = await self.send_raw(" ".join(parts))
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
-    async def write_expansion_unit_buffer(self, unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -> None:
+    async def write_expansion_unit_buffer(
+        self,
+        unit_no: int,
+        address: int,
+        values: Sequence[int | str],
+        *,
+        data_format: str = "",
+    ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         validate_range("unit_no", unit_no, 0, 48)

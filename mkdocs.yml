@@ -1,0 +1,16 @@
+site_name: Host Link Communication Python API
+site_url: https://github.com/fa-yoshinobu/plc-comm-hostlink-python
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: red
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+nav:
+  - Overview: index.md
+  - API Reference:
+      - Client: api/client.md
+  - Change Log: ../CHANGELOG.md

@@ -20,6 +20,14 @@ classifiers = [
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov"]
 
+[tool.setuptools.packages.find]
+include = ["hostlink*"]
+exclude = ["tests*", "scripts*", "docs/maintainer*", "docs/validation*"]
+
+[tool.setuptools]
+include-package-data = true
+exclude-package-data = { "*" = ["TODO.md"] }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

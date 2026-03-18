@@ -32,7 +32,9 @@ class MockHostLinkServer:
                 pass
 
     async def start(self):
-        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
+        self.server = await asyncio.start_server(
+            self.handle_client, self.host, self.port
+        )
         self.port = self.server.sockets[0].getsockname()[1]
 
     async def stop(self):
@@ -44,7 +46,9 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = MockHostLinkServer()
         await self.server.start()
-        self.client = AsyncHostLinkClient("127.0.0.1", port=self.server.port, auto_connect=False)
+        self.client = AsyncHostLinkClient(
+            "127.0.0.1", port=self.server.port, auto_connect=False
+        )
 
     async def asyncTearDown(self):
         await self.client.close()

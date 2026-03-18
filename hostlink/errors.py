@@ -28,7 +28,9 @@ class HostLinkError(Exception):
     response: str
 
     def __str__(self) -> str:
-        return f"{self.code}: {decode_error_code(self.code)} (response={self.response!r})"
+        return (
+            f"{self.code}: {decode_error_code(self.code)} (response={self.response!r})"
+        )
 
 
 class HostLinkProtocolError(ValueError):
@@ -37,4 +39,3 @@ class HostLinkProtocolError(ValueError):
 
 class HostLinkConnectionError(ConnectionError):
     """Raised when socket communication fails."""
-

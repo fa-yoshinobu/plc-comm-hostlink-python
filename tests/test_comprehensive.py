@@ -1,10 +1,14 @@
 import asyncio
 import socket
 import threading
-import time
 import unittest
 from datetime import datetime
-from hostlink import HostLinkClient, AsyncHostLinkClient, HostLinkError, HostLinkConnectionError, HostLinkProtocolError
+from hostlink import (
+    HostLinkClient,
+    AsyncHostLinkClient,
+    HostLinkError,
+    HostLinkProtocolError,
+)
 
 
 class MockSyncServer:
@@ -38,10 +42,12 @@ class MockSyncServer:
                         while self.running:
                             try:
                                 data = conn.recv(1024)
-                                if not data: break
+                                if not data:
+                                    break
                                 lines = data.decode("ascii").split("\r")
                                 for line in lines:
-                                    if not line: continue
+                                    if not line:
+                                        continue
                                     self.last_received.append(line.strip())
                                     resp = self.responses.get(line.strip(), "OK")
                                     conn.sendall((resp + "\r\n").encode("ascii"))
@@ -55,7 +61,8 @@ class MockSyncServer:
                 try:
                     data, addr = self.sock.recvfrom(1024)
                     line = data.decode("ascii").strip()
-                    if line == "STOP": break
+                    if line == "STOP":
+                        break
                     self.last_received.append(line)
                     resp = self.responses.get(line, "OK")
                     self.sock.sendto((resp + "\r\n").encode("ascii"), addr)
@@ -73,7 +80,8 @@ class MockSyncServer:
                 else:
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                         s.sendto(b"STOP", (self.host, self.port))
-            except: pass
+            except:
+                pass
         self.thread.join()
 
 
@@ -81,7 +89,9 @@ class TestComprehensiveSync(unittest.TestCase):
     def setUp(self):
         self.server = MockSyncServer(transport="tcp")
         self.server.start()
-        self.client = HostLinkClient("127.0.0.1", port=self.server.port, auto_connect=True)
+        self.client = HostLinkClient(
+            "127.0.0.1", port=self.server.port, auto_connect=True
+        )
 
     def tearDown(self):
         self.client.close()
@@ -159,7 +169,9 @@ class TestComprehensiveSync(unittest.TestCase):
         udp_server = MockSyncServer(transport="udp")
         udp_server.start()
         try:
-            with HostLinkClient("127.0.0.1", port=udp_server.port, transport="udp") as client:
+            with HostLinkClient(
+                "127.0.0.1", port=udp_server.port, transport="udp"
+            ) as client:
                 client.write("DM0.U", 123)
                 self.assertEqual(udp_server.last_received[-1], "WR DM0.U 123")
         finally:
@@ -199,7 +211,9 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         udp_server = MockSyncServer(transport="udp")
         udp_server.start()
         try:
-            async with AsyncHostLinkClient("127.0.0.1", port=udp_server.port, transport="udp") as client:
+            async with AsyncHostLinkClient(
+                "127.0.0.1", port=udp_server.port, transport="udp"
+            ) as client:
                 await client.write("DM10.U", 999)
                 self.assertEqual(udp_server.last_received[-1], "WR DM10.U 999")
                 udp_server.responses["RD DM10.U"] = "999"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from typing import Any
 
 from hostlink import HostLinkClient
@@ -37,7 +36,9 @@ def run(args: argparse.Namespace) -> int:
             timeout=args.timeout,
             append_lf_on_send=args.append_lf,
         ) as plc:
-            _print_ok(f"Connected to {args.host}:{args.port} ({args.transport.upper()})")
+            _print_ok(
+                f"Connected to {args.host}:{args.port} ({args.transport.upper()})"
+            )
 
             model = plc.query_model()
             _print_ok(f"?K model_code={model.code} model={model.model}")
@@ -51,19 +52,31 @@ def run(args: argparse.Namespace) -> int:
             one = plc.read(args.read_device, data_format=args.read_format)
             _print_ok(f"RD {args.read_device}{args.read_format or ''} => {one}")
 
-            many = plc.read_consecutive(args.read_device, args.read_count, data_format=args.read_format)
-            _print_ok(f"RDS {args.read_device}{args.read_format or ''} {args.read_count} => {many}")
+            many = plc.read_consecutive(
+                args.read_device, args.read_count, data_format=args.read_format
+            )
+            _print_ok(
+                f"RDS {args.read_device}{args.read_format or ''} {args.read_count} => {many}"
+            )
 
             if args.allow_write:
-                original = _as_scalar(plc.read(args.write_device, data_format=args.write_format))
+                original = _as_scalar(
+                    plc.read(args.write_device, data_format=args.write_format)
+                )
                 _print_ok(f"WR target original={original}")
 
-                plc.write(args.write_device, args.write_value, data_format=args.write_format)
-                updated = _as_scalar(plc.read(args.write_device, data_format=args.write_format))
+                plc.write(
+                    args.write_device, args.write_value, data_format=args.write_format
+                )
+                updated = _as_scalar(
+                    plc.read(args.write_device, data_format=args.write_format)
+                )
                 _print_ok(f"WR wrote={args.write_value} readback={updated}")
 
                 plc.write(args.write_device, original, data_format=args.write_format)
-                restored = _as_scalar(plc.read(args.write_device, data_format=args.write_format))
+                restored = _as_scalar(
+                    plc.read(args.write_device, data_format=args.write_format)
+                )
                 _print_ok(f"WR restored={restored}")
             else:
                 print("[SKIP] Write test disabled. Use --allow-write to enable.")
@@ -77,7 +90,9 @@ def run(args: argparse.Namespace) -> int:
                     if exc.code == "E1":
                         _print_ok("Invalid command returned E1 as expected")
                     else:
-                        _print_ng(f"Invalid command returned unexpected code: {exc.code}")
+                        _print_ng(
+                            f"Invalid command returned unexpected code: {exc.code}"
+                        )
                         failures += 1
             else:
                 print("[SKIP] Error-response test disabled.")
@@ -96,29 +111,56 @@ def run(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="KEYENCE Host Link E2E smoke test")
     parser.add_argument("--host", required=True, help="PLC IP/hostname")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default: 8501)")
-    parser.add_argument("--transport", choices=("tcp", "udp"), default="tcp", help="Transport (default: tcp)")
-    parser.add_argument("--timeout", type=float, default=3.0, help="Socket timeout seconds (default: 3.0)")
-    parser.add_argument("--append-lf", action="store_true", help="Send CRLF instead of CR")
+    parser.add_argument(
+        "--port", type=int, default=8501, help="Host Link port (default: 8501)"
+    )
+    parser.add_argument(
+        "--transport",
+        choices=("tcp", "udp"),
+        default="tcp",
+        help="Transport (default: tcp)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=3.0,
+        help="Socket timeout seconds (default: 3.0)",
+    )
+    parser.add_argument(
+        "--append-lf", action="store_true", help="Send CRLF instead of CR"
+    )
 
-    parser.add_argument("--read-device", default="DM0", help="Device for read checks (default: DM0)")
+    parser.add_argument(
+        "--read-device", default="DM0", help="Device for read checks (default: DM0)"
+    )
     parser.add_argument(
         "--read-format",
         default=".U",
         choices=("", ".U", ".S", ".D", ".L", ".H"),
         help="Data format for read checks (default: .U)",
     )
-    parser.add_argument("--read-count", type=int, default=2, help="Count for consecutive read check")
+    parser.add_argument(
+        "--read-count", type=int, default=2, help="Count for consecutive read check"
+    )
 
-    parser.add_argument("--allow-write", action="store_true", help="Enable write/restore roundtrip test")
-    parser.add_argument("--write-device", default="DM1", help="Device for write test (default: DM1)")
+    parser.add_argument(
+        "--allow-write", action="store_true", help="Enable write/restore roundtrip test"
+    )
+    parser.add_argument(
+        "--write-device", default="DM1", help="Device for write test (default: DM1)"
+    )
     parser.add_argument(
         "--write-format",
         default=".U",
         choices=("", ".U", ".S", ".D", ".L", ".H"),
         help="Data format for write test (default: .U)",
     )
-    parser.add_argument("--write-value", type=int, default=1234, help="Value used in write roundtrip test")
+    parser.add_argument(
+        "--write-value",
+        type=int,
+        default=1234,
+        help="Value used in write roundtrip test",
+    )
 
     parser.add_argument(
         "--test-error-response",
@@ -132,4 +174,3 @@ def build_parser() -> argparse.ArgumentParser:
 if __name__ == "__main__":
     args = build_parser().parse_args()
     raise SystemExit(run(args))
-

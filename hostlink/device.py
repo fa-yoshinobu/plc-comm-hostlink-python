@@ -65,7 +65,23 @@ MWS_DEVICE_TYPES = {
     "CM",
     "VM",
 }
-RDC_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "DM", "EM", "FM", "ZF", "W", "TM", "Z", "T", "C", "CM"}
+RDC_DEVICE_TYPES = {
+    "R",
+    "B",
+    "MR",
+    "LR",
+    "CR",
+    "DM",
+    "EM",
+    "FM",
+    "ZF",
+    "W",
+    "TM",
+    "Z",
+    "T",
+    "C",
+    "CM",
+}
 WS_DEVICE_TYPES = {"T", "C"}
 
 DEFAULT_FORMAT_BY_DEVICE_TYPE = {
@@ -139,7 +155,9 @@ _COUNT_CATEGORY_BY_DEVICE_TYPE = {
 }
 
 TYPE_PATTERN = "|".join(sorted(DEVICE_RANGES.keys(), key=len, reverse=True))
-DEVICE_RE = re.compile(rf"^(?P<type>{TYPE_PATTERN})?(?P<number>[0-9A-F]+)(?P<suffix>\.[USDLH])?$")
+DEVICE_RE = re.compile(
+    rf"^(?P<type>{TYPE_PATTERN})?(?P<number>[0-9A-F]+)(?P<suffix>\.[USDLH])?$"
+)
 
 
 @dataclass(frozen=True)
@@ -184,7 +202,9 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
     try:
         number = int(number_text, base)
     except ValueError as exc:
-        raise HostLinkProtocolError(f"Invalid device number for {device_type}: {number_text!r}") from exc
+        raise HostLinkProtocolError(
+            f"Invalid device number for {device_type}: {number_text!r}"
+        ) from exc
     if number < lo or number > hi:
         raise HostLinkProtocolError(
             f"Device number out of range: {device_type}{number_text} (allowed: {lo}..{hi})"
@@ -208,13 +228,17 @@ def resolve_effective_format(device_type: str, suffix: str) -> str:
 def validate_device_type(name: str, device_type: str, allowed_types: set[str]) -> None:
     if device_type not in allowed_types:
         allowed = ", ".join(sorted(allowed_types))
-        raise HostLinkProtocolError(f"{name} does not support device type {device_type}. Allowed: {allowed}")
+        raise HostLinkProtocolError(
+            f"{name} does not support device type {device_type}. Allowed: {allowed}"
+        )
 
 
 def validate_device_count(device_type: str, effective_format: str, count: int) -> None:
     category = _COUNT_CATEGORY_BY_DEVICE_TYPE.get(device_type)
     if category is None:
-        raise HostLinkProtocolError(f"No count constraint metadata for device type: {device_type}")
+        raise HostLinkProtocolError(
+            f"No count constraint metadata for device type: {device_type}"
+        )
 
     is_32bit = effective_format in {".D", ".L"}
     if category == "up_to_1000":
@@ -240,4 +264,6 @@ def validate_expansion_buffer_count(effective_format: str, count: int) -> None:
 
 def validate_range(name: str, value: int, lo: int, hi: int) -> None:
     if value < lo or value > hi:
-        raise HostLinkProtocolError(f"{name} out of range: {value} (allowed: {lo}..{hi})")
+        raise HostLinkProtocolError(
+            f"{name} out of range: {value} (allowed: {lo}..{hi})"
+        )

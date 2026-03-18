@@ -59,6 +59,7 @@ def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
         return token
 
 
-def parse_data_tokens(tokens: Iterable[str], *, data_format: str = "") -> list[int | str]:
+def parse_data_tokens(
+    tokens: Iterable[str], *, data_format: str = ""
+) -> list[int | str]:
     return [parse_scalar_token(token, data_format=data_format) for token in tokens]
-
