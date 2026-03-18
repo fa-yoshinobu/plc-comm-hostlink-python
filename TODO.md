@@ -1,6 +1,6 @@
-# TODO: HOST LINK COMMUNICATION Python
+# TODO: Host Link Communication Python
 
-This file tracks the remaining tasks and issues for the HOST LINK COMMUNICATION (Keyence KV) library.
+This file tracks the remaining tasks and issues for the Host Link Communication (Keyence KV) library.
 
 ## 1. Protocol Implementation Gaps
 - [ ] **Full Spec Coverage**: Complete the implementation for all commands listed in `docs/maintainer/SPEC_COVERAGE.md`.

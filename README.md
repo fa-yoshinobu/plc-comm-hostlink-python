@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Static Analysis: Ruff](https://img.shields.io/badge/Lint-Ruff-black.svg)](https://github.com/astral-sh/ruff)
 
-A Python client library for KEYENCE KV series PLCs using the **HOST LINK COMMUNICATION** protocol. Designed for reliable communication with KV-8000, KV-7500, and other compatible models.
+A Python client library for KEYENCE KV series PLCs using the **Host Link Communication** protocol. Designed for reliable communication with KV-8000, KV-7500, and other compatible models.
 
 ## Key Features
 

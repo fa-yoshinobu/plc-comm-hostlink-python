@@ -1,9 +1,9 @@
-# Agent Guide: HOST LINK COMMUNICATION Python
+# Agent Guide: Host Link Communication Python
 
 This repository is part of the PLC Communication Workspace and follows the global standards defined in `D:\PLC_COMM_PROJ\AGENTS.md`.
 
 ## 1. Project-Specific Context
-- **Protocol**: HOST LINK COMMUNICATION
+- **Protocol**: Host Link Communication
 - **Target Hardware**: KEYENCE KV series (KV-8000, KV-7500, etc.)
 - **Language**: Python (3.11+)
 - **Role**: Core Communication Library for KEYENCE Upper Link protocol.
