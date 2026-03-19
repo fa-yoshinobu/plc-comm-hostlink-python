@@ -5,7 +5,7 @@ This reference describes the public API of `hostlink.HostLinkClient`.
 ## Imports
 
 ```python
-from hostlink import HostLinkClient
+from hostlink import HostLinkClient, AsyncHostLinkClient
 from hostlink.errors import HostLinkError, HostLinkProtocolError, HostLinkConnectionError
 ```
 
@@ -219,11 +219,79 @@ Send `UWR`.
 - `unit_no` range: `0..48`
 - `address` range: `0..59999`
 - Number of values range:
-  - `1..1000` for `\"\"/.U/.S/.H`
+  - `1..1000` for `""/.U/.S/.H`
   - `1..500` for `.D/.L`
 
-## Supported Data Format Values
+  ## Class: `AsyncHostLinkClient`
 
+  The `AsyncHostLinkClient` provides an asynchronous interface for use with `asyncio`. It supports the same protocol features as `HostLinkClient` but uses `async`/`await` for all network and PLC-interacting methods.
+
+  ### Constructor
+
+  ```python
+  AsyncHostLinkClient(
+  host: str,
+  *,
+  port: int = 8501,
+  transport: str = "tcp",
+  timeout: float = 3.0,
+  buffer_size: int = 8192,
+  append_lf_on_send: bool = False,
+  auto_connect: bool = True,
+  )
+  ```
+
+  ### Async Usage Example
+
+  ```python
+  import asyncio
+  from hostlink import AsyncHostLinkClient
+
+  async def main():
+  async with AsyncHostLinkClient("192.168.0.10") as plc:
+      val = await plc.read("DM0.S")
+      print(f"DM0: {val}")
+      await plc.write("DM0.S", val + 1)
+
+  if __name__ == "__main__":
+  asyncio.run(main())
+  ```
+
+  ### Methods
+
+  All methods corresponding to those in `HostLinkClient` (except for class-internal sync helpers) are implemented as `async def` and must be awaited.
+
+  - `await connect() -> None`
+  - `await close() -> None`
+  - `await send_raw(body: str) -> str`
+  - `await change_mode(mode: int | str) -> None`
+  - `await clear_error() -> None`
+  - `await check_error_no() -> str`
+  - `await query_model() -> ModelInfo`
+  - `await confirm_operating_mode() -> int`
+  - `await set_time(...) -> None`
+  - `await forced_set(device: str) -> None`
+  - `await forced_reset(device: str) -> None`
+  - `await forced_set_consecutive(device: str, count: int) -> None`
+  - `await forced_reset_consecutive(device: str, count: int) -> None`
+  - `await read(device: str, *, data_format: str | None = None) -> ...`
+  - `await read_consecutive(...) -> ...`
+  - `await read_consecutive_legacy(...) -> ...`
+  - `await write(...) -> None`
+  - `await write_consecutive(...) -> None`
+  - `await write_consecutive_legacy(...) -> None`
+  - `await write_set_value(...) -> None`
+  - `await write_set_value_consecutive(...) -> None`
+  - `await register_monitor_bits(...) -> None`
+  - `await register_monitor_words(...) -> None`
+  - `await read_monitor_bits() -> list[int | str]`
+  - `await read_monitor_words() -> list[str]`
+  - `await read_comments(...) -> str`
+  - `await switch_bank(bank_no: int) -> None`
+  - `await read_expansion_unit_buffer(...) -> list[int | str]`
+  - `await write_expansion_unit_buffer(...) -> None`
+
+  ## Supported Data Format Values
 - `""` (omitted)
 - `.U`
 - `.S`

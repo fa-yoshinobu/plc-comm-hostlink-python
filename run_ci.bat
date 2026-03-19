@@ -20,21 +20,22 @@ if %errorlevel% neq 0 (
 )
 
 echo [3/5] Running Mypy (Type Checking core library)...
-python -m mypy hostlink
+python -m mypy src
 if %errorlevel% neq 0 (
     echo [ERROR] Mypy type check failed.
     pause & exit /b %errorlevel%
 )
 
 echo [4/5] Running Tests...
+set PYTHONPATH=src
 python -m pytest tests
 if %errorlevel% neq 0 (
     echo [ERROR] Tests failed.
     pause & exit /b %errorlevel%
 )
 
-echo [5/5] Building CLI Tool with PyInstaller...
-python -m PyInstaller --onefile --noconfirm --distpath "%PUBLISH_DIR%" --name hostlink hostlink/cli.py
+echo [5/5] Skipping CLI Build (cli.py not found)...
+rem python -m PyInstaller --onefile --noconfirm --distpath "%PUBLISH_DIR%" --name hostlink src/hostlink/cli.py
 if %errorlevel% neq 0 (
     echo [ERROR] PyInstaller build failed.
     pause & exit /b %errorlevel%

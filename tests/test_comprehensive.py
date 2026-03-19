@@ -80,7 +80,7 @@ class MockSyncServer:
                 else:
                     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                         s.sendto(b"STOP", (self.host, self.port))
-            except:
+            except Exception:
                 pass
         self.thread.join()
 

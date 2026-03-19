@@ -7,7 +7,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime
 import socket
-from typing import Any, Iterable, Sequence, TypeVar, cast
+from typing import Any, Sequence, TypeVar, cast
 
 from .device import (
     FORCE_DEVICE_TYPES,
@@ -181,10 +181,10 @@ class HostLinkBase:
 
     @staticmethod
     def _flatten_devices(
-        devices: Iterable[str] | tuple[Iterable[str], ...],
+        devices: Sequence[str] | tuple[Sequence[str], ...],
     ) -> list[str]:
-        if len(devices) == 1 and isinstance(next(iter(devices)), (list, tuple)):
-            return list(next(iter(devices)))
+        if len(devices) == 1 and isinstance(devices[0], (list, tuple)):
+            return list(devices[0])
         return list(devices)  # type: ignore[arg-type]
 
     @staticmethod
@@ -236,6 +236,8 @@ class HostLinkClient(HostLinkBase):
             )
             sock = socket.socket(socket.AF_INET, sock_type)
             sock.settimeout(self.timeout)
+            if self.transport == "tcp":
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
                 sock.connect((self.host, self.port))
             except OSError as exc:
@@ -584,15 +586,16 @@ class AsyncHostLinkClient(HostLinkBase):
                 ) from exc
         else:
             loop = asyncio.get_running_loop()
-            self._udp_protocol = _HostLinkUDPProtocol()
+            protocol = _HostLinkUDPProtocol()
             try:
                 self._udp_transport, _ = await asyncio.wait_for(
                     loop.create_datagram_endpoint(
-                        lambda: self._udp_protocol,
+                        lambda: protocol,
                         remote_addr=(self.host, self.port),
                     ),
                     timeout=self.timeout,
                 )
+                self._udp_protocol = protocol
             except (asyncio.TimeoutError, OSError) as exc:
                 raise HostLinkConnectionError(
                     f"Failed to setup UDP endpoint for {self.host}:{self.port}"
@@ -656,13 +659,9 @@ class AsyncHostLinkClient(HostLinkBase):
 
     async def _recv_tcp_line(self) -> bytes:
         assert self._reader is not None
+        # Responses typically end in \r\n. readuntil(\r) gets everything including \r.
+        # Leading \n from previous frames are handled by strip() or subsequent readuntil.
         line = await self._reader.readuntil(b"\r")
-        try:
-            next_byte = await asyncio.wait_for(self._reader.read(1), timeout=0.01)
-            if next_byte != b"\n":
-                pass
-        except (asyncio.TimeoutError, asyncio.IncompleteReadError):
-            pass
         return line.strip()
 
     # --- Async Commands ---
@@ -805,7 +804,7 @@ class AsyncHostLinkClient(HostLinkBase):
         payload = " ".join(self._format_value(v, suffix) for v in values)
         await self._expect_ok(f"WSS {token} {len(values)} {payload}")
 
-    def register_monitor_bits(self, *devices: str) -> None:
+    async def register_monitor_bits(self, *devices: str) -> None:
         targets = self._flatten_devices(devices)
         if not targets:
             raise HostLinkProtocolError("At least one device is required")
@@ -816,7 +815,7 @@ class AsyncHostLinkClient(HostLinkBase):
             addr = parse_device(device)
             validate_device_type("MBS", addr.device_type, MBS_DEVICE_TYPES)
             tokens.append(self._device_token(device, drop_suffix=True))
-        self._expect_ok("MBS " + " ".join(tokens))
+        await self._expect_ok("MBS " + " ".join(tokens))
 
     async def register_monitor_words(self, *devices: str) -> None:
         targets = self._flatten_devices(devices)
