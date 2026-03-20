@@ -1,4 +1,5 @@
-# KEYENCE KV Host Link Communication Python
+
+[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg)](https://fa-yoshinobu.github.io/plc-comm-hostlink-python/)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -89,4 +90,5 @@ The following models are formally verified with this library:
 ## License
 
 Distributed under the MIT License (LICENSE).
+
 
