@@ -64,18 +64,18 @@ if __name__ == "__main__":
 
 ## Documentation
 
-Detailed guides are available in the docs/ directory:
+Detailed guides are available in the docsrc/ directory:
 
 ### User Documentation
-- [**User Guide**](docs/user/USER_GUIDE.md): Getting started and PLC configuration.
-- [**API Reference**](docs/user/API_REFERENCE.md): Detailed method signatures and classes.
-- [**Troubleshooting**](docs/user/TROUBLESHOOTING.md): Solutions for connection and protocol errors.
-- [**Performance Tuning**](docs/user/PERFORMANCE_GUIDE.md): Tips for high-frequency communication.
+- [**User Guide**](docsrc/user/USER_GUIDE.md): Getting started and PLC configuration.
+- [**API Reference**](docsrc/user/API_REFERENCE.md): Detailed method signatures and classes.
+- [**Troubleshooting**](docsrc/user/TROUBLESHOOTING.md): Solutions for connection and protocol errors.
+- [**Performance Tuning**](docsrc/user/PERFORMANCE_GUIDE.md): Tips for high-frequency communication.
 
 ### Developer & QA Documentation
-- [**QA Evidence (KV-7500)**](docs/validation/reports/QA_REPORT_20260319_KV7500.md): Formal hardware verification report.
-- [**Protocol Specification**](docs/maintainer/PROTOCOL_SPEC.md): Technical details of the Host Link protocol.
-- [**Specification Coverage**](docs/maintainer/SPEC_COVERAGE.md): Implemented vs. Available commands.
+- [**QA Evidence (KV-7500)**](docsrc/validation/reports/QA_REPORT_20260319_KV7500.md): Formal hardware verification report.
+- [**Protocol Specification**](docsrc/maintainer/PROTOCOL_SPEC.md): Technical details of the Host Link protocol.
+- [**Specification Coverage**](docsrc/maintainer/SPEC_COVERAGE.md): Implemented vs. Available commands.
 
 ---
 
@@ -89,3 +89,4 @@ The following models are formally verified with this library:
 ## License
 
 Distributed under the MIT License (LICENSE).
+

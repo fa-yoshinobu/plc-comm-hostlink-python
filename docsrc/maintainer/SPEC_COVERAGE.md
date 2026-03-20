@@ -36,13 +36,14 @@ This matrix tracks what is covered in the Python library and documentation.
 
 | Document | Status | Scope |
 | --- | --- | --- |
-| `docs/host_link_protocol.md` | Covered | Protocol rules, command syntax, constraints |
-| `docs/api_reference.md` | Covered | Public API, signatures, behavior |
-| `docs/spec_coverage.md` | Covered | Coverage matrix and traceability |
+| `docsrc/host_link_protocol.md` | Covered | Protocol rules, command syntax, constraints |
+| `docsrc/api_reference.md` | Covered | Public API, signatures, behavior |
+| `docsrc/spec_coverage.md` | Covered | Coverage matrix and traceability |
 
 ## 5. Known Practical Boundaries
 
 - CPU family/version-specific runtime differences are handled by PLC responses (`E*`) and not fully simulated in code.
 - PLC-side timing/load-dependent behavior cannot be validated offline.
 - Network and hardware setup parameters are described as operational inputs; they are not enforced by the library.
+
 

@@ -1,4 +1,4 @@
-﻿# KEYENCE KV HOST LINK Protocol Notes
+# KEYENCE KV HOST LINK Protocol Notes
 
 ## 1. Communication Overview
 

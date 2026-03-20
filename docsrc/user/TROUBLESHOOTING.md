@@ -4,7 +4,7 @@ This guide provides solutions for common connectivity and protocol issues encoun
 
 ---
 
-## 🔌 Connection Issues
+## 伯 Connection Issues
 
 ### `HostLinkConnectionError: Failed to connect`
 **Possible Causes:**
@@ -21,7 +21,7 @@ This guide provides solutions for common connectivity and protocol issues encoun
 
 ---
 
-## 🚫 Protocol Errors (`HostLinkError`)
+## 圻 Protocol Errors (`HostLinkError`)
 
 ### `E1: Abnormal command`
 **Occurs when:** The PLC received a command it doesn't support or understand.
@@ -44,7 +44,7 @@ This guide provides solutions for common connectivity and protocol issues encoun
 
 ---
 
-## 🧩 Unexpected Data
+## ｧｩ Unexpected Data
 
 ### Value Mismatch (Endian Issues)
 **Symptoms:** Reading `32-bit (.D/.L)` values gives strange results.

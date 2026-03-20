@@ -30,8 +30,8 @@ include-package-data = true
 [tool.setuptools.exclude-package-data]
 "*" = [
     "TODO.md",
-    "docs/maintainer/*",
-    "docs/validation/*",
+    "docsrc/maintainer/*",
+    "docsrc/validation/*",
     "tests/*",
     "scripts/*",
     "samples/*"
@@ -40,4 +40,5 @@ include-package-data = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
 

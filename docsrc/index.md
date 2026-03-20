@@ -37,9 +37,9 @@ print(f"Value: {val}")
 
 Follows the workspace-wide hierarchical documentation policy:
 
-- [**API Reference**](docs/user/API_REFERENCE.md): Detailed method definitions.
-- [**QA Reports**](docs/validation/reports/): Formal evidence of communication with Keyence hardware.
-- [**Protocol Spec**](docs/maintainer/PROTOCOL_SPEC.md): Internal technical details of the Host Link protocol.
+- [**API Reference**](user/API_REFERENCE.md): Detailed method definitions.
+- [**QA Reports**](validation/reports/): Formal evidence of communication with Keyence hardware.
+- [**Protocol Spec**](maintainer/PROTOCOL_SPEC.md): Internal technical details of the Host Link protocol.
 
 ## Development & CI
 
@@ -59,4 +59,6 @@ Validates the code and builds a standalone CLI tool in the `publish/` directory.
 ## License
 
 Distributed under the [MIT License](LICENSE).
+
+
 

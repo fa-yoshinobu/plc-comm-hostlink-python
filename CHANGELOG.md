@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-03-19
 
 ### Added
-- Comprehensive `docs/user/USER_GUIDE.md` for end-users.
-- Documentation for `AsyncHostLinkClient` in `docs/user/API_REFERENCE.md`.
-- Connectivity verification evidence: `docs/validation/reports/QA_REPORT_20260319_KV7500.md`.
+- Comprehensive `docsrc/user/USER_GUIDE.md` for end-users.
+- Documentation for `AsyncHostLinkClient` in `docsrc/user/API_REFERENCE.md`.
+- Connectivity verification evidence: `docsrc/validation/reports/QA_REPORT_20260319_KV7500.md`.
 - Stability and stress test samples in `samples/` directory.
 
 ### Changed
@@ -27,3 +27,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation of KEYENCE KV Host Link protocol for Python.
 - Support for TCP/UDP transport.
 - Comprehensive unit tests and SPEC coverage documentation.
+
