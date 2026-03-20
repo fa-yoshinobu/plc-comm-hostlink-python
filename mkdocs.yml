@@ -1,7 +1,7 @@
 site_dir: docs
 docs_dir: docsrc
 site_name: Host Link Communication Python API
-site_url: https://github.com/fa-yoshinobu/plc-comm-hostlink-python
+site_url: https://fa-yoshinobu.github.io/plc-comm-hostlink-python/
 theme:
   name: material
   palette:
@@ -16,5 +16,6 @@ nav:
   - API Reference:
       - Client: api/client.md
   - Change Log: ../CHANGELOG.md
+
 
 
