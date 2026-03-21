@@ -7,7 +7,7 @@ name = "hostlink"
 version = "0.1.2"
 description = "Python library for KEYENCE KV-XLE02 Host Link communication."
 authors = [{ name = "Author Name", email = "author@example.com" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -40,6 +40,32 @@ include-package-data = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+files = ["src/hostlink"]
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+
+[tool.coverage.run]
+source = ["hostlink"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
 
 
 

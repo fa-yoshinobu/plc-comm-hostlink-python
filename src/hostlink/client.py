@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 import threading
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-import socket
-from typing import Any, Callable, Sequence, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from .device import (
     FORCE_DEVICE_TYPES,
@@ -36,14 +37,14 @@ from .protocol import (
 )
 
 
-class TraceDirection(Enum):
+class HostLinkTraceDirection(Enum):
     SEND = "send"
     RECEIVE = "receive"
 
 
-@dataclass
-class TraceFrame:
-    direction: TraceDirection
+@dataclass(frozen=True)
+class HostLinkTraceFrame:
+    direction: HostLinkTraceDirection
     data: bytes
     timestamp: datetime
 
@@ -89,6 +90,7 @@ class HostLinkBase:
         port: int = 8501,
         transport: str = "tcp",
         append_lf_on_send: bool = False,
+        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -96,11 +98,11 @@ class HostLinkBase:
         self.append_lf_on_send = append_lf_on_send
         if self.transport not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
-        self.trace_hook: Callable[[TraceFrame], None] | None = None
+        self.trace_hook = trace_hook
 
-    def _fire_trace(self, direction: TraceDirection, data: bytes) -> None:
+    def _fire_trace(self, direction: HostLinkTraceDirection, data: bytes) -> None:
         if self.trace_hook:
-            self.trace_hook(TraceFrame(direction, data, datetime.now(timezone.utc)))
+            self.trace_hook(HostLinkTraceFrame(direction, data, datetime.now(timezone.utc)))
 
     # --- Internal helpers ----------------------------------------------
 
@@ -227,8 +229,9 @@ class HostLinkClient(HostLinkBase):
         buffer_size: int = 8192,
         append_lf_on_send: bool = False,
         auto_connect: bool = True,
+        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
     ) -> None:
-        super().__init__(host, port, transport, append_lf_on_send)
+        super().__init__(host, port, transport, append_lf_on_send, trace_hook)
         self.timeout = timeout
         self.buffer_size = buffer_size
         self._sock: socket.socket | None = None
@@ -242,7 +245,7 @@ class HostLinkClient(HostLinkBase):
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         self.close()
 
     def connect(self) -> None:
@@ -299,13 +302,13 @@ class HostLinkClient(HostLinkBase):
             self._sock.connect((self.host, self.port))
 
         try:
-            self._fire_trace(TraceDirection.SEND, payload)
+            self._fire_trace(HostLinkTraceDirection.SEND, payload)
             self._sock.sendall(payload)
             if self.transport == "udp":
                 response = self._sock.recv(self.buffer_size)
             else:
                 response = self._recv_tcp_line()
-            self._fire_trace(TraceDirection.RECEIVE, response)
+            self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
             return response
         except TimeoutError as exc:
             raise HostLinkConnectionError(
@@ -570,8 +573,9 @@ class AsyncHostLinkClient(HostLinkBase):
         buffer_size: int = 8192,
         append_lf_on_send: bool = False,
         auto_connect: bool = True,
+        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
     ) -> None:
-        super().__init__(host, port, transport, append_lf_on_send)
+        super().__init__(host, port, transport, append_lf_on_send, trace_hook)
         self.timeout = timeout
         self.buffer_size = buffer_size
         self._reader: asyncio.StreamReader | None = None
@@ -585,7 +589,7 @@ class AsyncHostLinkClient(HostLinkBase):
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         await self.close()
 
     async def connect(self) -> None:
@@ -659,24 +663,24 @@ class AsyncHostLinkClient(HostLinkBase):
             if self.transport == "tcp":
                 assert self._writer is not None
                 assert self._reader is not None
-                self._fire_trace(TraceDirection.SEND, payload)
+                self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._writer.write(payload)
                 await self._writer.drain()
                 response = await asyncio.wait_for(
                     self._recv_tcp_line(), timeout=self.timeout
                 )
-                self._fire_trace(TraceDirection.RECEIVE, response)
+                self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
             else:
                 assert self._udp_transport is not None
                 assert self._udp_protocol is not None
-                self._fire_trace(TraceDirection.SEND, payload)
+                self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
                 response = await asyncio.wait_for(
                     self._udp_protocol.wait_response(), timeout=self.timeout
                 )
-                self._fire_trace(TraceDirection.RECEIVE, response)
+                self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
         except asyncio.TimeoutError as exc:
             raise HostLinkConnectionError(

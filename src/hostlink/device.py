@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .errors import HostLinkProtocolError
-
 
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 

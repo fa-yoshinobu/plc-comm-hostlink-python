@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from .errors import HostLinkError, HostLinkProtocolError
-
 
 ERROR_RE = re.compile(r"^E[0-9]$")
 CR = b"\r"
