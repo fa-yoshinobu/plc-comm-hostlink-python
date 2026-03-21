@@ -192,7 +192,11 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
     if not match:
         if allow_omitted_type and raw.isdigit():
             return parse_device(f"R{raw}", allow_omitted_type=False)
-        raise HostLinkProtocolError(f"Invalid device expression: {text!r}")
+        valid_types = ", ".join(sorted(DEVICE_RANGES.keys()))
+        raise HostLinkProtocolError(
+            f"Invalid device string {text!r}. "
+            f"Valid device types: {valid_types}"
+        )
 
     device_type = match.group("type") or "R"
     number_text = match.group("number")
@@ -225,11 +229,12 @@ def resolve_effective_format(device_type: str, suffix: str) -> str:
     return suffix if suffix else DEFAULT_FORMAT_BY_DEVICE_TYPE.get(device_type, "")
 
 
-def validate_device_type(name: str, device_type: str, allowed_types: set[str]) -> None:
+def validate_device_type(command: str, device_type: str, allowed_types: set[str]) -> None:
     if device_type not in allowed_types:
-        allowed = ", ".join(sorted(allowed_types))
+        supported = ", ".join(sorted(allowed_types))
         raise HostLinkProtocolError(
-            f"{name} does not support device type {device_type}. Allowed: {allowed}"
+            f"Command '{command}' does not support device type '{device_type}'. "
+            f"Supported types: {supported}"
         )
 
 

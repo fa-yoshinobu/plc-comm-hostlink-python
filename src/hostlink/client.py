@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 import socket
-from typing import Any, Sequence, TypeVar, cast
+from typing import Any, Callable, Sequence, TypeVar, cast
 
 from .device import (
     FORCE_DEVICE_TYPES,
@@ -33,6 +34,18 @@ from .protocol import (
     parse_data_tokens,
     split_data_tokens,
 )
+
+
+class TraceDirection(Enum):
+    SEND = "send"
+    RECEIVE = "receive"
+
+
+@dataclass
+class TraceFrame:
+    direction: TraceDirection
+    data: bytes
+    timestamp: datetime
 
 
 MODEL_CODES = {
@@ -83,6 +96,11 @@ class HostLinkBase:
         self.append_lf_on_send = append_lf_on_send
         if self.transport not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
+        self.trace_hook: Callable[[TraceFrame], None] | None = None
+
+    def _fire_trace(self, direction: TraceDirection, data: bytes) -> None:
+        if self.trace_hook:
+            self.trace_hook(TraceFrame(direction, data, datetime.now(timezone.utc)))
 
     # --- Internal helpers ----------------------------------------------
 
@@ -281,10 +299,14 @@ class HostLinkClient(HostLinkBase):
             self._sock.connect((self.host, self.port))
 
         try:
+            self._fire_trace(TraceDirection.SEND, payload)
             self._sock.sendall(payload)
             if self.transport == "udp":
-                return self._sock.recv(self.buffer_size)
-            return self._recv_tcp_line()
+                response = self._sock.recv(self.buffer_size)
+            else:
+                response = self._recv_tcp_line()
+            self._fire_trace(TraceDirection.RECEIVE, response)
+            return response
         except TimeoutError as exc:
             raise HostLinkConnectionError(
                 "Timeout while waiting response from PLC"
@@ -637,19 +659,25 @@ class AsyncHostLinkClient(HostLinkBase):
             if self.transport == "tcp":
                 assert self._writer is not None
                 assert self._reader is not None
+                self._fire_trace(TraceDirection.SEND, payload)
                 self._writer.write(payload)
                 await self._writer.drain()
-                return await asyncio.wait_for(
+                response = await asyncio.wait_for(
                     self._recv_tcp_line(), timeout=self.timeout
                 )
+                self._fire_trace(TraceDirection.RECEIVE, response)
+                return response
             else:
                 assert self._udp_transport is not None
                 assert self._udp_protocol is not None
+                self._fire_trace(TraceDirection.SEND, payload)
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
-                return await asyncio.wait_for(
+                response = await asyncio.wait_for(
                     self._udp_protocol.wait_response(), timeout=self.timeout
                 )
+                self._fire_trace(TraceDirection.RECEIVE, response)
+                return response
         except asyncio.TimeoutError as exc:
             raise HostLinkConnectionError(
                 "Timeout while waiting response from PLC"
