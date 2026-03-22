@@ -5,45 +5,36 @@ echo ===================================================
 echo [CI] Starting Python Quality Checks and CLI EXE Build...
 echo ===================================================
 
-echo [1/5] Running Ruff (Linting)...
+echo [1/4] Running Ruff (Linting)...
 python -m ruff check .
 if %errorlevel% neq 0 (
     echo [ERROR] Ruff check failed.
-    pause & exit /b %errorlevel%
+    exit /b %errorlevel%
 )
 
-echo [2/5] Running Ruff (Formatting Check)...
+echo [2/4] Running Ruff (Formatting Check)...
 python -m ruff format --check .
 if %errorlevel% neq 0 (
     echo [ERROR] Code is not formatted.
-    pause & exit /b %errorlevel%
+    exit /b %errorlevel%
 )
 
-echo [3/5] Running Mypy (Type Checking core library)...
+echo [3/4] Running Mypy (Type Checking core library)...
 python -m mypy src
 if %errorlevel% neq 0 (
     echo [ERROR] Mypy type check failed.
-    pause & exit /b %errorlevel%
+    exit /b %errorlevel%
 )
 
-echo [4/5] Running Tests...
+echo [4/4] Running Tests...
 set PYTHONPATH=src
 python -m pytest tests
 if %errorlevel% neq 0 (
     echo [ERROR] Tests failed.
-    pause & exit /b %errorlevel%
-)
-
-echo [5/5] Skipping CLI Build (cli.py not found)...
-rem python -m PyInstaller --onefile --noconfirm --distpath "%PUBLISH_DIR%" --name hostlink src/hostlink/cli.py
-if %errorlevel% neq 0 (
-    echo [ERROR] PyInstaller build failed.
-    pause & exit /b %errorlevel%
+    exit /b %errorlevel%
 )
 
 echo ===================================================
-echo [SUCCESS] CI passed and CLI EXE published to:
-echo %cd%\publish
+echo [SUCCESS] CI passed.
 echo ===================================================
-pause
 

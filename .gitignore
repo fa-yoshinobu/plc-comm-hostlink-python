@@ -22,5 +22,3 @@ venv/
 # Local files
 local_folder/
 build_check.log
-
-_site/

@@ -1,24 +1,47 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hostlink"
+name = "kv-hostlink"
 version = "0.1.2"
-description = "Python library for KEYENCE KV-XLE02 Host Link communication."
-authors = [{ name = "Author Name", email = "author@example.com" }]
+description = "Python library for KEYENCE KV series Host Link (Upper Link) communication."
+authors = [{ name = "fa-yoshinobu" }]
 requires-python = ">=3.10"
 dependencies = []
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["keyence", "kv", "hostlink", "upper-link", "plc", "tcp", "udp"]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Networking",
 ]
 
+[project.urls]
+Homepage = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
+Repository = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
+Issues = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python/issues"
+
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+dev = [
+    "build>=1.2",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "twine>=5.1",
+]
 [tool.setuptools]
 package-dir = { "" = "src" }
 packages = ["hostlink"]
