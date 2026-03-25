@@ -656,7 +656,6 @@
 <ul>
 <li><strong>Keyence Focused</strong>: Implements the KV series Upper Link protocol (HOST LINK).</li>
 <li><strong>Modern Python</strong>: Strictly typed and designed for performance and reliability.</li>
-<li><strong>Zero Mojibake</strong>: English-only documentation and UTF-8 encoding standards.</li>
 <li><strong>CI-Ready</strong>: Integrated quality checks via <code>run_ci.bat</code>.</li>
 </ul>
 <h2 id="quick-start">Quick Start</h2>
@@ -668,7 +667,7 @@
 <pre><code class="language-python">from hostlink.client import HostLinkClient
 
 # Connect to a KEYENCE KV PLC
-client = HostLinkClient(&quot;192.168.1.10&quot;, 8501)
+client = HostLinkClient(&quot;192.168.250.100&quot;, 8501)
 
 # Read D100 (Word)
 val = client.read(&quot;D100&quot;)

@@ -10,7 +10,6 @@ A Python client library for KEYENCE KV series PLCs using the **Host Link Communi
 
 - **Keyence Focused**: Implements the KV series Upper Link protocol (HOST LINK).
 - **Modern Python**: Strictly typed and designed for performance and reliability.
-- **Zero Mojibake**: English-only documentation and UTF-8 encoding standards.
 - **CI-Ready**: Integrated quality checks via `run_ci.bat`.
 
 ## Quick Start
@@ -26,7 +25,7 @@ A Python client library for KEYENCE KV series PLCs using the **Host Link Communi
 from hostlink.client import HostLinkClient
 
 # Connect to a KEYENCE KV PLC
-client = HostLinkClient("192.168.1.10", 8501)
+client = HostLinkClient("192.168.250.100", 8501)
 
 # Read D100 (Word)
 val = client.read("D100")

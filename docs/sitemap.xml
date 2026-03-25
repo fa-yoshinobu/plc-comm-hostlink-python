@@ -2,62 +2,30 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/CHANGELOG/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/api/client/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/API_UNIFICATION_POLICY/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/ARCHITECTURE/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/PROTOCOL_SPEC/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/RELEASE_PROCESS/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/SPEC_COVERAGE/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/maintainer/TESTING_GUIDE/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/API_REFERENCE/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/PERFORMANCE_GUIDE/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/TROUBLESHOOTING/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
     <url>
          <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/USER_GUIDE/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/validation/reports/QA_REPORT_20260319_KV7500/</loc>
-         <lastmod>2026-03-24</lastmod>
-    </url>
-    <url>
-         <loc>https://fa-yoshinobu.github.io/plc-comm-hostlink-python/validation/reports/SMOKE_TEST/</loc>
-         <lastmod>2026-03-24</lastmod>
+         <lastmod>2026-03-25</lastmod>
     </url>
 </urlset>

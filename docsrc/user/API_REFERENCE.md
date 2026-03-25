@@ -248,7 +248,7 @@ Send `UWR`.
   from hostlink import AsyncHostLinkClient
 
   async def main():
-  async with AsyncHostLinkClient("192.168.0.10") as plc:
+  async with AsyncHostLinkClient("192.168.250.100") as plc:
       val = await plc.read("DM0.S")
       print(f"DM0: {val}")
       await plc.write("DM0.S", val + 1)
@@ -304,7 +304,7 @@ Send `UWR`.
 ```python
 from hostlink import HostLinkClient
 
-with HostLinkClient("192.168.0.10", transport="tcp") as plc:
+with HostLinkClient("192.168.250.100", transport="tcp") as plc:
     plc.change_mode("RUN")
     current = plc.read("DM200.S")
     plc.write("DM200.S", 1234)

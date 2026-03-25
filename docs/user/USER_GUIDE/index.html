@@ -569,7 +569,7 @@
 <h3 id="synchronous-client">Synchronous client</h3>
 <pre><code class="language-python">from hostlink import HostLinkClient
 
-with HostLinkClient(&quot;192.168.1.10&quot;, 8501) as plc:
+with HostLinkClient(&quot;192.168.250.100&quot;, 8501) as plc:
     # Read DM100
     val = plc.read(&quot;DM100&quot;)
     print(f&quot;DM100 = {val}&quot;)
@@ -582,7 +582,7 @@ with HostLinkClient(&quot;192.168.1.10&quot;, 8501) as plc:
 from hostlink import open_and_connect
 
 async def main():
-    async with await open_and_connect(&quot;192.168.1.10&quot;) as plc:
+    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
         val = await plc.read(&quot;DM100&quot;)
         print(f&quot;DM100 = {val}&quot;)
 
@@ -669,7 +669,7 @@ from hostlink import open_and_connect
 from hostlink import read_typed, write_typed
 
 async def main():
-    async with await open_and_connect(&quot;192.168.1.10&quot;) as plc:
+    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
         f = await read_typed(plc, &quot;DM100&quot;, &quot;F&quot;)     # float32
         v = await read_typed(plc, &quot;DM200&quot;, &quot;L&quot;)     # signed 32-bit
         await write_typed(plc, &quot;DM100&quot;, &quot;F&quot;, 3.14)
@@ -680,10 +680,10 @@ asyncio.run(main())
 <h3 id="contiguous-array-read">Contiguous Array Read</h3>
 <pre><code class="language-python">from hostlink import read_words, read_dwords
 
-# Read 10 words from DM0 → list[int]
+# Read 10 words from DM0 ↁElist[int]
 words = await read_words(plc, &quot;DM0&quot;, 10)
 
-# Read 4 DWords (32-bit pairs) from DM0 → list[int]
+# Read 4 DWords (32-bit pairs) from DM0 ↁElist[int]
 dwords = await read_dwords(plc, &quot;DM0&quot;, 4)
 </code></pre>
 <h3 id="bit-in-word-write">Bit-in-Word Write</h3>
@@ -746,7 +746,7 @@ result = await read_named(plc, [&quot;DM100&quot;, &quot;DM101:F&quot;, &quot;DM
 from hostlink import open_and_connect, poll
 
 async def main():
-    async with await open_and_connect(&quot;192.168.1.10&quot;) as plc:
+    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
         async for snapshot in poll(plc, [&quot;DM100&quot;, &quot;DM101:F&quot;, &quot;DM0.3&quot;], interval=1.0):
             print(snapshot)
             # {&quot;DM100&quot;: 42, &quot;DM101:F&quot;: 3.14, &quot;DM0.3&quot;: True}

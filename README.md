@@ -40,7 +40,7 @@ pip install -e .
 from hostlink import HostLinkClient
 
 # Connect to KV-7500 via TCP (Default port 8501)
-with HostLinkClient("192.168.250.101") as plc:
+with HostLinkClient("192.168.250.100") as plc:
     # Read Signed 16-bit Word
     val = plc.read("DM0.S")
     print(f"DM0: {val}")
@@ -55,7 +55,7 @@ import asyncio
 from hostlink import AsyncHostLinkClient
 
 async def main():
-    async with AsyncHostLinkClient("192.168.250.101", transport="udp") as plc:
+    async with AsyncHostLinkClient("192.168.250.100", transport="udp") as plc:
         # Batch Read 100 Words
         data = await plc.read_consecutive("DM100", 100)
         print(f"Read {len(data)} words.")

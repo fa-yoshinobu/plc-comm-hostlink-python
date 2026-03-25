@@ -54,7 +54,7 @@ async def write_typed(
     Args:
         client: Connected AsyncHostLinkClient.
         device: Device address string, e.g. "DM100".
-        dtype: Data type code — same as read_typed.
+        dtype: Data type code  Esame as read_typed.
         value: Value to write.
     """
     fmt = f".{dtype.lstrip('.')}"
@@ -73,7 +73,7 @@ async def write_bit_in_word(
     Args:
         client: Connected AsyncHostLinkClient.
         device: Word device address string, e.g. "DM100".
-        bit_index: Bit position within the word (0–15).
+        bit_index: Bit position within the word (0 E5).
         value: New bit state.
     """
     if not 0 <= bit_index <= 15:
@@ -223,7 +223,7 @@ async def open_and_connect(
 
     Usage::
 
-        client = await open_and_connect("192.168.1.10")
+        client = await open_and_connect("192.168.250.100")
         async with client:
             values = await client.read_consecutive("DM100", 10)
     """

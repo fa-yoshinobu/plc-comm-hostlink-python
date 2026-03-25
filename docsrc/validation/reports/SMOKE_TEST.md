@@ -21,19 +21,19 @@ Optional flow:
 ## Basic usage
 
 ```bash
-python scripts/e2e_smoke_test.py --host 192.168.0.10
+python scripts/e2e_smoke_test.py --host 192.168.250.100
 ```
 
 ## With write test enabled
 
 ```bash
-python scripts/e2e_smoke_test.py --host 192.168.0.10 --allow-write --write-device DM100 --write-format .U --write-value 1234
+python scripts/e2e_smoke_test.py --host 192.168.250.100 --allow-write --write-device DM100 --write-format .U --write-value 1234
 ```
 
 ## UDP mode
 
 ```bash
-python scripts/e2e_smoke_test.py --host 192.168.0.10 --transport udp
+python scripts/e2e_smoke_test.py --host 192.168.250.100 --transport udp
 ```
 
 ## Notes
@@ -43,6 +43,6 @@ python scripts/e2e_smoke_test.py --host 192.168.0.10 --transport udp
 - If your PLC blocks unknown commands, you can disable invalid-command testing:
 
 ```bash
-python scripts/e2e_smoke_test.py --host 192.168.0.10 --no-test-error-response
+python scripts/e2e_smoke_test.py --host 192.168.250.100 --no-test-error-response
 ```
 

@@ -17,7 +17,7 @@ pip install .
 ```python
 from hostlink import HostLinkClient
 
-with HostLinkClient("192.168.1.10", 8501) as plc:
+with HostLinkClient("192.168.250.100", 8501) as plc:
     # Read DM100
     val = plc.read("DM100")
     print(f"DM100 = {val}")
@@ -33,7 +33,7 @@ import asyncio
 from hostlink import open_and_connect
 
 async def main():
-    async with await open_and_connect("192.168.1.10") as plc:
+    async with await open_and_connect("192.168.250.100") as plc:
         val = await plc.read("DM100")
         print(f"DM100 = {val}")
 
@@ -90,7 +90,7 @@ from hostlink import open_and_connect
 from hostlink import read_typed, write_typed
 
 async def main():
-    async with await open_and_connect("192.168.1.10") as plc:
+    async with await open_and_connect("192.168.250.100") as plc:
         f = await read_typed(plc, "DM100", "F")     # float32
         v = await read_typed(plc, "DM200", "L")     # signed 32-bit
         await write_typed(plc, "DM100", "F", 3.14)
@@ -104,10 +104,10 @@ asyncio.run(main())
 ```python
 from hostlink import read_words, read_dwords
 
-# Read 10 words from DM0 → list[int]
+# Read 10 words from DM0 ↁElist[int]
 words = await read_words(plc, "DM0", 10)
 
-# Read 4 DWords (32-bit pairs) from DM0 → list[int]
+# Read 4 DWords (32-bit pairs) from DM0 ↁElist[int]
 dwords = await read_dwords(plc, "DM0", 4)
 ```
 
@@ -156,7 +156,7 @@ import asyncio
 from hostlink import open_and_connect, poll
 
 async def main():
-    async with await open_and_connect("192.168.1.10") as plc:
+    async with await open_and_connect("192.168.250.100") as plc:
         async for snapshot in poll(plc, ["DM100", "DM101:F", "DM0.3"], interval=1.0):
             print(snapshot)
             # {"DM100": 42, "DM101:F": 3.14, "DM0.3": True}

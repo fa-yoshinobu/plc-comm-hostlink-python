@@ -11,6 +11,11 @@ plugins:
   - search
   - mkdocstrings:
       default_handler: python
+exclude_docs: |
+  internal_docs/**
+  maintainer/**
+  validation/**
+
 nav:
   - Overview: index.md
   - API Reference:

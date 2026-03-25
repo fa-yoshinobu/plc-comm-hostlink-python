@@ -1090,7 +1090,7 @@ from hostlink.errors import HostLinkError, HostLinkProtocolError, HostLinkConnec
   import asyncio
   from hostlink import AsyncHostLinkClient</p>
 <p>async def main():
-  async with AsyncHostLinkClient("192.168.0.10") as plc:
+  async with AsyncHostLinkClient("192.168.250.100") as plc:
       val = await plc.read("DM0.S")
       print(f"DM0: {val}")
       await plc.write("DM0.S", val + 1)</p>
@@ -1140,7 +1140,7 @@ from hostlink.errors import HostLinkError, HostLinkProtocolError, HostLinkConnec
 <h2 id="minimal-example">Minimal Example</h2>
 <pre><code class="language-python">from hostlink import HostLinkClient
 
-with HostLinkClient(&quot;192.168.0.10&quot;, transport=&quot;tcp&quot;) as plc:
+with HostLinkClient(&quot;192.168.250.100&quot;, transport=&quot;tcp&quot;) as plc:
     plc.change_mode(&quot;RUN&quot;)
     current = plc.read(&quot;DM200.S&quot;)
     plc.write(&quot;DM200.S&quot;, 1234)
