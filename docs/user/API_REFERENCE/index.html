@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/API_REFERENCE/">
       
       
+        <link rel="prev" href="../USER_GUIDE/">
+      
+      
+        <link rel="next" href="../PERFORMANCE_GUIDE/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>HostLink Python API Reference - Host Link Communication Python API</title>
+        <title>API Reference - Host Link Communication Python API</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              HostLink Python API Reference
+              API Reference
             
           </span>
         </div>
@@ -230,62 +234,15 @@
   
   
   
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
-      <a href="../../api/client/" class="md-nav__link">
+      <a href="../USER_GUIDE/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Client
+    User Guide
   
 
     
@@ -297,11 +254,354 @@
     </li>
   
 
-              
-            
-          </ul>
-        </nav>
+    
       
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#imports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exceptions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Helper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection Helper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-open_and_connecthost-port8501-transporttcp-timeout30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typed-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typed Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Typed Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-read_typedclient-device-dtype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_typed(client, device, dtype)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-write_typedclient-device-dtype-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await write_typed(client, device, dtype, value)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contiguous-block-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contiguous Block Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Contiguous Block Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-read_wordsclient-device-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_words(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_dwordsclient-device-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_dwords(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bit-in-word" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bit in Word
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bit in Word">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-write_bit_in_wordclient-device-bit_index-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await write_bit_in_word(client, device, bit_index, value)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-snapshots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Snapshots
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixed Snapshots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-read_namedclient-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_named(client, addresses)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pollclient-addresses-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        poll(client, addresses, interval)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PERFORMANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -382,22 +682,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#data-models" class="md-nav__link">
+  <a href="#connection-helper" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Data Models
+        Connection Helper
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Data Models">
+    <nav class="md-nav" aria-label="Connection Helper">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#modelinfo" class="md-nav__link">
+  <a href="#await-open_and_connecthost-port8501-transporttcp-timeout30" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ModelInfo
+        await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)
       
     </span>
   </a>
@@ -410,22 +710,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#class-hostlinkclient" class="md-nav__link">
+  <a href="#typed-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Class: HostLinkClient
+        Typed Helpers
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Class: HostLinkClient">
+    <nav class="md-nav" aria-label="Typed Helpers">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#constructor" class="md-nav__link">
+  <a href="#await-read_typedclient-device-dtype" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Constructor
+        await read_typed(client, device, dtype)
       
     </span>
   </a>
@@ -433,440 +733,13 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#connection-and-raw-access" class="md-nav__link">
+  <a href="#await-write_typedclient-device-dtype-value" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Connection and Raw Access
+        await write_typed(client, device, dtype, value)
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Connection and Raw Access">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#connect-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        connect() -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#close-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        close() -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#send_rawbody-str-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        send_raw(body: str) -&gt; str
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#basic-plc-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic PLC Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Basic PLC Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#change_modemode-int-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        change_mode(mode: int | str) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#clear_error-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        clear_error() -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#check_error_no-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        check_error_no() -&gt; str
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query_model-modelinfo" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        query_model() -&gt; ModelInfo
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#confirm_operating_mode-int" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        confirm_operating_mode() -&gt; int
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#set_timevalue-datetime-tupleint-int-int-int-int-int-int-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        set_time(value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#forced-setreset" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Forced Set/Reset
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Forced Set/Reset">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#forced_setdevice-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        forced_set(device: str) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#forced_resetdevice-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        forced_reset(device: str) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#forced_set_consecutivedevice-str-count-int-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        forced_set_consecutive(device: str, count: int) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#forced_reset_consecutivedevice-str-count-int-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        forced_reset_consecutive(device: str, count: int) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Read Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Read Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#readdevice-str-data_format-str-none-none-int-str-listint-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read(device: str, *, data_format: str | None = None) -&gt; int | str | list[int | str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read_consecutivedevice-str-count-int-data_format-str-none-none-listint-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_consecutive(device: str, count: int, *, data_format: str | None = None) -&gt; list[int | str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read_consecutive_legacydevice-str-count-int-data_format-str-none-none-listint-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_consecutive_legacy(device: str, count: int, *, data_format: str | None = None) -&gt; list[int | str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Write Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Write Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#writedevice-str-value-int-str-data_format-str-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write(device: str, value: int | str, *, data_format: str | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write_consecutivedevice-str-values-sequenceint-str-data_format-str-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write_consecutive_legacydevice-str-values-sequenceint-str-data_format-str-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_consecutive_legacy(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write_set_valuedevice-str-value-int-str-data_format-str-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_set_value(device: str, value: int | str, *, data_format: str | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write_set_value_consecutivedevice-str-values-sequenceint-str-data_format-str-none-none-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_set_value_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitor-commands" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Commands
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitor Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#register_monitor_bitsdevices-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        register_monitor_bits(*devices: str) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#register_monitor_wordsdevices-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        register_monitor_words(*devices: str) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read_monitor_bits-listint-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_monitor_bits() -&gt; list[int | str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read_monitor_words-liststr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_monitor_words() -&gt; list[str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#comments-bank-expansion-unit-buffer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Comments, Bank, Expansion Unit Buffer
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Comments, Bank, Expansion Unit Buffer">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#read_commentsdevice-str-strip_padding-bool-true-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_comments(device: str, *, strip_padding: bool = True) -&gt; str
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#switch_bankbank_no-int-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        switch_bank(bank_no: int) -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#read_expansion_unit_bufferunit_no-int-address-int-count-int-data_format-str-listint-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        read_expansion_unit_buffer(unit_no: int, address: int, count: int, *, data_format: str = "") -&gt; list[int | str]
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#write_expansion_unit_bufferunit_no-int-address-int-values-sequenceint-str-data_format-str-none" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        write_expansion_unit_buffer(unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -&gt; None
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -876,10 +749,133 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#minimal-example" class="md-nav__link">
+  <a href="#contiguous-block-helpers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Minimal Example
+        Contiguous Block Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Contiguous Block Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-read_wordsclient-device-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_words(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_dwordsclient-device-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_dwords(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bit-in-word" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bit in Word
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bit in Word">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-write_bit_in_wordclient-device-bit_index-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await write_bit_in_word(client, device, bit_index, value)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-snapshots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Snapshots
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixed Snapshots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#await-read_namedclient-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_named(client, addresses)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Polling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pollclient-addresses-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        poll(client, addresses, interval)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
       
     </span>
   </a>
@@ -904,249 +900,232 @@
 
 
 <h1 id="hostlink-python-api-reference">HostLink Python API Reference</h1>
-<p>This reference describes the public API of <code>hostlink.HostLinkClient</code>.</p>
+<p>This reference covers the recommended high-level helper API.</p>
+<p>It intentionally excludes raw protocol methods and low-level client operations.</p>
 <h2 id="imports">Imports</h2>
-<pre><code class="language-python">from hostlink import HostLinkClient, AsyncHostLinkClient
-from hostlink.errors import HostLinkError, HostLinkProtocolError, HostLinkConnectionError
+<pre><code class="language-python">from hostlink import (
+    open_and_connect,
+    read_typed,
+    write_typed,
+    write_bit_in_word,
+    read_named,
+    poll,
+    read_words,
+    read_dwords,
+)
+from hostlink.errors import (
+    HostLinkBaseError,
+    HostLinkConnectionError,
+    HostLinkError,
+    HostLinkProtocolError,
+)
 </code></pre>
 <h2 id="exceptions">Exceptions</h2>
 <ul>
-<li><code>HostLinkError</code>: PLC returned an error response such as <code>E0</code>, <code>E1</code>, <code>E2</code>, <code>E4</code>, <code>E5</code>, or <code>E6</code>.</li>
-<li><code>HostLinkProtocolError</code>: local validation/parsing failure (invalid device, invalid format, malformed frame, etc.).</li>
-<li><code>HostLinkConnectionError</code>: socket/timeout/connect/disconnect failure.</li>
+<li><code>HostLinkBaseError</code>: base type for library exceptions</li>
+<li><code>HostLinkError</code>: PLC returned an error response such as <code>E0</code>, <code>E1</code>, or <code>E6</code></li>
+<li><code>HostLinkProtocolError</code>: invalid address, invalid dtype, malformed response, or local validation failure</li>
+<li><code>HostLinkConnectionError</code>: connect, disconnect, socket, or timeout failure</li>
 </ul>
-<h2 id="data-models">Data Models</h2>
-<h3 id="modelinfo"><code>ModelInfo</code></h3>
+<h2 id="connection-helper">Connection Helper</h2>
+<h3 id="await-open_and_connecthost-port8501-transporttcp-timeout30"><code>await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)</code></h3>
+<p>Create and connect a client for use with the helper functions.</p>
+<p>Parameters:</p>
 <ul>
-<li><code>code: str</code>: raw model code returned by <code>?K</code> (for example <code>63</code>).</li>
-<li><code>model: str | None</code>: mapped model name when known (for example <code>KV-X550</code>).</li>
+<li><code>host</code>: PLC IP address or hostname</li>
+<li><code>port</code>: Host Link port, default <code>8501</code></li>
+<li><code>transport</code>: <code>"tcp"</code> or <code>"udp"</code></li>
+<li><code>timeout</code>: socket timeout in seconds</li>
 </ul>
-<h2 id="class-hostlinkclient">Class: <code>HostLinkClient</code></h2>
-<h3 id="constructor">Constructor</h3>
-<pre><code class="language-python">HostLinkClient(
-    host: str,
-    *,
-    port: int = 8501,
-    transport: str = &quot;tcp&quot;,
-    timeout: float = 3.0,
-    buffer_size: int = 8192,
-    append_lf_on_send: bool = False,
-    auto_connect: bool = True,
-)
+<p>Returns:</p>
+<ul>
+<li>A connected async client object for use with the helpers below</li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">async with await open_and_connect(&quot;192.168.250.100&quot;, 8501) as client:
+    ...
 </code></pre>
+<h2 id="typed-helpers">Typed Helpers</h2>
+<p>Supported dtype codes:</p>
+<table>
+<thead>
+<tr>
+<th>dtype</th>
+<th>Meaning</th>
+<th>Width</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>U</code></td>
+<td>unsigned 16-bit</td>
+<td>1 word</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>signed 16-bit</td>
+<td>1 word</td>
+</tr>
+<tr>
+<td><code>D</code></td>
+<td>unsigned 32-bit</td>
+<td>2 words</td>
+</tr>
+<tr>
+<td><code>L</code></td>
+<td>signed 32-bit</td>
+<td>2 words</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>IEEE 754 float32</td>
+<td>2 words</td>
+</tr>
+</tbody>
+</table>
+<h3 id="await-read_typedclient-device-dtype"><code>await read_typed(client, device, dtype)</code></h3>
+<p>Read one typed value.</p>
+<p>Parameters:</p>
 <ul>
-<li><code>host</code>: PLC IP or hostname.</li>
-<li><code>port</code>: Host Link port (default <code>8501</code>).</li>
-<li><code>transport</code>: <code>"tcp"</code> or <code>"udp"</code>.</li>
-<li><code>timeout</code>: socket timeout in seconds.</li>
-<li><code>buffer_size</code>: receive buffer size.</li>
-<li><code>append_lf_on_send</code>: if <code>True</code>, command terminator is <code>CRLF</code>; otherwise <code>CR</code>.</li>
-<li><code>auto_connect</code>: connect during initialization.</li>
+<li><code>client</code>: connected client from <code>open_and_connect</code></li>
+<li><code>device</code>: base word device such as <code>"DM100"</code></li>
+<li><code>dtype</code>: one of <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code>, <code>F</code></li>
 </ul>
-<h3 id="connection-and-raw-access">Connection and Raw Access</h3>
-<h4 id="connect-none"><code>connect() -&gt; None</code></h4>
-<p>Open socket connection to PLC.</p>
-<h4 id="close-none"><code>close() -&gt; None</code></h4>
-<p>Close socket connection.</p>
-<h4 id="send_rawbody-str-str"><code>send_raw(body: str) -&gt; str</code></h4>
-<p>Send raw Host Link command body (without CR/LF) and return decoded response text.</p>
+<p>Returns:</p>
 <ul>
-<li>Raises: <code>HostLinkError</code>, <code>HostLinkProtocolError</code>, <code>HostLinkConnectionError</code></li>
+<li><code>int</code> for <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code></li>
+<li><code>float</code> for <code>F</code></li>
 </ul>
-<h3 id="basic-plc-commands">Basic PLC Commands</h3>
-<h4 id="change_modemode-int-str-none"><code>change_mode(mode: int | str) -&gt; None</code></h4>
-<p>Switch PLC mode.</p>
-<ul>
-<li>Supported values: <code>0</code>, <code>1</code>, <code>"PROGRAM"</code>, <code>"RUN"</code></li>
-</ul>
-<h4 id="clear_error-none"><code>clear_error() -&gt; None</code></h4>
-<p>Send <code>ER</code>.</p>
-<h4 id="check_error_no-str"><code>check_error_no() -&gt; str</code></h4>
-<p>Send <code>?E</code> and return the PLC error number string.</p>
-<h4 id="query_model-modelinfo"><code>query_model() -&gt; ModelInfo</code></h4>
-<p>Send <code>?K</code> and return model code + mapped model name.</p>
-<h4 id="confirm_operating_mode-int"><code>confirm_operating_mode() -&gt; int</code></h4>
-<p>Send <code>?M</code> and return mode as integer (<code>0</code> or <code>1</code>).</p>
-<h4 id="set_timevalue-datetime-tupleint-int-int-int-int-int-int-none-none-none"><code>set_time(value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -&gt; None</code></h4>
-<p>Send <code>WRT</code>.</p>
-<ul>
-<li><code>None</code>: use current local datetime.</li>
-<li>Tuple format: <code>(yy, mm, dd, hh, mi, ss, w)</code> where <code>w</code> is <code>0=Sun..6=Sat</code>.</li>
-</ul>
-<h3 id="forced-setreset">Forced Set/Reset</h3>
-<h4 id="forced_setdevice-str-none"><code>forced_set(device: str) -&gt; None</code></h4>
-<p>Send <code>ST &lt;device&gt;</code>.</p>
-<h4 id="forced_resetdevice-str-none"><code>forced_reset(device: str) -&gt; None</code></h4>
-<p>Send <code>RS &lt;device&gt;</code>.</p>
-<h4 id="forced_set_consecutivedevice-str-count-int-none"><code>forced_set_consecutive(device: str, count: int) -&gt; None</code></h4>
-<p>Send <code>STS &lt;device&gt; &lt;count&gt;</code>.</p>
-<ul>
-<li><code>count</code> range: <code>1..16</code></li>
-</ul>
-<h4 id="forced_reset_consecutivedevice-str-count-int-none"><code>forced_reset_consecutive(device: str, count: int) -&gt; None</code></h4>
-<p>Send <code>RSS &lt;device&gt; &lt;count&gt;</code>.</p>
-<ul>
-<li><code>count</code> range: <code>1..16</code></li>
-</ul>
-<h3 id="read-commands">Read Commands</h3>
-<h4 id="readdevice-str-data_format-str-none-none-int-str-listint-str"><code>read(device: str, *, data_format: str | None = None) -&gt; int | str | list[int | str]</code></h4>
-<p>Send <code>RD</code>.</p>
-<ul>
-<li>Returns one scalar when one token is returned, otherwise a list.</li>
-</ul>
-<h4 id="read_consecutivedevice-str-count-int-data_format-str-none-none-listint-str"><code>read_consecutive(device: str, count: int, *, data_format: str | None = None) -&gt; list[int | str]</code></h4>
-<p>Send <code>RDS</code>.</p>
-<ul>
-<li><code>count</code> is validated by device family and format.</li>
-</ul>
-<h4 id="read_consecutive_legacydevice-str-count-int-data_format-str-none-none-listint-str"><code>read_consecutive_legacy(device: str, count: int, *, data_format: str | None = None) -&gt; list[int | str]</code></h4>
-<p>Send <code>RDE</code> (legacy-compatible).</p>
-<ul>
-<li><code>count</code> is validated by device family and format.</li>
-</ul>
-<h3 id="write-commands">Write Commands</h3>
-<h4 id="writedevice-str-value-int-str-data_format-str-none-none-none"><code>write(device: str, value: int | str, *, data_format: str | None = None) -&gt; None</code></h4>
-<p>Send <code>WR</code>.</p>
-<h4 id="write_consecutivedevice-str-values-sequenceint-str-data_format-str-none-none-none"><code>write_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None</code></h4>
-<p>Send <code>WRS</code>.</p>
-<ul>
-<li>Number of values is validated by device family and format.</li>
-</ul>
-<h4 id="write_consecutive_legacydevice-str-values-sequenceint-str-data_format-str-none-none-none"><code>write_consecutive_legacy(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None</code></h4>
-<p>Send <code>WRE</code> (legacy-compatible).</p>
-<ul>
-<li>Number of values is validated by device family and format.</li>
-</ul>
-<h4 id="write_set_valuedevice-str-value-int-str-data_format-str-none-none-none"><code>write_set_value(device: str, value: int | str, *, data_format: str | None = None) -&gt; None</code></h4>
-<p>Send <code>WS</code>.</p>
-<ul>
-<li>Allowed device families: <code>T</code> or <code>C</code></li>
-</ul>
-<h4 id="write_set_value_consecutivedevice-str-values-sequenceint-str-data_format-str-none-none-none"><code>write_set_value_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -&gt; None</code></h4>
-<p>Send <code>WSS</code>.</p>
-<ul>
-<li>Allowed device families: <code>T</code> or <code>C</code></li>
-</ul>
-<h3 id="monitor-commands">Monitor Commands</h3>
-<h4 id="register_monitor_bitsdevices-str-none"><code>register_monitor_bits(*devices: str) -&gt; None</code></h4>
-<p>Send <code>MBS</code> to register bit monitor table entries.</p>
-<ul>
-<li>Max devices: <code>120</code></li>
-</ul>
-<h4 id="register_monitor_wordsdevices-str-none"><code>register_monitor_words(*devices: str) -&gt; None</code></h4>
-<p>Send <code>MWS</code> to register word monitor table entries.</p>
-<ul>
-<li>Max devices: <code>120</code></li>
-</ul>
-<h4 id="read_monitor_bits-listint-str"><code>read_monitor_bits() -&gt; list[int | str]</code></h4>
-<p>Send <code>MBR</code>.</p>
-<h4 id="read_monitor_words-liststr"><code>read_monitor_words() -&gt; list[str]</code></h4>
-<p>Send <code>MWR</code>.</p>
-<h3 id="comments-bank-expansion-unit-buffer">Comments, Bank, Expansion Unit Buffer</h3>
-<h4 id="read_commentsdevice-str-strip_padding-bool-true-str"><code>read_comments(device: str, *, strip_padding: bool = True) -&gt; str</code></h4>
-<p>Send <code>RDC</code>.</p>
-<ul>
-<li>If <code>strip_padding=True</code>, right-side spaces are trimmed.</li>
-</ul>
-<h4 id="switch_bankbank_no-int-none"><code>switch_bank(bank_no: int) -&gt; None</code></h4>
-<p>Send <code>BE</code>.</p>
-<ul>
-<li><code>bank_no</code> range: <code>0..15</code></li>
-</ul>
-<h4 id="read_expansion_unit_bufferunit_no-int-address-int-count-int-data_format-str-listint-str"><code>read_expansion_unit_buffer(unit_no: int, address: int, count: int, *, data_format: str = "") -&gt; list[int | str]</code></h4>
-<p>Send <code>URD</code>.</p>
-<ul>
-<li><code>unit_no</code> range: <code>0..48</code></li>
-<li><code>address</code> range: <code>0..59999</code></li>
-<li><code>count</code> range:</li>
-<li><code>1..1000</code> for <code>\"\"/.U/.S/.H</code></li>
-<li><code>1..500</code> for <code>.D/.L</code></li>
-</ul>
-<h4 id="write_expansion_unit_bufferunit_no-int-address-int-values-sequenceint-str-data_format-str-none"><code>write_expansion_unit_buffer(unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -&gt; None</code></h4>
-<p>Send <code>UWR</code>.</p>
-<ul>
-<li><code>unit_no</code> range: <code>0..48</code></li>
-<li><code>address</code> range: <code>0..59999</code></li>
-<li>Number of values range:</li>
-<li><code>1..1000</code> for <code>""/.U/.S/.H</code></li>
-<li><code>1..500</code> for <code>.D/.L</code></li>
-</ul>
-<p>## Class: <code>AsyncHostLinkClient</code></p>
-<p>The <code>AsyncHostLinkClient</code> provides an asynchronous interface for use with <code>asyncio</code>. It supports the same protocol features as <code>HostLinkClient</code> but uses <code>async</code>/<code>await</code> for all network and PLC-interacting methods.</p>
-<p>### Constructor</p>
-<p><code>python
-  AsyncHostLinkClient(
-  host: str,
-  *,
-  port: int = 8501,
-  transport: str = "tcp",
-  timeout: float = 3.0,
-  buffer_size: int = 8192,
-  append_lf_on_send: bool = False,
-  auto_connect: bool = True,
-  )</code></p>
-<p>### Async Usage Example</p>
-<p>```python
-  import asyncio
-  from hostlink import AsyncHostLinkClient</p>
-<p>async def main():
-  async with AsyncHostLinkClient("192.168.250.100") as plc:
-      val = await plc.read("DM0.S")
-      print(f"DM0: {val}")
-      await plc.write("DM0.S", val + 1)</p>
-<p>if <strong>name</strong> == "<strong>main</strong>":
-  asyncio.run(main())
-  ```</p>
-<p>### Methods</p>
-<p>All methods corresponding to those in <code>HostLinkClient</code> (except for class-internal sync helpers) are implemented as <code>async def</code> and must be awaited.</p>
-<ul>
-<li><code>await connect() -&gt; None</code></li>
-<li><code>await close() -&gt; None</code></li>
-<li><code>await send_raw(body: str) -&gt; str</code></li>
-<li><code>await change_mode(mode: int | str) -&gt; None</code></li>
-<li><code>await clear_error() -&gt; None</code></li>
-<li><code>await check_error_no() -&gt; str</code></li>
-<li><code>await query_model() -&gt; ModelInfo</code></li>
-<li><code>await confirm_operating_mode() -&gt; int</code></li>
-<li><code>await set_time(...) -&gt; None</code></li>
-<li><code>await forced_set(device: str) -&gt; None</code></li>
-<li><code>await forced_reset(device: str) -&gt; None</code></li>
-<li><code>await forced_set_consecutive(device: str, count: int) -&gt; None</code></li>
-<li><code>await forced_reset_consecutive(device: str, count: int) -&gt; None</code></li>
-<li><code>await read(device: str, *, data_format: str | None = None) -&gt; ...</code></li>
-<li><code>await read_consecutive(...) -&gt; ...</code></li>
-<li><code>await read_consecutive_legacy(...) -&gt; ...</code></li>
-<li><code>await write(...) -&gt; None</code></li>
-<li><code>await write_consecutive(...) -&gt; None</code></li>
-<li><code>await write_consecutive_legacy(...) -&gt; None</code></li>
-<li><code>await write_set_value(...) -&gt; None</code></li>
-<li><code>await write_set_value_consecutive(...) -&gt; None</code></li>
-<li><code>await register_monitor_bits(...) -&gt; None</code></li>
-<li><code>await register_monitor_words(...) -&gt; None</code></li>
-<li><code>await read_monitor_bits() -&gt; list[int | str]</code></li>
-<li><code>await read_monitor_words() -&gt; list[str]</code></li>
-<li><code>await read_comments(...) -&gt; str</code></li>
-<li><code>await switch_bank(bank_no: int) -&gt; None</code></li>
-<li><code>await read_expansion_unit_buffer(...) -&gt; list[int | str]</code></li>
-<li><code>await write_expansion_unit_buffer(...) -&gt; None</code></li>
-</ul>
-<p>## Supported Data Format Values
-- <code>""</code> (omitted)
-- <code>.U</code>
-- <code>.S</code>
-- <code>.D</code>
-- <code>.L</code>
-- <code>.H</code></p>
-<h2 id="minimal-example">Minimal Example</h2>
-<pre><code class="language-python">from hostlink import HostLinkClient
-
-with HostLinkClient(&quot;192.168.250.100&quot;, transport=&quot;tcp&quot;) as plc:
-    plc.change_mode(&quot;RUN&quot;)
-    current = plc.read(&quot;DM200.S&quot;)
-    plc.write(&quot;DM200.S&quot;, 1234)
-    values = plc.read_consecutive(&quot;R100&quot;, 4)
-    print(current, values)
+<p>Example:</p>
+<pre><code class="language-python">value = await read_typed(client, &quot;DM100&quot;, &quot;F&quot;)
 </code></pre>
+<h3 id="await-write_typedclient-device-dtype-value"><code>await write_typed(client, device, dtype, value)</code></h3>
+<p>Write one typed value.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>client</code>: connected client from <code>open_and_connect</code></li>
+<li><code>device</code>: base word device such as <code>"DM100"</code></li>
+<li><code>dtype</code>: one of <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code>, <code>F</code></li>
+<li><code>value</code>: <code>int</code> or <code>float</code></li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">await write_typed(client, &quot;DM100&quot;, &quot;D&quot;, 123456)
+</code></pre>
+<h2 id="contiguous-block-helpers">Contiguous Block Helpers</h2>
+<h3 id="await-read_wordsclient-device-count"><code>await read_words(client, device, count)</code></h3>
+<p>Read contiguous unsigned 16-bit words.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>device</code>: start address such as <code>"DM200"</code></li>
+<li><code>count</code>: number of words</li>
+</ul>
+<p>Returns:</p>
+<ul>
+<li><code>list[int]</code></li>
+</ul>
+<h3 id="await-read_dwordsclient-device-count"><code>await read_dwords(client, device, count)</code></h3>
+<p>Read contiguous unsigned 32-bit values from adjacent words.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>device</code>: start address such as <code>"DM300"</code></li>
+<li><code>count</code>: number of 32-bit values</li>
+</ul>
+<p>Returns:</p>
+<ul>
+<li><code>list[int]</code></li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">words = await read_words(client, &quot;DM200&quot;, 8)
+dwords = await read_dwords(client, &quot;DM300&quot;, 4)
+</code></pre>
+<h2 id="bit-in-word">Bit in Word</h2>
+<h3 id="await-write_bit_in_wordclient-device-bit_index-value"><code>await write_bit_in_word(client, device, bit_index, value)</code></h3>
+<p>Update a single bit inside a word device by read-modify-write.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>device</code>: word device such as <code>"DM500"</code></li>
+<li><code>bit_index</code>: <code>0</code> to <code>15</code></li>
+<li><code>value</code>: <code>True</code> or <code>False</code></li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">await write_bit_in_word(client, &quot;DM500&quot;, 3, True)
+</code></pre>
+<h2 id="mixed-snapshots">Mixed Snapshots</h2>
+<h3 id="await-read_namedclient-addresses"><code>await read_named(client, addresses)</code></h3>
+<p>Read mixed values in one call.</p>
+<p>Supported address notation:</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"DM100"</code></td>
+<td>unsigned 16-bit</td>
+</tr>
+<tr>
+<td><code>"DM100:S"</code></td>
+<td>signed 16-bit</td>
+</tr>
+<tr>
+<td><code>"DM100:D"</code></td>
+<td>unsigned 32-bit</td>
+</tr>
+<tr>
+<td><code>"DM100:L"</code></td>
+<td>signed 32-bit</td>
+</tr>
+<tr>
+<td><code>"DM100:F"</code></td>
+<td>float32</td>
+</tr>
+<tr>
+<td><code>"DM100.3"</code></td>
+<td>bit 3 inside the word</td>
+</tr>
+<tr>
+<td><code>"DM100.A"</code></td>
+<td>bit 10 inside the word</td>
+</tr>
+</tbody>
+</table>
+<p>Parameters:</p>
+<ul>
+<li><code>addresses</code>: <code>list[str]</code></li>
+</ul>
+<p>Returns:</p>
+<ul>
+<li><code>dict[str, int | float | bool]</code></li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">snapshot = await read_named(client, [&quot;DM100&quot;, &quot;DM101:S&quot;, &quot;DM102:F&quot;, &quot;DM200.3&quot;])
+</code></pre>
+<h2 id="polling">Polling</h2>
+<h3 id="pollclient-addresses-interval"><code>poll(client, addresses, interval)</code></h3>
+<p>Async generator that repeatedly yields snapshot dictionaries using the same
+address notation as <code>read_named</code>.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>addresses</code>: <code>list[str]</code></li>
+<li><code>interval</code>: polling interval in seconds</li>
+</ul>
+<p>Yields:</p>
+<ul>
+<li><code>dict[str, int | float | bool]</code></li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-python">async for snapshot in poll(client, [&quot;DM100&quot;, &quot;DM101:L&quot;, &quot;DM200.3&quot;], interval=1.0):
+    print(snapshot)
+</code></pre>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>User-facing docs intentionally stop at the helper layer.</li>
+<li>Hex/token-oriented reads and raw protocol commands are maintainer topics.</li>
+<li>See <code>samples/README.md</code> for runnable example scripts.</li>
+</ul>
 
 
 

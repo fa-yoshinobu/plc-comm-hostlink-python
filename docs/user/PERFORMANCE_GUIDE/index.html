@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/PERFORMANCE_GUIDE/">
       
       
+        <link rel="prev" href="../API_REFERENCE/">
+      
+      
+        <link rel="next" href="../TROUBLESHOOTING/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Performance Tuning Guide - Host Link Communication Python API</title>
+        <title>Performance Guide - Host Link Communication Python API</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Performance Tuning Guide
+              Performance Guide
             
           </span>
         </div>
@@ -230,62 +234,15 @@
   
   
   
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
-      <a href="../../api/client/" class="md-nav__link">
+      <a href="../USER_GUIDE/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Client
+    User Guide
   
 
     
@@ -297,11 +254,197 @@
     </li>
   
 
-              
-            
-          </ul>
-        </nav>
+    
       
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-transport-choice-tcp-vs-udp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Transport Choice: TCP vs. UDP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-tcp-optimizations-tcp_nodelay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. TCP Optimizations (TCP_NODELAY)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-asynchronous-efficiency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Asynchronous Efficiency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-bulk-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Bulk Reads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-polling-and-snapshots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Polling and Snapshots
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-system-load-and-latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. System Load and Latency
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -393,10 +536,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-bulk-transfers-rdswrs" class="md-nav__link">
+  <a href="#4-bulk-reads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Bulk Transfers (RDS/WRS)
+        4. Bulk Reads
       
     </span>
   </a>
@@ -404,10 +547,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-monitoring-mbsmws" class="md-nav__link">
+  <a href="#5-polling-and-snapshots" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Monitoring (MBS/MWS)
+        5. Polling and Snapshots
       
     </span>
   </a>
@@ -460,22 +603,27 @@
 <h2 id="2-tcp-optimizations-tcp_nodelay">2. TCP Optimizations (TCP_NODELAY)</h2>
 <p>By default, the library enables <strong>TCP_NODELAY</strong>. This disables the Nagle algorithm, which normally waits to buffer small packets before sending. Since Host Link commands are small strings (e.g., RD DM0\r), TCP_NODELAY is essential for low-latency response.</p>
 <h2 id="3-asynchronous-efficiency">3. Asynchronous Efficiency</h2>
-<p>AsyncHostLinkClient is built on top of asyncio.StreamReader/Writer. </p>
+<p>The recommended helper workflow is fully asynchronous.</p>
 <ul>
-<li><strong>Internal Lock</strong>: The library handles an internal asyncio.Lock to ensure commands do not overlap in the same connection.</li>
-<li><strong>Parallel Requests</strong>: You can trigger multiple concurrent tasks. While the hardware handles one request at a time, the library's lock ensures they are queued and executed as fast as the PLC responds.</li>
+<li><strong>Single connection, many awaits</strong>: Reuse one connected client from <code>open_and_connect</code>.</li>
+<li><strong>Queued access</strong>: Multiple coroutines can await helper calls safely on the same connection.</li>
+<li><strong>Polling helper</strong>: Use <code>poll</code> when you want repeated snapshots without rebuilding the address list each time.</li>
 </ul>
-<h2 id="4-bulk-transfers-rdswrs">4. Bulk Transfers (RDS/WRS)</h2>
-<p>Instead of calling read() 1,000 times for 1,000 devices, use <strong>read_consecutive()</strong>.</p>
+<h2 id="4-bulk-reads">4. Bulk Reads</h2>
+<p>Prefer the high-level batch helpers instead of many single-value reads.</p>
 <ul>
-<li><strong>Protocol Limit</strong>: Up to 1,000 words can be transferred in a single command.</li>
-<li><strong>Latency Advantage</strong>: Reading 1,000 words in one bulk transfer (approx. 5ms) is much faster than 1,000 individual reads (approx. 1,000ms).</li>
+<li>Use <code>read_words</code> for contiguous 16-bit word blocks.</li>
+<li>Use <code>read_dwords</code> for contiguous 32-bit values.</li>
+<li>Use <code>read_named</code> when the snapshot mixes types or bit-in-word values.</li>
 </ul>
-<h2 id="5-monitoring-mbsmws">5. Monitoring (MBS/MWS)</h2>
-<p>For high-frequency cyclic reading of specific devices:
-1. Register them once with register_monitor_words().
-2. Repeatedly call read_monitor_words().</p>
-<p>This is the most efficient way to query a large set of non-consecutive devices.</p>
+<p>These helpers reduce round-trips and usually outperform repeated <code>read_typed</code> calls.</p>
+<h2 id="5-polling-and-snapshots">5. Polling and Snapshots</h2>
+<p>For cyclic application code:</p>
+<ol>
+<li>Use <code>read_named</code> for one mixed snapshot.</li>
+<li>Use <code>poll</code> for repeated snapshots at a fixed interval.</li>
+</ol>
+<p>This is the recommended user-facing pattern for dashboards, logging, and periodic monitoring loops.</p>
 <h2 id="6-system-load-and-latency">6. System Load and Latency</h2>
 <p>Communication speed is ultimately limited by:
 - <strong>PLC Scan Time</strong>: If the PLC is under heavy ladder load, it may respond slower to Host Link requests.

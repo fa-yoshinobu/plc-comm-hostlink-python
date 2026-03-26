@@ -9,87 +9,144 @@
 
 ![Illustration](docsrc/assets/kv.png)
 
-High-performance Python client library for KEYENCE KV series PLCs using the Host Link (Upper Link) protocol. Designed for mission-critical applications requiring speed, stability, and full specification coverage.
+High-performance Python library for KEYENCE KV series PLCs using the Host Link
+(Upper Link) protocol.
 
----
+This README intentionally covers the recommended high-level helper API only:
+`open_and_connect`, `read_typed`, `write_typed`, `write_bit_in_word`,
+`read_named`, `poll`, `read_words`, and `read_dwords`.
+
+Low-level client methods and protocol-level details are kept in maintainer
+documentation.
 
 ## Key Features
 
-- **High Performance**: Achieves 1,000+ operations/sec with TCP/UDP optimizations (TCP_NODELAY enabled).
-- **Dual Support**: Provides both Synchronous (HostLinkClient) and Asynchronous (AsyncHostLinkClient) interfaces.
-- **Full Spec Coverage**: Supports RD/WR, RDS/WRS, Monitoring (MBS/MWS), Expansion Unit Access (URD/UWR), and more.
-- **Hardware Verified**: Formally validated against real KV-7500 hardware.
-- **Type Safety**: 100% compliant with mypy for robust development.
-- **Industrial Standards**: Built-in support for multiple data formats (.U, .S, .D, .L, .H).
+- High-level helper API for typed reads, writes, snapshots, and polling
+- Typed helpers for `U`, `S`, `D`, `L`, and helper-level `F`
+- Mixed snapshots with `read_named`
+- Batch-friendly polling with `poll`
+- Contiguous block helpers with `read_words` and `read_dwords`
+- Hardware-verified against KV-7500
 
 ## Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/fa-yoshinobu/plc-comm-hostlink-python.git
 cd plc-comm-hostlink-python
-
-# Install dependencies
 pip install -e .
 ```
 
 ## Quick Start
 
-### 1. Synchronous (Simple Scripts)
-```python
-from hostlink import HostLinkClient
-
-# Connect to KV-7500 via TCP (Default port 8501)
-with HostLinkClient("192.168.250.100") as plc:
-    # Read Signed 16-bit Word
-    val = plc.read("DM0.S")
-    print(f"DM0: {val}")
-
-    # Write 32-bit Double Word
-    plc.write("DM100.D", 1234567)
-```
-
-### 2. Asynchronous (High Concurrency)
 ```python
 import asyncio
-from hostlink import AsyncHostLinkClient
 
-async def main():
-    async with AsyncHostLinkClient("192.168.250.100", transport="udp") as plc:
-        # Batch Read 100 Words
-        data = await plc.read_consecutive("DM100", 100)
-        print(f"Read {len(data)} words.")
+from hostlink import open_and_connect, read_named, read_typed, write_typed
+
+
+async def main() -> None:
+    async with await open_and_connect("192.168.250.100", 8501) as client:
+        dm0 = await read_typed(client, "DM0", "U")
+        await write_typed(client, "DM10", "U", dm0)
+
+        snapshot = await read_named(
+            client,
+            ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0"],
+        )
+        print(snapshot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
----
+## Common Workflows
+
+Typed block reads:
+
+```python
+words = await read_words(client, "DM100", 10)
+dwords = await read_dwords(client, "DM200", 4)
+```
+
+Bit-in-word update:
+
+```python
+await write_bit_in_word(client, "DM50", bit_index=3, value=True)
+```
+
+Polling:
+
+```python
+async for snapshot in poll(client, ["DM100", "DM101:L", "DM50.3"], interval=1.0):
+    print(snapshot)
+```
+
+## Sample Programs
+
+User-facing high-level examples:
+
+- `samples/high_level_async.py`
+- `samples/high_level_sync.py`
+- `samples/basic_high_level_rw.py`
+- `samples/named_snapshot.py`
+- `samples/polling_monitor.py`
+
+API and workflow to sample mapping:
+
+| API / workflow | Primary sample | Purpose |
+|---|---|---|
+| `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | End-to-end async walkthrough of the full helper surface |
+| Synchronous CLI entrypoint for the same helper surface | `samples/high_level_sync.py` | Shows how to wrap the async helper API behind `asyncio.run` |
+| `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read/write mirror example |
+| `read_named` | `samples/named_snapshot.py` | Mixed typed and bit-in-word snapshot example |
+| `poll` | `samples/polling_monitor.py` | Repeated snapshot monitoring loop |
+
+Run examples:
+
+```bash
+python samples/high_level_async.py --host 192.168.250.100
+python samples/high_level_sync.py --host 192.168.250.100
+python samples/basic_high_level_rw.py --host 192.168.250.100
+python samples/named_snapshot.py --host 192.168.250.100
+python samples/polling_monitor.py --host 192.168.250.100 --poll-count 5
+```
 
 ## Documentation
 
-Detailed guides are available in the docsrc/ directory:
+User documentation:
 
-### User Documentation
-- [**User Guide**](docsrc/user/USER_GUIDE.md): Getting started and PLC configuration.
-- [**API Reference**](docsrc/user/API_REFERENCE.md): Detailed method signatures and classes.
-- [**Troubleshooting**](docsrc/user/TROUBLESHOOTING.md): Solutions for connection and protocol errors.
-- [**Performance Tuning**](docsrc/user/PERFORMANCE_GUIDE.md): Tips for high-frequency communication.
+- [User Guide](docsrc/user/USER_GUIDE.md)
+- [API Reference](docsrc/user/API_REFERENCE.md)
+- [Troubleshooting](docsrc/user/TROUBLESHOOTING.md)
+- [Performance Tuning](docsrc/user/PERFORMANCE_GUIDE.md)
+- [Samples](samples/README.md)
 
-### Developer & QA Documentation
-- [**QA Evidence (KV-7500)**](docsrc/validation/reports/QA_REPORT_20260319_KV7500.md): Formal hardware verification report.
-- [**Protocol Specification**](docsrc/maintainer/PROTOCOL_SPEC.md): Technical details of the Host Link protocol.
-- [**Specification Coverage**](docsrc/maintainer/SPEC_COVERAGE.md): Implemented vs. Available commands.
+Maintainer and QA documentation:
 
----
+- [QA Evidence (KV-7500)](docsrc/validation/reports/QA_REPORT_20260319_KV7500.md)
+- [Protocol Specification](docsrc/maintainer/PROTOCOL_SPEC.md)
+- [Specification Coverage](docsrc/maintainer/SPEC_COVERAGE.md)
+- [API Unification Policy](docsrc/maintainer/API_UNIFICATION_POLICY.md)
 
 ## Verified Hardware
 
-The following models are formally verified with this library:
-- **CPU**: KV-7500, KV-8000, KV-X550 (via ?K model detection)
-- **Ethernet Units**: KV-XLE02, Built-in Ethernet Port
-- **Protocol**: Host Link (Upper Link), TCP and UDP modes.
+- CPU: KV-7500, KV-8000, KV-X550
+- Ethernet: built-in Ethernet port and KV-XLE02
+- Transport: TCP and UDP
+
+## Development and Release Checks
+
+```bash
+run_ci.bat
+release_check.bat
+```
+
+`run_ci.bat` runs lint, format, mypy, high-level docs coverage checks,
+user-facing sample validation, and tests.
+
+`release_check.bat` runs `run_ci.bat` and then rebuilds the published docs.
 
 ## License
 
-Distributed under the MIT License (LICENSE).
+Distributed under the MIT License.

@@ -67,16 +67,13 @@ def parse_args() -> argparse.Namespace:
 
 async def demo_open_and_connect(host: str, port: int) -> None:
     """
-    open_and_connect - create an AsyncHostLinkClient and open the connection.
+    open_and_connect - create and open the connected client used by the helper API.
 
     Parameters:
         host  - KV PLC IP / hostname
         port  - KV Ethernet port (default 8501 inside open_and_connect)
 
-    Returns a connected AsyncHostLinkClient.
-
-    Use case: the simplest way to establish an async connection without
-              manually instantiating AsyncHostLinkClient and calling OpenAsync.
+    Returns a connected client object for the helper functions below.
     """
     client = await open_and_connect(host, port=port)
     print(f"[open_and_connect] Connected to {host}:{port}")
@@ -92,19 +89,20 @@ async def demo_typed_rw(client) -> None:
         "S"  signed 16-bit int    (1 word)
         "D"  unsigned 32-bit int  (2 words, low-word first)
         "L"  signed 32-bit int    (2 words)
-        "F"  IEEE-754 float32     (2 words)
-        "H"  hexadecimal string   (1 word)
+        "F"  IEEE 754 float32     (2 words)
 
-    Use case: writing a float32 speed setpoint to DM200-DM201 from an
+    Use case: writing a signed 32-bit setpoint to DM200-DM201 from an
               asyncio-based HMI coroutine.
     """
     val_s = await read_typed(client, "DM100", "S")
-    val_f = await read_typed(client, "DM200", "F")
-    print(f"[read_typed] DM100(S)={val_s}  DM200(F)={val_f}")
+    val_l = await read_typed(client, "DM200", "L")
+    val_f = await read_typed(client, "DM300", "F")
+    print(f"[read_typed] DM100(S)={val_s}  DM200(L)={val_l}  DM300(F)={val_f}")
 
     await write_typed(client, "DM100", "S", -500)
-    await write_typed(client, "DM200", "F", 12.5)
-    print("[write_typed] Wrote -500->DM100, 12.5->DM200")
+    await write_typed(client, "DM200", "L", 123456)
+    await write_typed(client, "DM300", "F", 12.5)
+    print("[write_typed] Wrote -500->DM100, 123456->DM200, 12.5->DM300")
 
 
 async def demo_array_reads(client) -> None:
@@ -147,7 +145,6 @@ async def demo_read_named(client) -> None:
 
     Address notation:
         "DM100"    unsigned 16-bit (default)
-        "DM100:F"  float32
         "DM100:S"  signed 16-bit
         "DM100:D"  unsigned 32-bit (2 words)
         "DM100:L"  signed 32-bit
@@ -161,7 +158,7 @@ async def demo_read_named(client) -> None:
         client,
         [
             "DM100",
-            "DM200:F",
+            "DM200:L",
             "DM50.3",
             "DM50.A",
         ],
@@ -179,7 +176,7 @@ async def demo_poll(client, count: int) -> None:
     """
     print(f"\nPolling {count} snapshots:")
     i = 0
-    async for snap in poll(client, ["DM100", "DM200:F", "DM50.3"], interval=1.0):
+    async for snap in poll(client, ["DM100", "DM200:L", "DM50.3"], interval=1.0):
         print(f"  [{i + 1}] {snap}")
         i += 1
         if i >= count:

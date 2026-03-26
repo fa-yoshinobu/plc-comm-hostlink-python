@@ -249,9 +249,37 @@ def validate_device_count(device_type: str, effective_format: str, count: int) -
     validate_range("count", count, lo, hi)
 
 
+def validate_device_span(device_type: str, start_number: int, effective_format: str, count: int = 1) -> None:
+    lo, hi, base = DEVICE_RANGES[device_type]
+    if count < 1:
+        raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
+
+    word_width = 2 if effective_format in {".D", ".L"} else 1
+    end_number = start_number + (count * word_width) - 1
+    if start_number < lo or start_number > hi or end_number > hi:
+        start_text = format(start_number, "X") if base == 16 else str(start_number)
+        end_text = format(end_number, "X") if base == 16 else str(end_number)
+        raise HostLinkProtocolError(
+            f"Device span out of range: {device_type}{start_text}..{device_type}{end_text} "
+            f"with format '{effective_format}'"
+        )
+
+
 def validate_expansion_buffer_count(effective_format: str, count: int) -> None:
     lo, hi = (1, 500) if effective_format in {".D", ".L"} else (1, 1000)
     validate_range("count", count, lo, hi)
+
+
+def validate_expansion_buffer_span(address: int, effective_format: str, count: int) -> None:
+    if count < 1:
+        raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
+
+    word_width = 2 if effective_format in {".D", ".L"} else 1
+    end_address = address + (count * word_width) - 1
+    if address < 0 or address > 59999 or end_address > 59999:
+        raise HostLinkProtocolError(
+            f"Expansion buffer span out of range: {address}..{end_address} with format '{effective_format}'"
+        )
 
 
 def validate_range(name: str, value: int, lo: int, hi: int) -> None:

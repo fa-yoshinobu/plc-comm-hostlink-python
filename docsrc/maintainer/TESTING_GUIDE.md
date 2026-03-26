@@ -46,13 +46,14 @@ For live hardware verification, use the scripts in `scripts/`.
 
 ## Cross-Library Parity
 
-The Python library is kept in sync with `plc-comm-hostlink-dotnet`.
+The Python library is kept semantically aligned with `plc-comm-hostlink-dotnet`.
 
 When adding or changing a method, verify:
 
-1. The equivalent .NET method exists and has the same semantics.
-2. The async wrapper exists in `AsyncKvHostLinkClient` / `AsyncKvHostLinkDeviceClient`.
-3. Extension utilities in `utils.py` are updated where applicable.
+1. The equivalent .NET operation exists and has the same semantics.
+2. `HostLinkClient` and `AsyncHostLinkClient` stay internally aligned.
+3. Exported helper utilities in `utils.py` are updated where applicable.
+4. Intentional public API design differences remain documented in `API_UNIFICATION_POLICY.md`.
 
 ## Linting and Type Checking
 

@@ -1,44 +1,58 @@
 # Host Link Communication Python
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Static Analysis: Ruff](https://img.shields.io/badge/Lint-Ruff-black.svg)](https://github.com/astral-sh/ruff)
 
-A Python client library for KEYENCE KV series PLCs using the **Host Link Communication** protocol. Designed for reliable communication with KV-8000, KV-7500, and other compatible models.
+A Python client library for KEYENCE KV series PLCs using the Host Link
+Communication protocol.
+
+This published site intentionally focuses on the recommended high-level helper
+API:
+
+- `open_and_connect`
+- `read_typed`
+- `write_typed`
+- `read_words`
+- `read_dwords`
+- `write_bit_in_word`
+- `read_named`
+- `poll`
+
+Low-level token-oriented client methods are intentionally left out of the
+published user site and remain repository-maintainer material.
 
 ## Key Features
 
-- **Keyence Focused**: Implements the KV series Upper Link protocol (HOST LINK).
-- **Modern Python**: Strictly typed and designed for performance and reliability.
-- **CI-Ready**: Integrated quality checks via `run_ci.bat`.
+- High-level typed reads and writes for `U`, `S`, `D`, `L`, and `F`
+- Mixed named snapshots with `read_named`
+- Repeated snapshot streaming with `poll`
+- Contiguous block helpers for words and dwords
+- Strict lint, type-check, and test coverage in CI
 
 ## Quick Start
 
-### Installation
-```bash
-# (Coming Soon)
-# pip install hostlink-python
-```
-
 ### Basic Usage
+
 ```python
-from hostlink.client import HostLinkClient
+from hostlink import open_and_connect, read_named, read_typed, write_typed
 
-# Connect to a KEYENCE KV PLC
-client = HostLinkClient("192.168.250.100", 8501)
+async def main() -> None:
+    client = await open_and_connect("192.168.250.100", 8501)
+    async with client:
+        dm0 = await read_typed(client, "DM0", "U")
+        await write_typed(client, "DM10", "U", dm0)
 
-# Read D100 (Word)
-val = client.read("D100")
-print(f"Value: {val}")
+        snapshot = await read_named(client, ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0"])
+        print(snapshot)
 ```
 
 ## Documentation
 
-Follows the workspace-wide hierarchical documentation policy:
-
-- [**API Reference**](user/API_REFERENCE.md): Detailed method definitions.
-- [**QA Reports**](validation/reports/): Formal evidence of communication with Keyence hardware.
-- [**Protocol Spec**](maintainer/PROTOCOL_SPEC.md): Internal technical details of the Host Link protocol.
+- [User Guide](user/USER_GUIDE.md)
+- [API Reference](user/API_REFERENCE.md)
+- [Performance Guide](user/PERFORMANCE_GUIDE.md)
+- [Troubleshooting](user/TROUBLESHOOTING.md)
 
 ## Development & CI
 
@@ -57,7 +71,4 @@ Validates the code and builds a standalone CLI tool in the `publish/` directory.
 
 ## License
 
-Distributed under the [MIT License](LICENSE).
-
-
-
+Distributed under the MIT License.

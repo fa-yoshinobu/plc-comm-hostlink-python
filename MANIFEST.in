@@ -1,0 +1,2 @@
+prune docsrc/maintainer
+prune docsrc/validation

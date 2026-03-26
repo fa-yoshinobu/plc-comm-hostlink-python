@@ -1,6 +1,20 @@
 # User Guide: KEYENCE Host Link Python
 
-Asynchronous Python client for KEYENCE KV series PLCs using the Host Link (Upper Link) protocol.
+This guide covers the recommended high-level helper API only.
+
+Use these helpers for normal application code:
+
+- `open_and_connect`
+- `read_typed`
+- `write_typed`
+- `write_bit_in_word`
+- `read_named`
+- `poll`
+- `read_words`
+- `read_dwords`
+
+Raw protocol methods and low-level client APIs are intentionally left to the
+maintainer documentation.
 
 ## Installation
 
@@ -8,194 +22,163 @@ Asynchronous Python client for KEYENCE KV series PLCs using the Host Link (Upper
 pip install .
 ```
 
----
-
-## Quick Start
-
-### Synchronous client
-
-```python
-from hostlink import HostLinkClient
-
-with HostLinkClient("192.168.250.100", 8501) as plc:
-    # Read DM100
-    val = plc.read("DM100")
-    print(f"DM100 = {val}")
-
-    # Write 1234 to DM100
-    plc.write("DM100", 1234)
-```
-
-### Async client
+## Connect Once
 
 ```python
 import asyncio
+
 from hostlink import open_and_connect
 
-async def main():
-    async with await open_and_connect("192.168.250.100") as plc:
-        val = await plc.read("DM100")
-        print(f"DM100 = {val}")
 
-asyncio.run(main())
+async def main() -> None:
+    async with await open_and_connect("192.168.250.100", 8501) as client:
+        print("Connected")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
----
+`open_and_connect` returns a connected async client object that is then used by
+the helper functions below.
 
-## Device Addressing
+## Typed Read and Write
 
-### Device Types
+Supported dtype codes:
 
-| Category | Devices |
-|----------|---------|
-| Bit devices | `R`, `MR`, `LR`, `CR`, `B` |
-| Word devices | `DM`, `EM`, `FM`, `W`, `TM`, `CM`, `Z`, `AT` |
-| Timer/Counter coil | `T`, `C` |
-
-### Data Format Suffixes
-
-```python
-plc.read("DM100")         # raw value (unsigned 16-bit)
-plc.read("DM100", ".S")   # signed 16-bit
-plc.read("DM100", ".D")   # unsigned 32-bit (2 words)
-plc.read("DM100", ".L")   # signed 32-bit (2 words)
-plc.read("DM100", ".F")   # float32 (2 words)
-plc.read("DM100", ".H")   # hex string
-```
-
-### Consecutive Read
-
-```python
-# Read 10 consecutive words from DM0
-values = await plc.read_consecutive("DM0", 10)
-```
-
----
-
-## Typed Read / Write
-
-Utility functions handle type conversion automatically:
-
-| dtype | Type | Size |
-|-------|------|------|
-| `"U"` | unsigned 16-bit int | 1 word |
-| `"S"` | signed 16-bit int | 1 word |
-| `"D"` | unsigned 32-bit int | 2 words |
-| `"L"` | signed 32-bit int | 2 words |
-| `"F"` | float32 | 2 words |
+| dtype | Meaning | Width |
+|---|---|---|
+| `U` | unsigned 16-bit | 1 word |
+| `S` | signed 16-bit | 1 word |
+| `D` | unsigned 32-bit | 2 words |
+| `L` | signed 32-bit | 2 words |
+| `F` | IEEE 754 float32 | 2 words |
 
 ```python
 import asyncio
-from hostlink import open_and_connect
-from hostlink import read_typed, write_typed
 
-async def main():
-    async with await open_and_connect("192.168.250.100") as plc:
-        f = await read_typed(plc, "DM100", "F")     # float32
-        v = await read_typed(plc, "DM200", "L")     # signed 32-bit
-        await write_typed(plc, "DM100", "F", 3.14)
-        await write_typed(plc, "DM200", "S", -100)
+from hostlink import open_and_connect, read_typed, write_typed
 
-asyncio.run(main())
+
+async def main() -> None:
+    async with await open_and_connect("192.168.250.100") as client:
+        dm0 = await read_typed(client, "DM0", "U")
+        signed = await read_typed(client, "DM10", "S")
+        counter = await read_typed(client, "DM20", "D")
+        temp = await read_typed(client, "DM40", "F")
+
+        await write_typed(client, "DM100", "U", dm0)
+        await write_typed(client, "DM110", "S", signed)
+        await write_typed(client, "DM120", "D", counter)
+        await write_typed(client, "DM140", "F", temp)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Contiguous Array Read
+`F` is implemented in the helper layer by converting two `.U` words as
+float32.
+
+## Block Reads
+
+Use block helpers when you need contiguous data from a word area.
 
 ```python
-from hostlink import read_words, read_dwords
-
-# Read 10 words from DM0 ↁElist[int]
-words = await read_words(plc, "DM0", 10)
-
-# Read 4 DWords (32-bit pairs) from DM0 ↁElist[int]
-dwords = await read_dwords(plc, "DM0", 4)
+words = await read_words(client, "DM200", 8)
+dwords = await read_dwords(client, "DM300", 4)
 ```
 
-### Bit-in-Word Write
+- `read_words` returns `list[int]`
+- `read_dwords` returns `list[int]` assembled from adjacent words
+
+## Bit in Word
+
+Use `write_bit_in_word` for bit updates inside word devices such as `DM`, `EM`,
+`FM`, `W`, or `Z`.
 
 ```python
-from hostlink import write_bit_in_word
-
-# Set bit 3 of DM100 (read-modify-write)
-await write_bit_in_word(plc, "DM100", bit_index=3, value=True)
+await write_bit_in_word(client, "DM500", bit_index=0, value=True)
+await write_bit_in_word(client, "DM500", bit_index=3, value=False)
 ```
 
----
+This helper performs a read-modify-write so that the other 15 bits remain
+unchanged.
 
-## Named-Device Read
+## Mixed Snapshots with `read_named`
 
-Read multiple devices in one call using address strings with optional type suffixes.
+`read_named` accepts mixed address notations in a single call.
 
-Address notation:
+Supported notation:
 
 | Format | Meaning |
-|--------|---------|
-| `"DM100"` | DM100 as unsigned 16-bit |
-| `"DM100:F"` | DM100 as float32 |
-| `"DM100:S"` | DM100 as signed 16-bit |
-| `"DM100:D"` | DM100-DM101 as unsigned 32-bit |
-| `"DM100:L"` | DM100-DM101 as signed 32-bit |
-| `"DM100.3"` | Bit 3 of DM100 (bool) |
-| `"DM100.A"` | Bit 10 of DM100 (bool) -- bits 10-15 use hex digits A-F |
+|---|---|
+| `"DM100"` | unsigned 16-bit |
+| `"DM100:S"` | signed 16-bit |
+| `"DM100:D"` | unsigned 32-bit |
+| `"DM100:L"` | signed 32-bit |
+| `"DM100:F"` | float32 |
+| `"DM100.3"` | bit 3 inside the word |
+| `"DM100.A"` | bit 10 inside the word |
 
 ```python
-from hostlink import read_named
-
-result = await read_named(plc, ["DM100", "DM101:F", "DM102:S", "DM0.3"])
-# result == {"DM100": 42, "DM101:F": 3.14, "DM102:S": -1, "DM0.3": True}
+snapshot = await read_named(
+    client,
+    ["DM100", "DM101:S", "DM102:D", "DM104:F", "DM200.0", "DM200.A"],
+)
+print(snapshot)
 ```
 
----
+Bit indices use hexadecimal notation from `0` to `F`.
 
 ## Polling
 
-`poll` yields device snapshots at a fixed interval until the loop is broken.
+`poll` repeatedly yields the same kind of snapshot dictionary.
 
 ```python
-import asyncio
-from hostlink import open_and_connect, poll
-
-async def main():
-    async with await open_and_connect("192.168.250.100") as plc:
-        async for snapshot in poll(plc, ["DM100", "DM101:F", "DM0.3"], interval=1.0):
-            print(snapshot)
-            # {"DM100": 42, "DM101:F": 3.14, "DM0.3": True}
-
-asyncio.run(main())
+async for snapshot in poll(
+    client,
+    ["DM100", "DM101:L", "DM200.3"],
+    interval=1.0,
+):
+    print(snapshot)
 ```
 
-Press `Ctrl+C` to stop.
-
----
+Break out of the loop or cancel the task to stop polling.
 
 ## Error Handling
 
-| Exception | Condition |
-|-----------|-----------|
-| `HostLinkBaseError` | Base class for all host link errors |
-| `HostLinkError` | PLC returned an error code (e.g. `!E1`, `!E0`) |
-| `HostLinkProtocolError` | Unexpected or malformed response |
-| `HostLinkConnectionError` | TCP connection failure |
+| Exception | Meaning |
+|---|---|
+| `HostLinkBaseError` | Base class for library errors |
+| `HostLinkError` | PLC returned an error code |
+| `HostLinkProtocolError` | Local validation or parsing failure |
+| `HostLinkConnectionError` | Connect, disconnect, socket, or timeout failure |
 
 ```python
-from hostlink import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
+from hostlink.errors import (
+    HostLinkConnectionError,
+    HostLinkError,
+    HostLinkProtocolError,
+)
+
 
 try:
-    val = await plc.read("DM100")
-except HostLinkProtocolError as e:
-    print(f"Protocol error: {e}")
-except HostLinkConnectionError as e:
-    print(f"Connection error: {e}")
-except HostLinkError as e:
-    print(f"PLC error: code={e.code}  response={e.response}")
+    value = await read_typed(client, "DM100", "U")
+except HostLinkProtocolError as ex:
+    print(f"Protocol error: {ex}")
+except HostLinkConnectionError as ex:
+    print(f"Connection error: {ex}")
+except HostLinkError as ex:
+    print(f"PLC error: code={ex.code} response={ex.response}")
 ```
 
----
+## Recommended Samples
 
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `HostLinkConnectionError` | Wrong IP or port | Default port is 8501; confirm in KV Studio Ethernet settings |
-| `HostLinkProtocolError` | Invalid device name | Check device type and address range for your KV model |
-| `TimeoutError` | PLC not responding | Verify network and that the KV Ethernet unit is enabled |
+| API / workflow | Sample | Purpose |
+|---|---|---|
+| `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | Full async walkthrough of the helper layer |
+| Synchronous entrypoint over the helper layer | `samples/high_level_sync.py` | CLI wrapper that uses `asyncio.run` internally |
+| `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read and write example |
+| `read_named` | `samples/named_snapshot.py` | Mixed snapshot example |
+| `poll` | `samples/polling_monitor.py` | Repeated snapshot monitoring example |

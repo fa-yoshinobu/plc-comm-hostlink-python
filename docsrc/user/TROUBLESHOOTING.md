@@ -26,7 +26,7 @@ This guide provides solutions for common connectivity and protocol issues encoun
 ### `E1: Abnormal command`
 **Occurs when:** The PLC received a command it doesn't support or understand.
 **Solutions:**
-- **Bit Write Restriction**: Many KV PLCs do not support `WR MR0 1`. Use `forced_set("MR0")` or `forced_reset("MR0")` instead.
+- **Bit Update Scope**: The user-facing helper layer supports bit-in-word updates such as `write_bit_in_word(client, "DM100", 3, True)`. Direct coil-force workflows are advanced operations and are not covered by the user guide.
 - **Model Limitation**: Some older CPUs do not support certain commands (e.g., `URD` expansion access).
 - **Format Mismatch**: Using `.D` or `.L` suffixes on devices that don't support 32-bit (rare, but possible).
 
@@ -52,5 +52,5 @@ This guide provides solutions for common connectivity and protocol issues encoun
 **Solutions:** The library handles this automatically when using `.D` or `.L`. Do not try to manually swap words unless you have a non-standard ladder configuration.
 
 ### Float Handling
-**Note:** Host Link is an ASCII protocol and doesn't natively return "float" tokens.
-**Solutions:** Read the data as `.D` or `.L` and use Python's `struct` module to convert the bits to a floating-point value.
+**Note:** The library supports `.F` for float32 helper reads and writes.
+**Solutions:** Use `.F` when the PLC side stores the value as IEEE 754 float32. If the device actually contains raw integer bits, read it as `.D` or `.L` instead.

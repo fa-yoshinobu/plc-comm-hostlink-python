@@ -2,7 +2,7 @@ import asyncio
 import unittest
 
 from hostlink import AsyncHostLinkClient
-from hostlink.errors import HostLinkError
+from hostlink.errors import HostLinkError, HostLinkProtocolError
 
 
 class MockHostLinkServer:
@@ -75,6 +75,10 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
         self.server.responses["RDS DM0.U 2"] = "100 200"
         vals = await self.client.read_consecutive("DM0.U", 2)
         self.assertEqual(vals, [100, 200])
+
+    async def test_float_suffix_is_rejected_by_low_level_client(self):
+        with self.assertRaises(HostLinkProtocolError):
+            await self.client.read("DM2.F")
 
 
 if __name__ == "__main__":

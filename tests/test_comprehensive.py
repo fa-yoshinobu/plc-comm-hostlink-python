@@ -9,6 +9,10 @@ from hostlink import (
     HostLinkClient,
     HostLinkError,
     HostLinkProtocolError,
+    poll,
+    read_named,
+    read_typed,
+    write_typed,
 )
 
 
@@ -180,6 +184,12 @@ class TestComprehensiveSync(unittest.TestCase):
         self.client.write_consecutive("DM10.U", [100, 200])
         self.assertEqual(self.server.last_received[-1], "WRS DM10.U 2 100 200")
 
+    def test_hex_reads_return_hex_strings(self):
+        self.server.responses["RD DM2.H"] = "00FF"
+        self.assertEqual(self.client.read("DM2.H"), "00FF")
+        self.server.responses["RDS DM2.H 2"] = "00FF 000A"
+        self.assertEqual(self.client.read_consecutive("DM2.H", 2), ["00FF", "000A"])
+
     def test_legacy_commands(self):
         self.server.responses["RDE DM0.U 2"] = "1 2"
         self.assertEqual(self.client.read_consecutive_legacy("DM0.U", 2), [1, 2])
@@ -230,6 +240,68 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.client.read_consecutive("DM0.U", 3), [10, 20, 30])
         await self.client.write_consecutive("DM10.U", [100, 200])
         self.assertEqual(self.server.last_received[-1], "WRS DM10.U 2 100 200")
+
+    async def test_async_hex_reads_return_hex_strings(self):
+        self.server.responses["RD DM2.H"] = "00FF"
+        self.assertEqual(await self.client.read("DM2.H"), "00FF")
+        self.server.responses["RDS DM2.H 2"] = "00FF 000A"
+        self.assertEqual(await self.client.read_consecutive("DM2.H", 2), ["00FF", "000A"])
+
+    async def test_async_float_helpers(self):
+        self.server.responses["RDS DM0.U 2"] = "0 16288"
+        self.server.responses["RDS DM2.U 2"] = "0 16712"
+        self.assertAlmostEqual(await read_typed(self.client, "DM2", "F"), 12.5)
+
+        await write_typed(self.client, "DM2", "F", 12.5)
+        self.assertEqual(self.server.last_received[-1], "WRS DM2.U 2 0 16712")
+
+        self.server.last_received.clear()
+        self.server.responses["RDS DM0.U 4"] = "0 16288 0 16712"
+        result = await read_named(self.client, ["DM0:F", "DM2:F"])
+        self.assertEqual(result, {"DM0:F": 1.25, "DM2:F": 12.5})
+        self.assertEqual(self.server.last_received, ["RDS DM0.U 4"])
+
+    async def test_async_read_named_batches_contiguous_word_reads(self):
+        self.server.responses["RDS DM100.U 8"] = "1025 65535 2 1 57920 1 0 16712"
+
+        result = await read_named(
+            self.client,
+            ["DM100", "DM100.0", "DM100.A", "DM101:S", "DM102:D", "DM104:L", "DM106:F"],
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "DM100": 1025,
+                "DM100.0": True,
+                "DM100.A": True,
+                "DM101:S": -1,
+                "DM102:D": 65538,
+                "DM104:L": 123456,
+                "DM106:F": 12.5,
+            },
+        )
+        self.assertEqual(self.server.last_received, ["RDS DM100.U 8"])
+
+    async def test_async_poll_reuses_compiled_read_plan(self):
+        self.server.responses["RDS DM100.U 3"] = "1 0 16320"
+        snapshots: list[dict[str, int | float | bool | str]] = []
+
+        async for snapshot in poll(self.client, ["DM100", "DM100.0", "DM101:F"], interval=0.001):
+            snapshots.append(snapshot)
+            if len(snapshots) == 1:
+                self.server.responses["RDS DM100.U 3"] = "3 0 16416"
+            if len(snapshots) >= 2:
+                break
+
+        self.assertEqual(
+            snapshots,
+            [
+                {"DM100": 1, "DM100.0": True, "DM101:F": 1.5},
+                {"DM100": 3, "DM100.0": True, "DM101:F": 2.5},
+            ],
+        )
+        self.assertEqual(self.server.last_received, ["RDS DM100.U 3", "RDS DM100.U 3"])
 
     async def test_async_legacy_commands(self):
         self.server.responses["RDE DM0.U 2"] = "1 2"

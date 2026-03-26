@@ -23,8 +23,10 @@ from .device import (
     parse_device_text,
     resolve_effective_format,
     validate_device_count,
+    validate_device_span,
     validate_device_type,
     validate_expansion_buffer_count,
+    validate_expansion_buffer_span,
     validate_range,
 )
 from .errors import HostLinkConnectionError, HostLinkProtocolError
@@ -174,16 +176,17 @@ class HostLinkBase:
             addr = DeviceAddress(addr.device_type, addr.number, "")
         return addr.to_text()
 
-    def _device_with_format(self, device: str, data_format: str | None) -> tuple[str, str]:
+    def _device_with_format(self, device: str, data_format: str | None, count: int = 1) -> tuple[str, str]:
         addr = parse_device(device)
         suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
         # If still no suffix, resolve effective default for the device type
         if not suffix:
             suffix = resolve_effective_format(addr.device_type, "")
+        validate_device_span(addr.device_type, addr.number, suffix, count)
         addr = DeviceAddress(addr.device_type, addr.number, suffix)
         return addr.to_text(), suffix
 
-    def _ensure_timer_or_counter(self, device: str, data_format: str | None) -> str:
+    def _ensure_timer_or_counter(self, device: str, data_format: str | None, count: int = 1) -> str:
         token = parse_device_text(device, default_suffix=data_format or "")
         addr = parse_device(token)
         validate_device_type("WS/WSS", addr.device_type, WS_DEVICE_TYPES)
@@ -191,6 +194,7 @@ class HostLinkBase:
         if not addr.suffix:
             suffix = resolve_effective_format(addr.device_type, "")
             addr = DeviceAddress(addr.device_type, addr.number, suffix)
+        validate_device_span(addr.device_type, addr.number, addr.suffix, count)
         return addr.to_text()
 
     @staticmethod
@@ -377,7 +381,7 @@ class HostLinkClient(HostLinkBase):
         return values
 
     def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, count)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, count)
@@ -385,7 +389,7 @@ class HostLinkClient(HostLinkBase):
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
 
     def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, count)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, count)
@@ -406,7 +410,7 @@ class HostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
@@ -422,7 +426,7 @@ class HostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
@@ -444,7 +448,7 @@ class HostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token = self._ensure_timer_or_counter(device, data_format)
+        token = self._ensure_timer_or_counter(device, data_format, len(values))
         suffix = parse_device(token).suffix
         payload = " ".join(self._format_value(v, suffix) for v in values)
         self._expect_ok(f"WSS {token} {len(values)} {payload}")
@@ -502,6 +506,7 @@ class HostLinkClient(HostLinkBase):
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", count)
+        validate_expansion_buffer_span(address, suffix or ".U", count)
         parts = ["URD", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
         parts.append(effective_suffix)
@@ -523,6 +528,7 @@ class HostLinkClient(HostLinkBase):
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", len(values))
+        validate_expansion_buffer_span(address, suffix or ".U", len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
         parts = ["UWR", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
@@ -708,7 +714,7 @@ class AsyncHostLinkClient(HostLinkBase):
         return values
 
     async def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, count)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, count)
@@ -718,7 +724,7 @@ class AsyncHostLinkClient(HostLinkBase):
     async def read_consecutive_legacy(
         self, device: str, count: int, *, data_format: str | None = None
     ) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, count)
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, count)
@@ -739,7 +745,7 @@ class AsyncHostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
@@ -755,7 +761,7 @@ class AsyncHostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format)
+        token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
@@ -777,7 +783,7 @@ class AsyncHostLinkClient(HostLinkBase):
     ) -> None:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
-        token = self._ensure_timer_or_counter(device, data_format)
+        token = self._ensure_timer_or_counter(device, data_format, len(values))
         suffix = parse_device(token).suffix
         payload = " ".join(self._format_value(v, suffix) for v in values)
         await self._expect_ok(f"WSS {token} {len(values)} {payload}")
@@ -835,6 +841,7 @@ class AsyncHostLinkClient(HostLinkBase):
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", count)
+        validate_expansion_buffer_span(address, suffix or ".U", count)
         parts = ["URD", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
         parts.append(effective_suffix)
@@ -856,6 +863,7 @@ class AsyncHostLinkClient(HostLinkBase):
         validate_range("address", address, 0, 59999)
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", len(values))
+        validate_expansion_buffer_span(address, suffix or ".U", len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
         parts = ["UWR", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"

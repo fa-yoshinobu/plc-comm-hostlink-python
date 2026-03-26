@@ -13,13 +13,16 @@ plugins:
       default_handler: python
 exclude_docs: |
   internal_docs/**
+  api/**
   maintainer/**
   validation/**
 
 nav:
   - Overview: index.md
-  - API Reference:
-      - Client: api/client.md
+  - User Guide: user/USER_GUIDE.md
+  - API Reference: user/API_REFERENCE.md
+  - Performance Guide: user/PERFORMANCE_GUIDE.md
+  - Troubleshooting: user/TROUBLESHOOTING.md
   - Change Log: CHANGELOG.md
 
 

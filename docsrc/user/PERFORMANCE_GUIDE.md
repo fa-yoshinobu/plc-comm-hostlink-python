@@ -23,25 +23,30 @@ By default, the library enables **TCP_NODELAY**. This disables the Nagle algorit
 
 ## 3. Asynchronous Efficiency
 
-AsyncHostLinkClient is built on top of asyncio.StreamReader/Writer. 
+The recommended helper workflow is fully asynchronous.
 
-- **Internal Lock**: The library handles an internal asyncio.Lock to ensure commands do not overlap in the same connection.
-- **Parallel Requests**: You can trigger multiple concurrent tasks. While the hardware handles one request at a time, the library's lock ensures they are queued and executed as fast as the PLC responds.
+- **Single connection, many awaits**: Reuse one connected client from `open_and_connect`.
+- **Queued access**: Multiple coroutines can await helper calls safely on the same connection.
+- **Polling helper**: Use `poll` when you want repeated snapshots without rebuilding the address list each time.
 
-## 4. Bulk Transfers (RDS/WRS)
+## 4. Bulk Reads
 
-Instead of calling read() 1,000 times for 1,000 devices, use **read_consecutive()**.
+Prefer the high-level batch helpers instead of many single-value reads.
 
-- **Protocol Limit**: Up to 1,000 words can be transferred in a single command.
-- **Latency Advantage**: Reading 1,000 words in one bulk transfer (approx. 5ms) is much faster than 1,000 individual reads (approx. 1,000ms).
+- Use `read_words` for contiguous 16-bit word blocks.
+- Use `read_dwords` for contiguous 32-bit values.
+- Use `read_named` when the snapshot mixes types or bit-in-word values.
 
-## 5. Monitoring (MBS/MWS)
+These helpers reduce round-trips and usually outperform repeated `read_typed` calls.
 
-For high-frequency cyclic reading of specific devices:
-1. Register them once with register_monitor_words().
-2. Repeatedly call read_monitor_words().
+## 5. Polling and Snapshots
 
-This is the most efficient way to query a large set of non-consecutive devices.
+For cyclic application code:
+
+1. Use `read_named` for one mixed snapshot.
+2. Use `poll` for repeated snapshots at a fixed interval.
+
+This is the recommended user-facing pattern for dashboards, logging, and periodic monitoring loops.
 
 ## 6. System Load and Latency
 

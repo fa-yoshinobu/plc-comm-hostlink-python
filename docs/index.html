@@ -12,7 +12,7 @@
       
       
       
-        <link rel="next" href="api/client/">
+        <link rel="next" href="user/USER_GUIDE/">
       
       
         
@@ -289,17 +289,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -390,62 +379,15 @@
   
   
   
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
-      <a href="api/client/" class="md-nav__link">
+      <a href="user/USER_GUIDE/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Client
+    User Guide
   
 
     
@@ -457,11 +399,84 @@
     </li>
   
 
-              
-            
-          </ul>
-        </nav>
+    
       
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user/API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user/PERFORMANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user/TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -541,17 +556,6 @@
   
     <nav class="md-nav" aria-label="Quick Start">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Installation
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#basic-usage" class="md-nav__link">
@@ -649,36 +653,51 @@
 
 <h1 id="host-link-communication-python">Host Link Communication Python</h1>
 <p><a href="https://www.python.org/downloads/"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-blue.svg" /></a>
-<a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
+<a href="https://opensource.org/licenses/MIT"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
 <a href="https://github.com/astral-sh/ruff"><img alt="Static Analysis: Ruff" src="https://img.shields.io/badge/Lint-Ruff-black.svg" /></a></p>
-<p>A Python client library for KEYENCE KV series PLCs using the <strong>Host Link Communication</strong> protocol. Designed for reliable communication with KV-8000, KV-7500, and other compatible models.</p>
+<p>A Python client library for KEYENCE KV series PLCs using the Host Link
+Communication protocol.</p>
+<p>This published site intentionally focuses on the recommended high-level helper
+API:</p>
+<ul>
+<li><code>open_and_connect</code></li>
+<li><code>read_typed</code></li>
+<li><code>write_typed</code></li>
+<li><code>read_words</code></li>
+<li><code>read_dwords</code></li>
+<li><code>write_bit_in_word</code></li>
+<li><code>read_named</code></li>
+<li><code>poll</code></li>
+</ul>
+<p>Low-level token-oriented client methods are intentionally left out of the
+published user site and remain repository-maintainer material.</p>
 <h2 id="key-features">Key Features</h2>
 <ul>
-<li><strong>Keyence Focused</strong>: Implements the KV series Upper Link protocol (HOST LINK).</li>
-<li><strong>Modern Python</strong>: Strictly typed and designed for performance and reliability.</li>
-<li><strong>CI-Ready</strong>: Integrated quality checks via <code>run_ci.bat</code>.</li>
+<li>High-level typed reads and writes for <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code>, and <code>F</code></li>
+<li>Mixed named snapshots with <code>read_named</code></li>
+<li>Repeated snapshot streaming with <code>poll</code></li>
+<li>Contiguous block helpers for words and dwords</li>
+<li>Strict lint, type-check, and test coverage in CI</li>
 </ul>
 <h2 id="quick-start">Quick Start</h2>
-<h3 id="installation">Installation</h3>
-<pre><code class="language-bash"># (Coming Soon)
-# pip install hostlink-python
-</code></pre>
 <h3 id="basic-usage">Basic Usage</h3>
-<pre><code class="language-python">from hostlink.client import HostLinkClient
+<pre><code class="language-python">from hostlink import open_and_connect, read_named, read_typed, write_typed
 
-# Connect to a KEYENCE KV PLC
-client = HostLinkClient(&quot;192.168.250.100&quot;, 8501)
+async def main() -&gt; None:
+    client = await open_and_connect(&quot;192.168.250.100&quot;, 8501)
+    async with client:
+        dm0 = await read_typed(client, &quot;DM0&quot;, &quot;U&quot;)
+        await write_typed(client, &quot;DM10&quot;, &quot;U&quot;, dm0)
 
-# Read D100 (Word)
-val = client.read(&quot;D100&quot;)
-print(f&quot;Value: {val}&quot;)
+        snapshot = await read_named(client, [&quot;DM0&quot;, &quot;DM1:S&quot;, &quot;DM2:D&quot;, &quot;DM4:F&quot;, &quot;DM10.0&quot;])
+        print(snapshot)
 </code></pre>
 <h2 id="documentation">Documentation</h2>
-<p>Follows the workspace-wide hierarchical documentation policy:</p>
 <ul>
-<li><a href="user/API_REFERENCE/"><strong>API Reference</strong></a>: Detailed method definitions.</li>
-<li><a href="validation/reports/"><strong>QA Reports</strong></a>: Formal evidence of communication with Keyence hardware.</li>
-<li><a href="maintainer/PROTOCOL_SPEC/"><strong>Protocol Spec</strong></a>: Internal technical details of the Host Link protocol.</li>
+<li><a href="user/USER_GUIDE/">User Guide</a></li>
+<li><a href="user/API_REFERENCE/">API Reference</a></li>
+<li><a href="user/PERFORMANCE_GUIDE/">Performance Guide</a></li>
+<li><a href="user/TROUBLESHOOTING/">Troubleshooting</a></li>
 </ul>
 <h2 id="development-ci">Development &amp; CI</h2>
 <p>This project enforces strict quality standards via <code>run_ci.bat</code>.</p>
@@ -693,7 +712,7 @@ print(f&quot;Value: {val}&quot;)
 </code></pre>
 <p>Validates the code and builds a standalone CLI tool in the <code>publish/</code> directory.</p>
 <h2 id="license">License</h2>
-<p>Distributed under the <a href="LICENSE">MIT License</a>.</p>
+<p>Distributed under the MIT License.</p>
 
 
 

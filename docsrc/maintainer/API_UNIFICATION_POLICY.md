@@ -1,83 +1,68 @@
 # API Unification Policy
 
-This document defines the public API rules for the KEYENCE KV Host Link Python library.
-It is a design policy document. It does not claim that every rule is implemented yet.
+This document defines the current public API policy for `plc-comm-hostlink-python`.
 
 ## Purpose
 
-- Keep the Host Link Python API internally consistent between sync and async clients.
-- Keep operation names aligned with the Host Link .NET library where the operation class is the same.
-- Avoid hiding protocol-specific distinctions behind overly generic names.
+- Keep the Python API internally consistent between sync and async clients.
+- Keep behavior aligned with `plc-comm-hostlink-dotnet` where the operation class is equivalent.
+- Document intentional cross-language design differences explicitly.
 
-## Public API Shape
+## Current Public Surface
 
-The canonical client classes are:
+The current public low-level clients are:
 
-- `KvHostLinkClient` — low-level client
-- `AsyncKvHostLinkClient` — async wrapper
-- `KvHostLinkDeviceClient` — high-level string-address client
-- `AsyncKvHostLinkDeviceClient` — async high-level client
+- `HostLinkClient`
+- `AsyncHostLinkClient`
 
-### High-Level Canonical Names
+The current exported high-level helpers are:
 
-- `read`
-- `write`
-- `read_many`
-- `write_many`
-- `read_dword`
-- `write_dword`
-- `read_dwords`
-- `write_dwords`
-- `read_float32`
-- `write_float32`
-- `read_float32s`
-- `write_float32s`
-- `resolve_device`
-- `read_clock`
-- `write_clock`
-- `read_cpu_status`
-
-### Low-Level Canonical Names
-
+- `open_and_connect`
+- `read_typed`
+- `write_typed`
+- `write_bit_in_word`
+- `read_named`
+- `poll`
 - `read_words`
-- `write_words`
-- `read_bits`
-- `write_bits`
 - `read_dwords`
-- `write_dwords`
-- `read_float32s`
-- `write_float32s`
-- `send_raw`
 
-## Sync and Async Parity Rules
+## Sync / Async Rules
 
-The async client must mirror the sync client.
+Python maintains both sync and async low-level clients.
 
 - The async method name stays identical to the sync method name.
 - The async method returns the same logical result shape.
 - Argument names and ordering stay aligned.
-- Missing async parity is considered backlog, not a reason to rename the sync API.
+- Missing async parity is backlog.
 
-## Cross-Language Parity Rules
+## Cross-Language Semantic Parity
 
-When an equivalent operation exists in the Host Link .NET library, semantic names must stay aligned.
+Semantic parity with `plc-comm-hostlink-dotnet` is the target.
+Literal public API identity is not the target.
 
-Examples:
+The following must stay aligned across Python and .NET:
 
-- `read_words` <-> `ReadWordsAsync`
-- `read_dwords` <-> `ReadDWordsAsync`
-- `read_float32s` <-> `ReadFloat32sAsync`
-- `read_clock` <-> `ReadClockAsync`
+- Host Link frame bodies for equivalent operations
+- validation behavior
+- helper-layer typed behavior
+- live PLC behavior
 
-## 32-Bit Value Rules
+## Intentional Differences From .NET
 
-- `dword` means a raw 32-bit unsigned value stored across two PLC words (low-word-first).
-- Signed 32-bit helpers, if added later, should be named `read_int32` / `write_int32`.
-- Floating-point helpers must use `float32` in the public name.
+The following differences are intentional and are not treated as bugs by themselves:
+
+- Python exposes both sync and async low-level clients.
+  .NET is async-native and exposes high-level helpers as extension methods.
+- Python low-level reads parse decimal tokens into `int` values and return `int | str | list[int | str]`.
+  .NET low-level reads return raw `string[]`.
+- Python accepts `transport="tcp"/"udp"` and mode values such as `"RUN"` / `"PROGRAM"` or `0/1`.
+  .NET uses `HostLinkTransportMode` and `KvPlcMode`.
+- Python returns `ModelInfo.model = None` when the `?K` code is unmapped.
+  .NET returns `"Unknown"`.
 
 ## dtype Codes
 
-Typed access methods use these codes:
+Helper-layer typed access uses these codes:
 
 | Code | Type |
 | --- | --- |
@@ -87,9 +72,11 @@ Typed access methods use these codes:
 | `L` | signed 32-bit |
 | `F` | IEEE 754 float32 |
 
-Do not use `W`, `I`, or other legacy codes.
+`F` is helper-layer only.
+Low-level Host Link suffix validation remains limited to `.U`, `.S`, `.D`, `.L`, and `.H`.
 
 ## Documentation Rules
 
-README, samples, and generated docs must describe the canonical names from this document.
-If a sync method exists and async parity is not yet implemented, document the gap as backlog.
+- README, samples, and user docs must describe the current public names.
+- If behavior intentionally differs from .NET, document the difference explicitly.
+- Do not describe an intentional design difference as missing parity.

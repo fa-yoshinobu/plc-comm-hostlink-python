@@ -1,27 +1,43 @@
 # plc-comm-hostlink-python / samples
 
-Sample scripts for the `hostlink` package (KEYENCE KV Host Link).
+Sample scripts for the `hostlink` package.
 
-All scripts accept `--host` (required) and `--port` (default 8501) unless
-noted otherwise. Run any script with `--help` for full usage.
+## User-Facing High-Level Examples
 
-## Scripts
+These examples use the recommended helper API only.
+
+| File | Primary APIs | Description |
+|---|---|---|
+| `high_level_async.py` | `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | Full walkthrough of the high-level helper API |
+| `high_level_sync.py` | `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | Normal synchronous CLI entrypoint that internally uses the high-level helper API |
+| `basic_high_level_rw.py` | `read_typed`, `write_typed` | Focused typed read/write example |
+| `named_snapshot.py` | `read_named` | Mixed snapshot example using `read_named` |
+| `polling_monitor.py` | `poll` | Repeated snapshot example using `poll` |
+
+Run examples:
+
+```bash
+python samples/high_level_async.py --host 192.168.250.100
+python samples/high_level_sync.py --host 192.168.250.100
+python samples/basic_high_level_rw.py --host 192.168.250.100
+python samples/named_snapshot.py --host 192.168.250.100
+python samples/polling_monitor.py --host 192.168.250.100 --poll-count 5
+```
+
+CI validates these entrypoints with `python scripts/check_user_samples.py`,
+which compiles each sample and runs `--help` for every user-facing script.
+
+## Maintainer Validation Scripts
+
+These scripts are for validation, stress, or edge-case testing rather than
+normal application examples.
 
 | File | Description |
 |---|---|
-| `high_level_sync.py` | All high-level synchronous API helpers |
-| `high_level_async.py` | All high-level asynchronous API helpers |
-| `basic_test.py` | Basic read/write communication test |
-| `grand_unified_test.py` | Comprehensive multi-command communication test |
-| `exhaustive_address_test.py` | Exhaustive address format validation |
-| `full_pattern_validation.py` | Full command pattern validation |
-| `stress_test.py` | Stress test for reliability and throughput |
-| `ultimate_dm_stress.py` | DM area stress test |
+| `basic_test.py` | Basic communication validation |
+| `grand_unified_test.py` | Comprehensive multi-command validation |
+| `exhaustive_address_test.py` | Address format validation |
+| `full_pattern_validation.py` | Command pattern validation |
+| `stress_test.py` | Reliability and throughput stress test |
+| `ultimate_dm_stress.py` | DM-area stress test |
 | `extreme_validation.py` | Extreme edge-case validation |
-
-## Quick start
-
-```
-python samples/high_level_sync.py --host 192.168.250.100
-python samples/high_level_async.py --host 192.168.250.100
-```

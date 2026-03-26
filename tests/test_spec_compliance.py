@@ -1,7 +1,7 @@
 import unittest
 
 from hostlink import HostLinkClient
-from hostlink.device import parse_device
+from hostlink.device import parse_device, validate_device_span, validate_expansion_buffer_span
 from hostlink.errors import HostLinkProtocolError
 
 
@@ -81,6 +81,30 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_decimal_device_rejects_hex_digits(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
             parse_device("DM1A")
+
+    def test_parse_device_rejects_float_suffix(self) -> None:
+        with self.assertRaises(HostLinkProtocolError):
+            parse_device("DM10.F")
+
+    def test_validate_device_span_rejects_32bit_end_crossing(self) -> None:
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("DM", 65534, ".D", 1)
+
+    def test_validate_expansion_buffer_span_rejects_32bit_end_crossing(self) -> None:
+        with self.assertRaises(HostLinkProtocolError):
+            validate_expansion_buffer_span(59999, ".D", 1)
+
+    def test_read_rejects_32bit_device_end_crossing(self) -> None:
+        plc = FakeHostLinkClient()
+        with self.assertRaises(HostLinkProtocolError):
+            plc.read("DM65534.D")
+        self.assertEqual(plc.sent_frames, [])
+
+    def test_write_set_value_rejects_default_32bit_device_end_crossing(self) -> None:
+        plc = FakeHostLinkClient()
+        with self.assertRaises(HostLinkProtocolError):
+            plc.write_set_value("T3999", 100)
+        self.assertEqual(plc.sent_frames, [])
 
 
 if __name__ == "__main__":

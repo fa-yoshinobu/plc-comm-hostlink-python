@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Added `MANIFEST.in` pruning for `docsrc/maintainer/` and `docsrc/validation/` so source distributions exclude maintainer-only and validation-only documentation explicitly.
+
+### Added
+- Added `scripts/check_high_level_docs.py` to verify that all public high-level helper functions keep user-facing docstring coverage.
+- Added `scripts/check_user_samples.py` to validate user-facing sample scripts by compiling them and running `--help`.
+- Added `release_check.bat` as a one-step release gate that runs CI and then rebuilds the published docs.
+- Added three focused user-facing high-level samples: `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, and `samples/polling_monitor.py`.
+
+### Changed
+- Updated README, user docs, and samples to describe the current helper API coverage.
+- Clarified that low-level `.H` reads return uppercase hex strings.
+- Added helper-level `.F` float32 conversion for typed and named reads/writes.
+- Updated `run_ci.bat` to include high-level docs coverage checks and user-facing sample validation.
+- Expanded the user docs and sample docs with API-to-sample mapping tables for the recommended helper workflows.
+- Updated `.gitignore` to ignore coverage artifacts such as `.coverage*` and `htmlcov/`.
+
 ## [0.1.2] - 2026-03-19
 
 ### Added

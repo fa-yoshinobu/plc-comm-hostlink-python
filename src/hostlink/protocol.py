@@ -51,7 +51,7 @@ def split_data_tokens(response_text: str) -> list[str]:
 
 def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
     if data_format == ".H":
-        return int(token, 16)
+        return token.upper()
     try:
         return int(token, 10)
     except ValueError:

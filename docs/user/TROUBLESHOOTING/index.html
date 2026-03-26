@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/TROUBLESHOOTING/">
       
       
+        <link rel="prev" href="../PERFORMANCE_GUIDE/">
+      
+      
+        <link rel="next" href="../../CHANGELOG/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Troubleshooting Guide - Host Link Communication Python API</title>
+        <title>Troubleshooting - Host Link Communication Python API</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting Guide
+              Troubleshooting
             
           </span>
         </div>
@@ -230,62 +234,15 @@
   
   
   
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API Reference
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
     <li class="md-nav__item">
-      <a href="../../api/client/" class="md-nav__link">
+      <a href="../USER_GUIDE/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Client
+    User Guide
   
 
     
@@ -297,10 +254,258 @@
     </li>
   
 
-              
-            
-          </ul>
-        </nav>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PERFORMANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connection-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hostlinkconnectionerror-failed-to-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HostLinkConnectionError: Failed to connect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hostlinkconnectionerror-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HostLinkConnectionError: Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#protocol-errors-hostlinkerror" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol Errors (HostLinkError)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Protocol Errors (HostLinkError)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#e1-abnormal-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E1: Abnormal command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e0-abnormal-device-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E0: Abnormal device No.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#e4-write-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        E4: Write disabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unexpected-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unexpected Data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unexpected Data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#value-mismatch-endian-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Value Mismatch (Endian Issues)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#float-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Float Handling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -524,7 +729,7 @@
 <h3 id="e1-abnormal-command"><code>E1: Abnormal command</code></h3>
 <p><strong>Occurs when:</strong> The PLC received a command it doesn't support or understand.
 <strong>Solutions:</strong>
-- <strong>Bit Write Restriction</strong>: Many KV PLCs do not support <code>WR MR0 1</code>. Use <code>forced_set("MR0")</code> or <code>forced_reset("MR0")</code> instead.
+- <strong>Bit Update Scope</strong>: The user-facing helper layer supports bit-in-word updates such as <code>write_bit_in_word(client, "DM100", 3, True)</code>. Direct coil-force workflows are advanced operations and are not covered by the user guide.
 - <strong>Model Limitation</strong>: Some older CPUs do not support certain commands (e.g., <code>URD</code> expansion access).
 - <strong>Format Mismatch</strong>: Using <code>.D</code> or <code>.L</code> suffixes on devices that don't support 32-bit (rare, but possible).</p>
 <h3 id="e0-abnormal-device-no"><code>E0: Abnormal device No.</code></h3>
@@ -544,8 +749,8 @@
 <strong>Analysis:</strong> Keyence stores 32-bit values with the <strong>Low-word first</strong> (e.g., DM100=Low, DM101=High).
 <strong>Solutions:</strong> The library handles this automatically when using <code>.D</code> or <code>.L</code>. Do not try to manually swap words unless you have a non-standard ladder configuration.</p>
 <h3 id="float-handling">Float Handling</h3>
-<p><strong>Note:</strong> Host Link is an ASCII protocol and doesn't natively return "float" tokens.
-<strong>Solutions:</strong> Read the data as <code>.D</code> or <code>.L</code> and use Python's <code>struct</code> module to convert the bits to a floating-point value.</p>
+<p><strong>Note:</strong> The library supports <code>.F</code> for float32 helper reads and writes.
+<strong>Solutions:</strong> Use <code>.F</code> when the PLC side stores the value as IEEE 754 float32. If the device actually contains raw integer bits, read it as <code>.D</code> or <code>.L</code> instead.</p>
 
 
 

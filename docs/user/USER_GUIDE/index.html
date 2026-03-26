@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://fa-yoshinobu.github.io/plc-comm-hostlink-python/user/USER_GUIDE/">
       
       
+        <link rel="prev" href="../..">
+      
+      
+        <link rel="next" href="../API_REFERENCE/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>User Guide: KEYENCE Host Link Python - Host Link Communication Python API</title>
+        <title>User Guide - Host Link Communication Python API</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              User Guide: KEYENCE Host Link Python
+              User Guide
             
           </span>
         </div>
@@ -228,28 +232,26 @@
       
   
   
+    
   
   
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
-        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
-            
   
   
   <span class="md-ellipsis">
     
   
-    API Reference
+    User Guide
   
 
     
@@ -257,35 +259,163 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API Reference
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/client/" class="md-nav__link">
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    Client
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-once" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect Once
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typed-read-and-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typed Read and Write
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Block Reads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bit-in-word" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bit in Word
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-snapshots-with-read_named" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Snapshots with read_named
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recommended-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Samples
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
   
 
     
@@ -297,11 +427,57 @@
     </li>
   
 
-              
-            
-          </ul>
-        </nav>
+    
       
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PERFORMANCE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TROUBLESHOOTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -371,138 +547,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#connect-once" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Connect Once
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Quick Start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#synchronous-client" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Synchronous client
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#async-client" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Async client
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#device-addressing" class="md-nav__link">
+  <a href="#typed-read-and-write" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Device Addressing
+        Typed Read and Write
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Device Addressing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#device-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Device Types
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#data-format-suffixes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Data Format Suffixes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#consecutive-read" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Consecutive Read
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#typed-read-write" class="md-nav__link">
+  <a href="#block-reads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Typed Read / Write
+        Block Reads
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Typed Read / Write">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#contiguous-array-read" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contiguous Array Read
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bit-in-word-write" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bit-in-Word Write
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#named-device-read" class="md-nav__link">
+  <a href="#bit-in-word" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Named-Device Read
+        Bit in Word
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mixed-snapshots-with-read_named" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Snapshots with read_named
       
     </span>
   </a>
@@ -532,10 +624,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
+  <a href="#recommended-samples" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Troubleshooting
+        Recommended Samples
       
     </span>
   </a>
@@ -560,142 +652,120 @@
 
 
 <h1 id="user-guide-keyence-host-link-python">User Guide: KEYENCE Host Link Python</h1>
-<p>Asynchronous Python client for KEYENCE KV series PLCs using the Host Link (Upper Link) protocol.</p>
+<p>This guide covers the recommended high-level helper API only.</p>
+<p>Use these helpers for normal application code:</p>
+<ul>
+<li><code>open_and_connect</code></li>
+<li><code>read_typed</code></li>
+<li><code>write_typed</code></li>
+<li><code>write_bit_in_word</code></li>
+<li><code>read_named</code></li>
+<li><code>poll</code></li>
+<li><code>read_words</code></li>
+<li><code>read_dwords</code></li>
+</ul>
+<p>Raw protocol methods and low-level client APIs are intentionally left to the
+maintainer documentation.</p>
 <h2 id="installation">Installation</h2>
 <pre><code class="language-bash">pip install .
 </code></pre>
-<hr />
-<h2 id="quick-start">Quick Start</h2>
-<h3 id="synchronous-client">Synchronous client</h3>
-<pre><code class="language-python">from hostlink import HostLinkClient
-
-with HostLinkClient(&quot;192.168.250.100&quot;, 8501) as plc:
-    # Read DM100
-    val = plc.read(&quot;DM100&quot;)
-    print(f&quot;DM100 = {val}&quot;)
-
-    # Write 1234 to DM100
-    plc.write(&quot;DM100&quot;, 1234)
-</code></pre>
-<h3 id="async-client">Async client</h3>
+<h2 id="connect-once">Connect Once</h2>
 <pre><code class="language-python">import asyncio
+
 from hostlink import open_and_connect
 
-async def main():
-    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
-        val = await plc.read(&quot;DM100&quot;)
-        print(f&quot;DM100 = {val}&quot;)
 
-asyncio.run(main())
+async def main() -&gt; None:
+    async with await open_and_connect(&quot;192.168.250.100&quot;, 8501) as client:
+        print(&quot;Connected&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    asyncio.run(main())
 </code></pre>
-<hr />
-<h2 id="device-addressing">Device Addressing</h2>
-<h3 id="device-types">Device Types</h3>
-<table>
-<thead>
-<tr>
-<th>Category</th>
-<th>Devices</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Bit devices</td>
-<td><code>R</code>, <code>MR</code>, <code>LR</code>, <code>CR</code>, <code>B</code></td>
-</tr>
-<tr>
-<td>Word devices</td>
-<td><code>DM</code>, <code>EM</code>, <code>FM</code>, <code>W</code>, <code>TM</code>, <code>CM</code>, <code>Z</code>, <code>AT</code></td>
-</tr>
-<tr>
-<td>Timer/Counter coil</td>
-<td><code>T</code>, <code>C</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="data-format-suffixes">Data Format Suffixes</h3>
-<pre><code class="language-python">plc.read(&quot;DM100&quot;)         # raw value (unsigned 16-bit)
-plc.read(&quot;DM100&quot;, &quot;.S&quot;)   # signed 16-bit
-plc.read(&quot;DM100&quot;, &quot;.D&quot;)   # unsigned 32-bit (2 words)
-plc.read(&quot;DM100&quot;, &quot;.L&quot;)   # signed 32-bit (2 words)
-plc.read(&quot;DM100&quot;, &quot;.F&quot;)   # float32 (2 words)
-plc.read(&quot;DM100&quot;, &quot;.H&quot;)   # hex string
-</code></pre>
-<h3 id="consecutive-read">Consecutive Read</h3>
-<pre><code class="language-python"># Read 10 consecutive words from DM0
-values = await plc.read_consecutive(&quot;DM0&quot;, 10)
-</code></pre>
-<hr />
-<h2 id="typed-read-write">Typed Read / Write</h2>
-<p>Utility functions handle type conversion automatically:</p>
+<p><code>open_and_connect</code> returns a connected async client object that is then used by
+the helper functions below.</p>
+<h2 id="typed-read-and-write">Typed Read and Write</h2>
+<p>Supported dtype codes:</p>
 <table>
 <thead>
 <tr>
 <th>dtype</th>
-<th>Type</th>
-<th>Size</th>
+<th>Meaning</th>
+<th>Width</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>"U"</code></td>
-<td>unsigned 16-bit int</td>
+<td><code>U</code></td>
+<td>unsigned 16-bit</td>
 <td>1 word</td>
 </tr>
 <tr>
-<td><code>"S"</code></td>
-<td>signed 16-bit int</td>
+<td><code>S</code></td>
+<td>signed 16-bit</td>
 <td>1 word</td>
 </tr>
 <tr>
-<td><code>"D"</code></td>
-<td>unsigned 32-bit int</td>
+<td><code>D</code></td>
+<td>unsigned 32-bit</td>
 <td>2 words</td>
 </tr>
 <tr>
-<td><code>"L"</code></td>
-<td>signed 32-bit int</td>
+<td><code>L</code></td>
+<td>signed 32-bit</td>
 <td>2 words</td>
 </tr>
 <tr>
-<td><code>"F"</code></td>
-<td>float32</td>
+<td><code>F</code></td>
+<td>IEEE 754 float32</td>
 <td>2 words</td>
 </tr>
 </tbody>
 </table>
 <pre><code class="language-python">import asyncio
-from hostlink import open_and_connect
-from hostlink import read_typed, write_typed
 
-async def main():
-    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
-        f = await read_typed(plc, &quot;DM100&quot;, &quot;F&quot;)     # float32
-        v = await read_typed(plc, &quot;DM200&quot;, &quot;L&quot;)     # signed 32-bit
-        await write_typed(plc, &quot;DM100&quot;, &quot;F&quot;, 3.14)
-        await write_typed(plc, &quot;DM200&quot;, &quot;S&quot;, -100)
+from hostlink import open_and_connect, read_typed, write_typed
 
-asyncio.run(main())
+
+async def main() -&gt; None:
+    async with await open_and_connect(&quot;192.168.250.100&quot;) as client:
+        dm0 = await read_typed(client, &quot;DM0&quot;, &quot;U&quot;)
+        signed = await read_typed(client, &quot;DM10&quot;, &quot;S&quot;)
+        counter = await read_typed(client, &quot;DM20&quot;, &quot;D&quot;)
+        temp = await read_typed(client, &quot;DM40&quot;, &quot;F&quot;)
+
+        await write_typed(client, &quot;DM100&quot;, &quot;U&quot;, dm0)
+        await write_typed(client, &quot;DM110&quot;, &quot;S&quot;, signed)
+        await write_typed(client, &quot;DM120&quot;, &quot;D&quot;, counter)
+        await write_typed(client, &quot;DM140&quot;, &quot;F&quot;, temp)
+
+
+if __name__ == &quot;__main__&quot;:
+    asyncio.run(main())
 </code></pre>
-<h3 id="contiguous-array-read">Contiguous Array Read</h3>
-<pre><code class="language-python">from hostlink import read_words, read_dwords
-
-# Read 10 words from DM0 ↁElist[int]
-words = await read_words(plc, &quot;DM0&quot;, 10)
-
-# Read 4 DWords (32-bit pairs) from DM0 ↁElist[int]
-dwords = await read_dwords(plc, &quot;DM0&quot;, 4)
+<p><code>F</code> is implemented in the helper layer by converting two <code>.U</code> words as
+float32.</p>
+<h2 id="block-reads">Block Reads</h2>
+<p>Use block helpers when you need contiguous data from a word area.</p>
+<pre><code class="language-python">words = await read_words(client, &quot;DM200&quot;, 8)
+dwords = await read_dwords(client, &quot;DM300&quot;, 4)
 </code></pre>
-<h3 id="bit-in-word-write">Bit-in-Word Write</h3>
-<pre><code class="language-python">from hostlink import write_bit_in_word
-
-# Set bit 3 of DM100 (read-modify-write)
-await write_bit_in_word(plc, &quot;DM100&quot;, bit_index=3, value=True)
+<ul>
+<li><code>read_words</code> returns <code>list[int]</code></li>
+<li><code>read_dwords</code> returns <code>list[int]</code> assembled from adjacent words</li>
+</ul>
+<h2 id="bit-in-word">Bit in Word</h2>
+<p>Use <code>write_bit_in_word</code> for bit updates inside word devices such as <code>DM</code>, <code>EM</code>,
+<code>FM</code>, <code>W</code>, or <code>Z</code>.</p>
+<pre><code class="language-python">await write_bit_in_word(client, &quot;DM500&quot;, bit_index=0, value=True)
+await write_bit_in_word(client, &quot;DM500&quot;, bit_index=3, value=False)
 </code></pre>
-<hr />
-<h2 id="named-device-read">Named-Device Read</h2>
-<p>Read multiple devices in one call using address strings with optional type suffixes.</p>
-<p>Address notation:</p>
+<p>This helper performs a read-modify-write so that the other 15 bits remain
+unchanged.</p>
+<h2 id="mixed-snapshots-with-read_named">Mixed Snapshots with <code>read_named</code></h2>
+<p><code>read_named</code> accepts mixed address notations in a single call.</p>
+<p>Supported notation:</p>
 <table>
 <thead>
 <tr>
@@ -706,118 +776,128 @@ await write_bit_in_word(plc, &quot;DM100&quot;, bit_index=3, value=True)
 <tbody>
 <tr>
 <td><code>"DM100"</code></td>
-<td>DM100 as unsigned 16-bit</td>
-</tr>
-<tr>
-<td><code>"DM100:F"</code></td>
-<td>DM100 as float32</td>
+<td>unsigned 16-bit</td>
 </tr>
 <tr>
 <td><code>"DM100:S"</code></td>
-<td>DM100 as signed 16-bit</td>
+<td>signed 16-bit</td>
 </tr>
 <tr>
 <td><code>"DM100:D"</code></td>
-<td>DM100-DM101 as unsigned 32-bit</td>
+<td>unsigned 32-bit</td>
 </tr>
 <tr>
 <td><code>"DM100:L"</code></td>
-<td>DM100-DM101 as signed 32-bit</td>
+<td>signed 32-bit</td>
+</tr>
+<tr>
+<td><code>"DM100:F"</code></td>
+<td>float32</td>
 </tr>
 <tr>
 <td><code>"DM100.3"</code></td>
-<td>Bit 3 of DM100 (bool)</td>
+<td>bit 3 inside the word</td>
 </tr>
 <tr>
 <td><code>"DM100.A"</code></td>
-<td>Bit 10 of DM100 (bool) -- bits 10-15 use hex digits A-F</td>
+<td>bit 10 inside the word</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-python">from hostlink import read_named
-
-result = await read_named(plc, [&quot;DM100&quot;, &quot;DM101:F&quot;, &quot;DM102:S&quot;, &quot;DM0.3&quot;])
-# result == {&quot;DM100&quot;: 42, &quot;DM101:F&quot;: 3.14, &quot;DM102:S&quot;: -1, &quot;DM0.3&quot;: True}
+<pre><code class="language-python">snapshot = await read_named(
+    client,
+    [&quot;DM100&quot;, &quot;DM101:S&quot;, &quot;DM102:D&quot;, &quot;DM104:F&quot;, &quot;DM200.0&quot;, &quot;DM200.A&quot;],
+)
+print(snapshot)
 </code></pre>
-<hr />
+<p>Bit indices use hexadecimal notation from <code>0</code> to <code>F</code>.</p>
 <h2 id="polling">Polling</h2>
-<p><code>poll</code> yields device snapshots at a fixed interval until the loop is broken.</p>
-<pre><code class="language-python">import asyncio
-from hostlink import open_and_connect, poll
-
-async def main():
-    async with await open_and_connect(&quot;192.168.250.100&quot;) as plc:
-        async for snapshot in poll(plc, [&quot;DM100&quot;, &quot;DM101:F&quot;, &quot;DM0.3&quot;], interval=1.0):
-            print(snapshot)
-            # {&quot;DM100&quot;: 42, &quot;DM101:F&quot;: 3.14, &quot;DM0.3&quot;: True}
-
-asyncio.run(main())
+<p><code>poll</code> repeatedly yields the same kind of snapshot dictionary.</p>
+<pre><code class="language-python">async for snapshot in poll(
+    client,
+    [&quot;DM100&quot;, &quot;DM101:L&quot;, &quot;DM200.3&quot;],
+    interval=1.0,
+):
+    print(snapshot)
 </code></pre>
-<p>Press <code>Ctrl+C</code> to stop.</p>
-<hr />
+<p>Break out of the loop or cancel the task to stop polling.</p>
 <h2 id="error-handling">Error Handling</h2>
 <table>
 <thead>
 <tr>
 <th>Exception</th>
-<th>Condition</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>HostLinkBaseError</code></td>
-<td>Base class for all host link errors</td>
+<td>Base class for library errors</td>
 </tr>
 <tr>
 <td><code>HostLinkError</code></td>
-<td>PLC returned an error code (e.g. <code>!E1</code>, <code>!E0</code>)</td>
+<td>PLC returned an error code</td>
 </tr>
 <tr>
 <td><code>HostLinkProtocolError</code></td>
-<td>Unexpected or malformed response</td>
+<td>Local validation or parsing failure</td>
 </tr>
 <tr>
 <td><code>HostLinkConnectionError</code></td>
-<td>TCP connection failure</td>
+<td>Connect, disconnect, socket, or timeout failure</td>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-python">from hostlink import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
+<pre><code class="language-python">from hostlink.errors import (
+    HostLinkConnectionError,
+    HostLinkError,
+    HostLinkProtocolError,
+)
+
 
 try:
-    val = await plc.read(&quot;DM100&quot;)
-except HostLinkProtocolError as e:
-    print(f&quot;Protocol error: {e}&quot;)
-except HostLinkConnectionError as e:
-    print(f&quot;Connection error: {e}&quot;)
-except HostLinkError as e:
-    print(f&quot;PLC error: code={e.code}  response={e.response}&quot;)
+    value = await read_typed(client, &quot;DM100&quot;, &quot;U&quot;)
+except HostLinkProtocolError as ex:
+    print(f&quot;Protocol error: {ex}&quot;)
+except HostLinkConnectionError as ex:
+    print(f&quot;Connection error: {ex}&quot;)
+except HostLinkError as ex:
+    print(f&quot;PLC error: code={ex.code} response={ex.response}&quot;)
 </code></pre>
-<hr />
-<h2 id="troubleshooting">Troubleshooting</h2>
+<h2 id="recommended-samples">Recommended Samples</h2>
 <table>
 <thead>
 <tr>
-<th>Symptom</th>
-<th>Cause</th>
-<th>Fix</th>
+<th>API / workflow</th>
+<th>Sample</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>HostLinkConnectionError</code></td>
-<td>Wrong IP or port</td>
-<td>Default port is 8501; confirm in KV Studio Ethernet settings</td>
+<td><code>open_and_connect</code>, <code>read_typed</code>, <code>write_typed</code>, <code>read_words</code>, <code>read_dwords</code>, <code>write_bit_in_word</code>, <code>read_named</code>, <code>poll</code></td>
+<td><code>samples/high_level_async.py</code></td>
+<td>Full async walkthrough of the helper layer</td>
 </tr>
 <tr>
-<td><code>HostLinkProtocolError</code></td>
-<td>Invalid device name</td>
-<td>Check device type and address range for your KV model</td>
+<td>Synchronous entrypoint over the helper layer</td>
+<td><code>samples/high_level_sync.py</code></td>
+<td>CLI wrapper that uses <code>asyncio.run</code> internally</td>
 </tr>
 <tr>
-<td><code>TimeoutError</code></td>
-<td>PLC not responding</td>
-<td>Verify network and that the KV Ethernet unit is enabled</td>
+<td><code>read_typed</code>, <code>write_typed</code></td>
+<td><code>samples/basic_high_level_rw.py</code></td>
+<td>Focused typed read and write example</td>
+</tr>
+<tr>
+<td><code>read_named</code></td>
+<td><code>samples/named_snapshot.py</code></td>
+<td>Mixed snapshot example</td>
+</tr>
+<tr>
+<td><code>poll</code></td>
+<td><code>samples/polling_monitor.py</code></td>
+<td>Repeated snapshot monitoring example</td>
 </tr>
 </tbody>
 </table>

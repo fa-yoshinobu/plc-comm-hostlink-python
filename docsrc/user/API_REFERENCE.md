@@ -1,313 +1,221 @@
 # HostLink Python API Reference
 
-This reference describes the public API of `hostlink.HostLinkClient`.
+This reference covers the recommended high-level helper API.
+
+It intentionally excludes raw protocol methods and low-level client operations.
 
 ## Imports
 
 ```python
-from hostlink import HostLinkClient, AsyncHostLinkClient
-from hostlink.errors import HostLinkError, HostLinkProtocolError, HostLinkConnectionError
+from hostlink import (
+    open_and_connect,
+    read_typed,
+    write_typed,
+    write_bit_in_word,
+    read_named,
+    poll,
+    read_words,
+    read_dwords,
+)
+from hostlink.errors import (
+    HostLinkBaseError,
+    HostLinkConnectionError,
+    HostLinkError,
+    HostLinkProtocolError,
+)
 ```
 
 ## Exceptions
 
-- `HostLinkError`: PLC returned an error response such as `E0`, `E1`, `E2`, `E4`, `E5`, or `E6`.
-- `HostLinkProtocolError`: local validation/parsing failure (invalid device, invalid format, malformed frame, etc.).
-- `HostLinkConnectionError`: socket/timeout/connect/disconnect failure.
+- `HostLinkBaseError`: base type for library exceptions
+- `HostLinkError`: PLC returned an error response such as `E0`, `E1`, or `E6`
+- `HostLinkProtocolError`: invalid address, invalid dtype, malformed response, or local validation failure
+- `HostLinkConnectionError`: connect, disconnect, socket, or timeout failure
 
-## Data Models
+## Connection Helper
 
-### `ModelInfo`
+### `await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)`
 
-- `code: str`: raw model code returned by `?K` (for example `63`).
-- `model: str | None`: mapped model name when known (for example `KV-X550`).
+Create and connect a client for use with the helper functions.
 
-## Class: `HostLinkClient`
+Parameters:
 
-### Constructor
+- `host`: PLC IP address or hostname
+- `port`: Host Link port, default `8501`
+- `transport`: `"tcp"` or `"udp"`
+- `timeout`: socket timeout in seconds
+
+Returns:
+
+- A connected async client object for use with the helpers below
+
+Example:
 
 ```python
-HostLinkClient(
-    host: str,
-    *,
-    port: int = 8501,
-    transport: str = "tcp",
-    timeout: float = 3.0,
-    buffer_size: int = 8192,
-    append_lf_on_send: bool = False,
-    auto_connect: bool = True,
-)
+async with await open_and_connect("192.168.250.100", 8501) as client:
+    ...
 ```
 
-- `host`: PLC IP or hostname.
-- `port`: Host Link port (default `8501`).
-- `transport`: `"tcp"` or `"udp"`.
-- `timeout`: socket timeout in seconds.
-- `buffer_size`: receive buffer size.
-- `append_lf_on_send`: if `True`, command terminator is `CRLF`; otherwise `CR`.
-- `auto_connect`: connect during initialization.
+## Typed Helpers
 
-### Connection and Raw Access
+Supported dtype codes:
 
-#### `connect() -> None`
+| dtype | Meaning | Width |
+|---|---|---|
+| `U` | unsigned 16-bit | 1 word |
+| `S` | signed 16-bit | 1 word |
+| `D` | unsigned 32-bit | 2 words |
+| `L` | signed 32-bit | 2 words |
+| `F` | IEEE 754 float32 | 2 words |
 
-Open socket connection to PLC.
+### `await read_typed(client, device, dtype)`
 
-#### `close() -> None`
+Read one typed value.
 
-Close socket connection.
+Parameters:
 
-#### `send_raw(body: str) -> str`
+- `client`: connected client from `open_and_connect`
+- `device`: base word device such as `"DM100"`
+- `dtype`: one of `U`, `S`, `D`, `L`, `F`
 
-Send raw Host Link command body (without CR/LF) and return decoded response text.
+Returns:
 
-- Raises: `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError`
+- `int` for `U`, `S`, `D`, `L`
+- `float` for `F`
 
-### Basic PLC Commands
-
-#### `change_mode(mode: int | str) -> None`
-
-Switch PLC mode.
-
-- Supported values: `0`, `1`, `"PROGRAM"`, `"RUN"`
-
-#### `clear_error() -> None`
-
-Send `ER`.
-
-#### `check_error_no() -> str`
-
-Send `?E` and return the PLC error number string.
-
-#### `query_model() -> ModelInfo`
-
-Send `?K` and return model code + mapped model name.
-
-#### `confirm_operating_mode() -> int`
-
-Send `?M` and return mode as integer (`0` or `1`).
-
-#### `set_time(value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None`
-
-Send `WRT`.
-
-- `None`: use current local datetime.
-- Tuple format: `(yy, mm, dd, hh, mi, ss, w)` where `w` is `0=Sun..6=Sat`.
-
-### Forced Set/Reset
-
-#### `forced_set(device: str) -> None`
-
-Send `ST <device>`.
-
-#### `forced_reset(device: str) -> None`
-
-Send `RS <device>`.
-
-#### `forced_set_consecutive(device: str, count: int) -> None`
-
-Send `STS <device> <count>`.
-
-- `count` range: `1..16`
-
-#### `forced_reset_consecutive(device: str, count: int) -> None`
-
-Send `RSS <device> <count>`.
-
-- `count` range: `1..16`
-
-### Read Commands
-
-#### `read(device: str, *, data_format: str | None = None) -> int | str | list[int | str]`
-
-Send `RD`.
-
-- Returns one scalar when one token is returned, otherwise a list.
-
-#### `read_consecutive(device: str, count: int, *, data_format: str | None = None) -> list[int | str]`
-
-Send `RDS`.
-
-- `count` is validated by device family and format.
-
-#### `read_consecutive_legacy(device: str, count: int, *, data_format: str | None = None) -> list[int | str]`
-
-Send `RDE` (legacy-compatible).
-
-- `count` is validated by device family and format.
-
-### Write Commands
-
-#### `write(device: str, value: int | str, *, data_format: str | None = None) -> None`
-
-Send `WR`.
-
-#### `write_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None`
-
-Send `WRS`.
-
-- Number of values is validated by device family and format.
-
-#### `write_consecutive_legacy(device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None`
-
-Send `WRE` (legacy-compatible).
-
-- Number of values is validated by device family and format.
-
-#### `write_set_value(device: str, value: int | str, *, data_format: str | None = None) -> None`
-
-Send `WS`.
-
-- Allowed device families: `T` or `C`
-
-#### `write_set_value_consecutive(device: str, values: Sequence[int | str], *, data_format: str | None = None) -> None`
-
-Send `WSS`.
-
-- Allowed device families: `T` or `C`
-
-### Monitor Commands
-
-#### `register_monitor_bits(*devices: str) -> None`
-
-Send `MBS` to register bit monitor table entries.
-
-- Max devices: `120`
-
-#### `register_monitor_words(*devices: str) -> None`
-
-Send `MWS` to register word monitor table entries.
-
-- Max devices: `120`
-
-#### `read_monitor_bits() -> list[int | str]`
-
-Send `MBR`.
-
-#### `read_monitor_words() -> list[str]`
-
-Send `MWR`.
-
-### Comments, Bank, Expansion Unit Buffer
-
-#### `read_comments(device: str, *, strip_padding: bool = True) -> str`
-
-Send `RDC`.
-
-- If `strip_padding=True`, right-side spaces are trimmed.
-
-#### `switch_bank(bank_no: int) -> None`
-
-Send `BE`.
-
-- `bank_no` range: `0..15`
-
-#### `read_expansion_unit_buffer(unit_no: int, address: int, count: int, *, data_format: str = "") -> list[int | str]`
-
-Send `URD`.
-
-- `unit_no` range: `0..48`
-- `address` range: `0..59999`
-- `count` range:
-  - `1..1000` for `\"\"/.U/.S/.H`
-  - `1..500` for `.D/.L`
-
-#### `write_expansion_unit_buffer(unit_no: int, address: int, values: Sequence[int | str], *, data_format: str = "") -> None`
-
-Send `UWR`.
-
-- `unit_no` range: `0..48`
-- `address` range: `0..59999`
-- Number of values range:
-  - `1..1000` for `""/.U/.S/.H`
-  - `1..500` for `.D/.L`
-
-  ## Class: `AsyncHostLinkClient`
-
-  The `AsyncHostLinkClient` provides an asynchronous interface for use with `asyncio`. It supports the same protocol features as `HostLinkClient` but uses `async`/`await` for all network and PLC-interacting methods.
-
-  ### Constructor
-
-  ```python
-  AsyncHostLinkClient(
-  host: str,
-  *,
-  port: int = 8501,
-  transport: str = "tcp",
-  timeout: float = 3.0,
-  buffer_size: int = 8192,
-  append_lf_on_send: bool = False,
-  auto_connect: bool = True,
-  )
-  ```
-
-  ### Async Usage Example
-
-  ```python
-  import asyncio
-  from hostlink import AsyncHostLinkClient
-
-  async def main():
-  async with AsyncHostLinkClient("192.168.250.100") as plc:
-      val = await plc.read("DM0.S")
-      print(f"DM0: {val}")
-      await plc.write("DM0.S", val + 1)
-
-  if __name__ == "__main__":
-  asyncio.run(main())
-  ```
-
-  ### Methods
-
-  All methods corresponding to those in `HostLinkClient` (except for class-internal sync helpers) are implemented as `async def` and must be awaited.
-
-  - `await connect() -> None`
-  - `await close() -> None`
-  - `await send_raw(body: str) -> str`
-  - `await change_mode(mode: int | str) -> None`
-  - `await clear_error() -> None`
-  - `await check_error_no() -> str`
-  - `await query_model() -> ModelInfo`
-  - `await confirm_operating_mode() -> int`
-  - `await set_time(...) -> None`
-  - `await forced_set(device: str) -> None`
-  - `await forced_reset(device: str) -> None`
-  - `await forced_set_consecutive(device: str, count: int) -> None`
-  - `await forced_reset_consecutive(device: str, count: int) -> None`
-  - `await read(device: str, *, data_format: str | None = None) -> ...`
-  - `await read_consecutive(...) -> ...`
-  - `await read_consecutive_legacy(...) -> ...`
-  - `await write(...) -> None`
-  - `await write_consecutive(...) -> None`
-  - `await write_consecutive_legacy(...) -> None`
-  - `await write_set_value(...) -> None`
-  - `await write_set_value_consecutive(...) -> None`
-  - `await register_monitor_bits(...) -> None`
-  - `await register_monitor_words(...) -> None`
-  - `await read_monitor_bits() -> list[int | str]`
-  - `await read_monitor_words() -> list[str]`
-  - `await read_comments(...) -> str`
-  - `await switch_bank(bank_no: int) -> None`
-  - `await read_expansion_unit_buffer(...) -> list[int | str]`
-  - `await write_expansion_unit_buffer(...) -> None`
-
-  ## Supported Data Format Values
-- `""` (omitted)
-- `.U`
-- `.S`
-- `.D`
-- `.L`
-- `.H`
-
-## Minimal Example
+Example:
 
 ```python
-from hostlink import HostLinkClient
-
-with HostLinkClient("192.168.250.100", transport="tcp") as plc:
-    plc.change_mode("RUN")
-    current = plc.read("DM200.S")
-    plc.write("DM200.S", 1234)
-    values = plc.read_consecutive("R100", 4)
-    print(current, values)
+value = await read_typed(client, "DM100", "F")
 ```
+
+### `await write_typed(client, device, dtype, value)`
+
+Write one typed value.
+
+Parameters:
+
+- `client`: connected client from `open_and_connect`
+- `device`: base word device such as `"DM100"`
+- `dtype`: one of `U`, `S`, `D`, `L`, `F`
+- `value`: `int` or `float`
+
+Example:
+
+```python
+await write_typed(client, "DM100", "D", 123456)
+```
+
+## Contiguous Block Helpers
+
+### `await read_words(client, device, count)`
+
+Read contiguous unsigned 16-bit words.
+
+Parameters:
+
+- `device`: start address such as `"DM200"`
+- `count`: number of words
+
+Returns:
+
+- `list[int]`
+
+### `await read_dwords(client, device, count)`
+
+Read contiguous unsigned 32-bit values from adjacent words.
+
+Parameters:
+
+- `device`: start address such as `"DM300"`
+- `count`: number of 32-bit values
+
+Returns:
+
+- `list[int]`
+
+Example:
+
+```python
+words = await read_words(client, "DM200", 8)
+dwords = await read_dwords(client, "DM300", 4)
+```
+
+## Bit in Word
+
+### `await write_bit_in_word(client, device, bit_index, value)`
+
+Update a single bit inside a word device by read-modify-write.
+
+Parameters:
+
+- `device`: word device such as `"DM500"`
+- `bit_index`: `0` to `15`
+- `value`: `True` or `False`
+
+Example:
+
+```python
+await write_bit_in_word(client, "DM500", 3, True)
+```
+
+## Mixed Snapshots
+
+### `await read_named(client, addresses)`
+
+Read mixed values in one call.
+
+Supported address notation:
+
+| Format | Meaning |
+|---|---|
+| `"DM100"` | unsigned 16-bit |
+| `"DM100:S"` | signed 16-bit |
+| `"DM100:D"` | unsigned 32-bit |
+| `"DM100:L"` | signed 32-bit |
+| `"DM100:F"` | float32 |
+| `"DM100.3"` | bit 3 inside the word |
+| `"DM100.A"` | bit 10 inside the word |
+
+Parameters:
+
+- `addresses`: `list[str]`
+
+Returns:
+
+- `dict[str, int | float | bool]`
+
+Example:
+
+```python
+snapshot = await read_named(client, ["DM100", "DM101:S", "DM102:F", "DM200.3"])
+```
+
+## Polling
+
+### `poll(client, addresses, interval)`
+
+Async generator that repeatedly yields snapshot dictionaries using the same
+address notation as `read_named`.
+
+Parameters:
+
+- `addresses`: `list[str]`
+- `interval`: polling interval in seconds
+
+Yields:
+
+- `dict[str, int | float | bool]`
+
+Example:
+
+```python
+async for snapshot in poll(client, ["DM100", "DM101:L", "DM200.3"], interval=1.0):
+    print(snapshot)
+```
+
+## Notes
+
+- User-facing docs intentionally stop at the helper layer.
+- Hex/token-oriented reads and raw protocol commands are maintainer topics.
+- See `samples/README.md` for runnable example scripts.
