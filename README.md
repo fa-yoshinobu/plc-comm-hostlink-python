@@ -124,7 +124,7 @@ User documentation:
 
 Maintainer and QA documentation:
 
-- [QA Evidence (KV-7500)](docsrc/validation/reports/QA_REPORT_20260319_KV7500.md)
+- [QA Evidence](docsrc/validation/reports/)
 - [Protocol Specification](docsrc/maintainer/PROTOCOL_SPEC.md)
 - [Specification Coverage](docsrc/maintainer/SPEC_COVERAGE.md)
 - [API Unification Policy](docsrc/maintainer/API_UNIFICATION_POLICY.md)
