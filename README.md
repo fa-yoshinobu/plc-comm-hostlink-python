@@ -131,7 +131,7 @@ Maintainer and QA documentation:
 
 ## Verified Hardware
 
-- CPU: KV-7500, KV-8000, KV-X550
+- CPU: KV-7500
 - Ethernet: built-in Ethernet port and KV-XLE02
 - Transport: TCP and UDP
 
