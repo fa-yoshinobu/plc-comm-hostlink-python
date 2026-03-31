@@ -33,8 +33,8 @@ The recommended helper workflow is fully asynchronous.
 
 Prefer the high-level batch helpers instead of many single-value reads.
 
-- Use `read_words` for contiguous 16-bit word blocks.
-- Use `read_dwords` for contiguous 32-bit values.
+- Use `read_words_single_request` and `read_dwords_single_request` when one logical block must stay on one PLC request.
+- Use `read_words_chunked` and `read_dwords_chunked` only when multi-request contiguous reads are explicitly acceptable.
 - Use `read_named` when the snapshot mixes types or bit-in-word values.
 
 These helpers reduce round-trips and usually outperform repeated `read_typed` calls.

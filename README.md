@@ -14,8 +14,10 @@ High-performance Python library for KEYENCE KV series PLCs using the Host Link
 (Upper Link) protocol.
 
 This README intentionally covers the recommended high-level helper API only:
-`open_and_connect`, `read_typed`, `write_typed`, `write_bit_in_word`,
-`read_named`, `poll`, `read_words`, and `read_dwords`.
+`HostLinkConnectionOptions`, `open_and_connect`, `normalize_address`,
+`read_typed`, `write_typed`, `write_bit_in_word`, `read_named`, `poll`,
+`read_words_single_request`, `read_dwords_single_request`,
+`read_words_chunked`, and `read_dwords_chunked`.
 
 Low-level client methods and protocol-level details are kept in maintainer
 documentation.
@@ -26,7 +28,7 @@ documentation.
 - Typed helpers for `U`, `S`, `D`, `L`, and helper-level `F`
 - Mixed snapshots with `read_named`
 - Batch-friendly polling with `poll`
-- Contiguous block helpers with `read_words` and `read_dwords`
+- Contiguous block helpers with explicit `single_request` and `chunked` entry points
 - Hardware-verified against KV-7500
 
 ## Installation
@@ -52,11 +54,17 @@ Published metadata lives at https://pypi.org/project/kv-hostlink/, where wheel/t
 ```python
 import asyncio
 
-from hostlink import open_and_connect, read_named, read_typed, write_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, read_typed, write_typed
 
 
 async def main() -> None:
-    async with await open_and_connect("192.168.250.100", 8501) as client:
+    options = HostLinkConnectionOptions(
+        host="192.168.250.100",
+        port=8501,
+        transport="tcp",
+        timeout=3.0,
+    )
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         await write_typed(client, "DM10", "U", dm0)
 
@@ -73,11 +81,27 @@ if __name__ == "__main__":
 
 ## Common Workflows
 
+Address normalization:
+
+```python
+from hostlink import normalize_address
+
+print(normalize_address("dm100"))    # DM100
+print(normalize_address("dm100.a"))  # DM100.A
+```
+
 Typed block reads:
 
 ```python
-words = await read_words(client, "DM100", 10)
-dwords = await read_dwords(client, "DM200", 4)
+words = await read_words_single_request(client, "DM100", 10)
+dwords = await read_dwords_single_request(client, "DM200", 4)
+```
+
+Explicit chunked contiguous reads:
+
+```python
+large_words = await read_words_chunked(client, "DM1000", 1000)
+large_dwords = await read_dwords_chunked(client, "DM2000", 120)
 ```
 
 Bit-in-word update:
@@ -107,7 +131,7 @@ API and workflow to sample mapping:
 
 | API / workflow | Primary sample | Purpose |
 |---|---|---|
-| `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | End-to-end async walkthrough of the full helper surface |
+| `HostLinkConnectionOptions`, `open_and_connect`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | End-to-end async walkthrough of the full helper surface |
 | Synchronous CLI entrypoint for the same helper surface | `samples/high_level_sync.py` | Shows how to wrap the async helper API behind `asyncio.run` |
 | `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read/write mirror example |
 | `read_named` | `samples/named_snapshot.py` | Mixed typed and bit-in-word snapshot example |

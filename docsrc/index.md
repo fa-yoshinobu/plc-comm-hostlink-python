@@ -10,11 +10,15 @@ Communication protocol.
 This published site intentionally focuses on the recommended high-level helper
 API:
 
+- `HostLinkConnectionOptions`
 - `open_and_connect`
+- `normalize_address`
 - `read_typed`
 - `write_typed`
-- `read_words`
-- `read_dwords`
+- `read_words_single_request`
+- `read_dwords_single_request`
+- `read_words_chunked`
+- `read_dwords_chunked`
 - `write_bit_in_word`
 - `read_named`
 - `poll`
@@ -27,7 +31,7 @@ published user site and remain repository-maintainer material.
 - High-level typed reads and writes for `U`, `S`, `D`, `L`, and `F`
 - Mixed named snapshots with `read_named`
 - Repeated snapshot streaming with `poll`
-- Contiguous block helpers for words and dwords
+- Explicit contiguous helpers for `single_request` and `chunked` reads
 - Strict lint, type-check, and test coverage in CI
 
 ## Quick Start
@@ -35,11 +39,11 @@ published user site and remain repository-maintainer material.
 ### Basic Usage
 
 ```python
-from hostlink import open_and_connect, read_named, read_typed, write_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, read_typed, write_typed
 
 async def main() -> None:
-    client = await open_and_connect("192.168.250.100", 8501)
-    async with client:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         await write_typed(client, "DM10", "U", dm0)
 

@@ -8,14 +8,18 @@ It intentionally excludes raw protocol methods and low-level client operations.
 
 ```python
 from hostlink import (
+    HostLinkConnectionOptions,
     open_and_connect,
+    normalize_address,
     read_typed,
     write_typed,
     write_bit_in_word,
     read_named,
     poll,
-    read_words,
-    read_dwords,
+    read_words_single_request,
+    read_dwords_single_request,
+    read_words_chunked,
+    read_dwords_chunked,
 )
 from hostlink.errors import (
     HostLinkBaseError,
@@ -34,16 +38,18 @@ from hostlink.errors import (
 
 ## Connection Helper
 
-### `await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)`
+### `await open_and_connect(options)` or `await open_and_connect(host, ...)`
 
 Create and connect a client for use with the helper functions.
 
 Parameters:
 
+- `options`: `HostLinkConnectionOptions(host, port=8501, transport="tcp", timeout=3.0, append_lf_on_send=False)`
 - `host`: PLC IP address or hostname
 - `port`: Host Link port, default `8501`
 - `transport`: `"tcp"` or `"udp"`
 - `timeout`: socket timeout in seconds
+- `append_lf_on_send`: append `LF` after the protocol `CR`
 
 Returns:
 
@@ -52,8 +58,21 @@ Returns:
 Example:
 
 ```python
-async with await open_and_connect("192.168.250.100", 8501) as client:
+options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+async with await open_and_connect(options) as client:
     ...
+```
+
+### `normalize_address(address, default_suffix="")`
+
+Normalize a user-supplied device string into canonical Host Link form.
+
+Examples:
+
+```python
+normalize_address("dm100")      # DM100
+normalize_address("dm100.a")    # DM100.A
+normalize_address("dm100", default_suffix="U")  # DM100.U
 ```
 
 ## Typed Helpers
@@ -108,9 +127,9 @@ await write_typed(client, "DM100", "D", 123456)
 
 ## Contiguous Block Helpers
 
-### `await read_words(client, device, count)`
+### `await read_words_single_request(client, device, count)`
 
-Read contiguous unsigned 16-bit words.
+Read contiguous unsigned 16-bit words using exactly one PLC request.
 
 Parameters:
 
@@ -121,9 +140,11 @@ Returns:
 
 - `list[int]`
 
-### `await read_dwords(client, device, count)`
+If the request does not fit in one PLC operation, this helper returns an error.
 
-Read contiguous unsigned 32-bit values from adjacent words.
+### `await read_dwords_single_request(client, device, count)`
+
+Read contiguous unsigned 32-bit values from adjacent words using exactly one PLC request.
 
 Parameters:
 
@@ -137,9 +158,20 @@ Returns:
 Example:
 
 ```python
-words = await read_words(client, "DM200", 8)
-dwords = await read_dwords(client, "DM300", 4)
+words = await read_words_single_request(client, "DM200", 8)
+dwords = await read_dwords_single_request(client, "DM300", 4)
 ```
+
+### `await read_words_chunked(client, device, count, chunk_words=...)`
+
+Read a large contiguous word range using explicit multi-request chunking.
+
+### `await read_dwords_chunked(client, device, count, chunk_dwords=...)`
+
+Read a large contiguous dword range using explicit multi-request chunking.
+
+`*_chunked` is the opt-in surface for protocol-defined chunk boundaries.
+It must not be confused with `*_single_request`.
 
 ## Bit in Word
 

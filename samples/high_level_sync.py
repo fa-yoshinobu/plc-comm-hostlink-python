@@ -22,12 +22,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from hostlink import (
+    HostLinkConnectionOptions,
+    normalize_address,
     open_and_connect,
     poll,
-    read_dwords,
+    read_dwords_chunked,
+    read_dwords_single_request,
     read_named,
     read_typed,
-    read_words,
+    read_words_chunked,
+    read_words_single_request,
     write_bit_in_word,
     write_typed,
 )
@@ -52,11 +56,16 @@ def parse_args() -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> None:
+    print(f"[normalize_address] dm20 -> {normalize_address('dm20')}")
+    print(f"[normalize_address] dm20.a -> {normalize_address('dm20.a')}")
+
     async with await open_and_connect(
-        args.host,
-        port=args.port,
-        transport=args.transport,
-        timeout=args.timeout,
+        HostLinkConnectionOptions(
+            host=args.host,
+            port=args.port,
+            transport=args.transport,
+            timeout=args.timeout,
+        )
     ) as client:
         print(f"Connected to {args.host}:{args.port} via {args.transport}")
 
@@ -72,10 +81,15 @@ async def run(args: argparse.Namespace) -> None:
         await write_typed(client, "DM14", "F", dm4)
         print("[write_typed] Mirrored DM0/DM1/DM2/DM4 into DM10/DM11/DM12/DM14")
 
-        words = await read_words(client, "DM20", 6)
-        dwords = await read_dwords(client, "DM30", 3)
-        print(f"[read_words] DM20-DM25 = {words}")
-        print(f"[read_dwords] DM30-DM35 = {dwords}")
+        words = await read_words_single_request(client, "DM20", 6)
+        dwords = await read_dwords_single_request(client, "DM30", 3)
+        print(f"[read_words_single_request] DM20-DM25 = {words}")
+        print(f"[read_dwords_single_request] DM30-DM35 = {dwords}")
+
+        large_words = await read_words_chunked(client, "DM1000", 1000)
+        large_dwords = await read_dwords_chunked(client, "DM2000", 120)
+        print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
+        print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
         await write_bit_in_word(client, "DM50", bit_index=0, value=True)
         await write_bit_in_word(client, "DM50", bit_index=3, value=False)

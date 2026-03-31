@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE, DeviceAddress, parse_device
+from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE, DeviceAddress, parse_device, parse_device_text
 from .errors import HostLinkProtocolError
 
 if TYPE_CHECKING:
@@ -56,6 +56,17 @@ class _ReadPlanSegment:
 class _CompiledReadNamedPlan:
     requests_in_input_order: tuple[_ReadPlanRequest, ...]
     segments: tuple[_ReadPlanSegment, ...]
+
+
+@dataclass(frozen=True)
+class HostLinkConnectionOptions:
+    """Stable connection settings for one Host Link session."""
+
+    host: str
+    port: int = 8501
+    transport: str = "tcp"
+    timeout: float = 3.0
+    append_lf_on_send: bool = False
 
 
 async def read_typed(
@@ -461,6 +472,146 @@ def _float32_to_words(value: float) -> tuple[int, int]:
     return bits & 0xFFFF, (bits >> 16) & 0xFFFF
 
 
+def normalize_address(address: str, *, default_suffix: str = "") -> str:
+    """Return the canonical Host Link device string."""
+
+    base, dtype, bit_index = _parse_address(address)
+    base_text = parse_device_text(base, default_suffix=default_suffix)
+    if dtype == "BIT_IN_WORD":
+        assert bit_index is not None
+        return f"{base_text}.{format(bit_index, 'X')}"
+    if ":" in address:
+        return f"{base_text}:{dtype}"
+    return base_text
+
+
+async def read_words_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    count: int,
+) -> list[int]:
+    """Read contiguous unsigned words using one PLC request."""
+
+    values = await client.read_consecutive(device, count, data_format=".U")
+    return [int(v) & 0xFFFF for v in values]
+
+
+async def read_dwords_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    count: int,
+) -> list[int]:
+    """Read contiguous unsigned dwords using one PLC request."""
+
+    words = await read_words_single_request(client, device, count * 2)
+    return [(words[i] | (words[i + 1] << 16)) for i in range(0, count * 2, 2)]
+
+
+async def write_words_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    values: list[int],
+) -> None:
+    """Write contiguous unsigned words using one PLC request."""
+
+    await client.write_consecutive(device, [int(value) & 0xFFFF for value in values], data_format=".U")
+
+
+async def write_dwords_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    values: list[int],
+) -> None:
+    """Write contiguous unsigned dwords using one PLC request."""
+
+    words: list[int] = []
+    for value in values:
+        words.extend((int(value) & 0xFFFF, (int(value) >> 16) & 0xFFFF))
+    await write_words_single_request(client, device, words)
+
+
+async def read_words_chunked(
+    client: AsyncHostLinkClient,
+    device: str,
+    count: int,
+    max_per_request: int = 1000,
+) -> list[int]:
+    """Read contiguous unsigned words across multiple aligned requests."""
+
+    effective_max = max(1, (max_per_request // 2) * 2)
+    start = parse_device(device)
+    result: list[int] = []
+    remaining = count
+    offset = 0
+    while remaining > 0:
+        chunk = min(remaining, effective_max)
+        chunk_device = DeviceAddress(start.device_type, start.number + offset, "").to_text()
+        result.extend(await read_words_single_request(client, chunk_device, chunk))
+        offset += chunk
+        remaining -= chunk
+    return result
+
+
+async def read_dwords_chunked(
+    client: AsyncHostLinkClient,
+    device: str,
+    count: int,
+    max_dwords_per_request: int = 500,
+) -> list[int]:
+    """Read contiguous unsigned dwords across multiple aligned requests."""
+
+    if max_dwords_per_request <= 0:
+        raise ValueError("max_dwords_per_request must be at least 1")
+    start = parse_device(device)
+    result: list[int] = []
+    remaining = count
+    offset = 0
+    while remaining > 0:
+        chunk = min(remaining, max_dwords_per_request)
+        chunk_device = DeviceAddress(start.device_type, start.number + (offset * 2), "").to_text()
+        result.extend(await read_dwords_single_request(client, chunk_device, chunk))
+        offset += chunk
+        remaining -= chunk
+    return result
+
+
+async def write_words_chunked(
+    client: AsyncHostLinkClient,
+    device: str,
+    values: list[int],
+    max_per_request: int = 1000,
+) -> None:
+    """Write contiguous unsigned words across multiple aligned requests."""
+
+    effective_max = max(1, (max_per_request // 2) * 2)
+    start = parse_device(device)
+    offset = 0
+    while offset < len(values):
+        chunk = min(len(values) - offset, effective_max)
+        chunk_device = DeviceAddress(start.device_type, start.number + offset, "").to_text()
+        await write_words_single_request(client, chunk_device, values[offset : offset + chunk])
+        offset += chunk
+
+
+async def write_dwords_chunked(
+    client: AsyncHostLinkClient,
+    device: str,
+    values: list[int],
+    max_dwords_per_request: int = 500,
+) -> None:
+    """Write contiguous unsigned dwords across multiple aligned requests."""
+
+    if max_dwords_per_request <= 0:
+        raise ValueError("max_dwords_per_request must be at least 1")
+    start = parse_device(device)
+    offset = 0
+    while offset < len(values):
+        chunk = min(len(values) - offset, max_dwords_per_request)
+        chunk_device = DeviceAddress(start.device_type, start.number + (offset * 2), "").to_text()
+        await write_dwords_single_request(client, chunk_device, values[offset : offset + chunk])
+        offset += chunk
+
+
 async def read_words(
     client: AsyncHostLinkClient,
     device: str,
@@ -479,8 +630,7 @@ async def read_words(
     Returns:
         A list of unsigned word values in PLC order.
     """
-    values = await client.read_consecutive(device, count, data_format=".U")
-    return [int(v) & 0xFFFF for v in values]
+    return await read_words_single_request(client, device, count)
 
 
 async def read_dwords(
@@ -502,15 +652,15 @@ async def read_dwords(
     Returns:
         A list of Python ``int`` values.
     """
-    words = await read_words(client, device, count * 2)
-    return [(words[i] | (words[i + 1] << 16)) for i in range(0, count * 2, 2)]
+    return await read_dwords_single_request(client, device, count)
 
 
 async def open_and_connect(
-    host: str,
+    host: str | HostLinkConnectionOptions,
     port: int = 8501,
     transport: str = "tcp",
     timeout: float = 3.0,
+    append_lf_on_send: bool = False,
 ) -> AsyncHostLinkClient:
     """
     Create and connect an :class:`AsyncHostLinkClient`.
@@ -536,11 +686,23 @@ async def open_and_connect(
     """
     from .client import AsyncHostLinkClient
 
+    if isinstance(host, HostLinkConnectionOptions):
+        options = host
+    else:
+        options = HostLinkConnectionOptions(
+            host,
+            port=port,
+            transport=transport,
+            timeout=timeout,
+            append_lf_on_send=append_lf_on_send,
+        )
+
     client = AsyncHostLinkClient(
-        host,
-        port=port,
-        transport=transport,
-        timeout=timeout,
+        options.host,
+        port=options.port,
+        transport=options.transport,
+        timeout=options.timeout,
+        append_lf_on_send=options.append_lf_on_send,
         auto_connect=False,
     )
     await client.connect()

@@ -8,8 +8,8 @@ These examples use the recommended helper API only.
 
 | File | Primary APIs | Description |
 |---|---|---|
-| `high_level_async.py` | `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | Full walkthrough of the high-level helper API |
-| `high_level_sync.py` | `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | Normal synchronous CLI entrypoint that internally uses the high-level helper API |
+| `high_level_async.py` | `HostLinkConnectionOptions`, `open_and_connect`, `normalize_address`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `read_words_chunked`, `read_dwords_chunked`, `write_bit_in_word`, `read_named`, `poll` | Full walkthrough of the current high-level helper API |
+| `high_level_sync.py` | `HostLinkConnectionOptions`, `open_and_connect`, `normalize_address`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `read_words_chunked`, `read_dwords_chunked`, `write_bit_in_word`, `read_named`, `poll` | CLI entrypoint that walks the same high-level helper API |
 | `basic_high_level_rw.py` | `read_typed`, `write_typed` | Focused typed read/write example |
 | `named_snapshot.py` | `read_named` | Mixed snapshot example using `read_named` |
 | `polling_monitor.py` | `poll` | Repeated snapshot example using `poll` |

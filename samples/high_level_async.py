@@ -3,8 +3,10 @@
 KEYENCE Host Link - High-Level Asynchronous API Sample
 ======================================================
 Demonstrates all high-level *async* utility helpers shipped with the
-hostlink package (read_typed, write_typed, read_named, read_words,
-read_dwords, write_bit_in_word, poll, open_and_connect).
+hostlink package (HostLinkConnectionOptions, open_and_connect,
+read_typed, write_typed, read_named, read_words_single_request,
+read_dwords_single_request, read_words_chunked, read_dwords_chunked,
+write_bit_in_word, poll, normalize_address).
 
 Usage
 -----
@@ -23,12 +25,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from hostlink import (
+    HostLinkConnectionOptions,
+    normalize_address,
     open_and_connect,
     poll,
-    read_dwords,
+    read_dwords_chunked,
+    read_dwords_single_request,
     read_named,
     read_typed,
-    read_words,
+    read_words_chunked,
+    read_words_single_request,
     write_bit_in_word,
     write_typed,
 )
@@ -75,9 +81,14 @@ async def demo_open_and_connect(host: str, port: int) -> None:
 
     Returns a connected client object for the helper functions below.
     """
-    client = await open_and_connect(host, port=port)
+    client = await open_and_connect(HostLinkConnectionOptions(host=host, port=port))
     print(f"[open_and_connect] Connected to {host}:{port}")
     await client.close()
+
+
+def demo_normalize_address() -> None:
+    print(f"[normalize_address] dm100 -> {normalize_address('dm100')}")
+    print(f"[normalize_address] dm100.a -> {normalize_address('dm100.a')}")
 
 
 async def demo_typed_rw(client) -> None:
@@ -107,19 +118,24 @@ async def demo_typed_rw(client) -> None:
 
 async def demo_array_reads(client) -> None:
     """
-    read_words / read_dwords - read contiguous word / dword blocks.
+    Explicit contiguous helpers.
 
-    read_words(client, device, count)  - returns list[int] (16-bit)
-    read_dwords(client, device, count) - returns list[int] (32-bit, uint)
+    `*_single_request` keeps one logical read on one PLC request.
+    `*_chunked` is the explicit opt-in surface for large multi-request reads.
 
     Use case: reading a data table of 10 consecutive words in one
               Host Link command instead of 10 individual reads.
     """
-    words = await read_words(client, "DM0", 10)
-    print(f"[read_words]  DM0-DM9  = {words}")
+    words = await read_words_single_request(client, "DM0", 10)
+    print(f"[read_words_single_request]  DM0-DM9  = {words}")
 
-    dwords = await read_dwords(client, "DM0", 4)
-    print(f"[read_dwords] DM0-DM7 (as 4 x uint32) = {dwords}")
+    dwords = await read_dwords_single_request(client, "DM0", 4)
+    print(f"[read_dwords_single_request] DM0-DM7 (as 4 x uint32) = {dwords}")
+
+    large_words = await read_words_chunked(client, "DM1000", 1000)
+    large_dwords = await read_dwords_chunked(client, "DM2000", 120)
+    print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
+    print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
 
 async def demo_bit_in_word(client) -> None:
@@ -189,11 +205,13 @@ async def demo_poll(client, count: int) -> None:
 
 
 async def run(args: argparse.Namespace) -> None:
+    demo_normalize_address()
+
     # 1. open_and_connect shortcut
     await demo_open_and_connect(args.host, args.port)
 
     # 2-6. connect once, run all demos
-    client = await open_and_connect(args.host, port=args.port)
+    client = await open_and_connect(HostLinkConnectionOptions(host=args.host, port=args.port))
     try:
         await demo_typed_rw(client)
         await demo_array_reads(client)

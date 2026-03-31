@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1] / "src"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from hostlink import open_and_connect, read_typed, write_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, write_typed
 from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
 
 
@@ -24,7 +24,8 @@ def parse_args() -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> None:
-    async with await open_and_connect(args.host, args.port) as client:
+    options = HostLinkConnectionOptions(host=args.host, port=args.port)
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         dm1 = await read_typed(client, "DM1", "S")
         dm2 = await read_typed(client, "DM2", "D")

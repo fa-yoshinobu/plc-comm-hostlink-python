@@ -4,14 +4,18 @@ This guide covers the recommended high-level helper API only.
 
 Use these helpers for normal application code:
 
+- `HostLinkConnectionOptions`
 - `open_and_connect`
+- `normalize_address`
 - `read_typed`
 - `write_typed`
 - `write_bit_in_word`
 - `read_named`
 - `poll`
-- `read_words`
-- `read_dwords`
+- `read_words_single_request`
+- `read_dwords_single_request`
+- `read_words_chunked`
+- `read_dwords_chunked`
 
 Raw protocol methods and low-level client APIs are intentionally left to the
 maintainer documentation.
@@ -27,11 +31,12 @@ pip install .
 ```python
 import asyncio
 
-from hostlink import open_and_connect
+from hostlink import HostLinkConnectionOptions, open_and_connect
 
 
 async def main() -> None:
-    async with await open_and_connect("192.168.250.100", 8501) as client:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options) as client:
         print("Connected")
 
 
@@ -40,7 +45,8 @@ if __name__ == "__main__":
 ```
 
 `open_and_connect` returns a connected async client object that is then used by
-the helper functions below.
+the helper functions below. `HostLinkConnectionOptions` is the recommended way
+to keep transport and timeout settings explicit.
 
 ## Typed Read and Write
 
@@ -57,11 +63,12 @@ Supported dtype codes:
 ```python
 import asyncio
 
-from hostlink import open_and_connect, read_typed, write_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, write_typed
 
 
 async def main() -> None:
-    async with await open_and_connect("192.168.250.100") as client:
+    options = HostLinkConnectionOptions(host="192.168.250.100")
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         signed = await read_typed(client, "DM10", "S")
         counter = await read_typed(client, "DM20", "D")
@@ -82,15 +89,18 @@ float32.
 
 ## Block Reads
 
-Use block helpers when you need contiguous data from a word area.
+Use explicit contiguous helpers when you need data from one word area.
 
 ```python
-words = await read_words(client, "DM200", 8)
-dwords = await read_dwords(client, "DM300", 4)
+words = await read_words_single_request(client, "DM200", 8)
+dwords = await read_dwords_single_request(client, "DM300", 4)
+
+large_words = await read_words_chunked(client, "DM1000", 1000)
+large_dwords = await read_dwords_chunked(client, "DM2000", 120)
 ```
 
-- `read_words` returns `list[int]`
-- `read_dwords` returns `list[int]` assembled from adjacent words
+- `*_single_request` returns an error instead of silently splitting one logical read
+- `*_chunked` is the explicit opt-in surface for multi-request contiguous reads
 
 ## Bit in Word
 
@@ -177,7 +187,7 @@ except HostLinkError as ex:
 
 | API / workflow | Sample | Purpose |
 |---|---|---|
-| `open_and_connect`, `read_typed`, `write_typed`, `read_words`, `read_dwords`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | Full async walkthrough of the helper layer |
+| `HostLinkConnectionOptions`, `open_and_connect`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `read_words_chunked`, `read_dwords_chunked`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | Full async walkthrough of the helper layer |
 | Synchronous entrypoint over the helper layer | `samples/high_level_sync.py` | CLI wrapper that uses `asyncio.run` internally |
 | `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read and write example |
 | `read_named` | `samples/named_snapshot.py` | Mixed snapshot example |
