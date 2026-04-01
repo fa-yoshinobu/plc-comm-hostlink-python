@@ -60,7 +60,20 @@ class _CompiledReadNamedPlan:
 
 @dataclass(frozen=True)
 class HostLinkConnectionOptions:
-    """Stable connection settings for one Host Link session."""
+    """Stable connection settings for one Host Link session.
+
+    The dataclass is the preferred input for :func:`open_and_connect` because
+    it keeps transport, timeout, and framing options together in one explicit
+    object.
+
+    Attributes:
+        host: PLC hostname or IP address.
+        port: Host Link port number.
+        transport: Transport name such as ``"tcp"`` or ``"udp"``.
+        timeout: Socket timeout in seconds.
+        append_lf_on_send: Whether an LF byte is appended after the trailing
+            CR on transmitted commands.
+    """
 
     host: str
     port: int = 8501
@@ -473,7 +486,18 @@ def _float32_to_words(value: float) -> tuple[int, int]:
 
 
 def normalize_address(address: str, *, default_suffix: str = "") -> str:
-    """Return the canonical Host Link device string."""
+    """Return the canonical Host Link device string.
+
+    The helper normalizes device-family spelling, trims whitespace, and keeps
+    explicit dtype or bit-in-word intent when present.
+
+    Args:
+        address: User-facing address such as ``"dm100:f"`` or ``"DM100.a"``.
+        default_suffix: Optional default format used by :func:`parse_device_text`.
+
+    Returns:
+        Canonical uppercase address text.
+    """
 
     base, dtype, bit_index = _parse_address(address)
     base_text = parse_device_text(base, default_suffix=default_suffix)
@@ -490,7 +514,12 @@ async def read_words_single_request(
     device: str,
     count: int,
 ) -> list[int]:
-    """Read contiguous unsigned words using one PLC request."""
+    """Read contiguous unsigned words using one PLC request.
+
+    This helper is the explicit atomic path for one consecutive read. If the
+    caller wants multiple protocol requests, use :func:`read_words_chunked`
+    instead.
+    """
 
     values = await client.read_consecutive(device, count, data_format=".U")
     return [int(v) & 0xFFFF for v in values]
@@ -501,7 +530,11 @@ async def read_dwords_single_request(
     device: str,
     count: int,
 ) -> list[int]:
-    """Read contiguous unsigned dwords using one PLC request."""
+    """Read contiguous unsigned dwords using one PLC request.
+
+    Adjacent word pairs are combined in low-word, high-word order. The helper
+    never silently splits the logical request.
+    """
 
     words = await read_words_single_request(client, device, count * 2)
     return [(words[i] | (words[i + 1] << 16)) for i in range(0, count * 2, 2)]
@@ -512,7 +545,12 @@ async def write_words_single_request(
     device: str,
     values: list[int],
 ) -> None:
-    """Write contiguous unsigned words using one PLC request."""
+    """Write contiguous unsigned words using one PLC request.
+
+    This helper is intended for ranges that should remain one logical Host
+    Link write. Use :func:`write_words_chunked` only when multiple requests are
+    acceptable to the caller.
+    """
 
     await client.write_consecutive(device, [int(value) & 0xFFFF for value in values], data_format=".U")
 
@@ -522,7 +560,11 @@ async def write_dwords_single_request(
     device: str,
     values: list[int],
 ) -> None:
-    """Write contiguous unsigned dwords using one PLC request."""
+    """Write contiguous unsigned dwords using one PLC request.
+
+    Each Python ``int`` is encoded as two ``.U`` words in low-word, high-word
+    order before the consecutive write is sent.
+    """
 
     words: list[int] = []
     for value in values:
@@ -536,7 +578,11 @@ async def read_words_chunked(
     count: int,
     max_per_request: int = 1000,
 ) -> list[int]:
-    """Read contiguous unsigned words across multiple aligned requests."""
+    """Read contiguous unsigned words across multiple aligned requests.
+
+    Chunking is explicit here. The helper aligns chunk sizes so the related
+    dword helper can reuse the same boundary rules safely.
+    """
 
     effective_max = max(1, (max_per_request // 2) * 2)
     start = parse_device(device)
@@ -558,7 +604,11 @@ async def read_dwords_chunked(
     count: int,
     max_dwords_per_request: int = 500,
 ) -> list[int]:
-    """Read contiguous unsigned dwords across multiple aligned requests."""
+    """Read contiguous unsigned dwords across multiple aligned requests.
+
+    Chunk boundaries are aligned to full 32-bit values so one dword is never
+    torn across requests.
+    """
 
     if max_dwords_per_request <= 0:
         raise ValueError("max_dwords_per_request must be at least 1")
@@ -581,7 +631,11 @@ async def write_words_chunked(
     values: list[int],
     max_per_request: int = 1000,
 ) -> None:
-    """Write contiguous unsigned words across multiple aligned requests."""
+    """Write contiguous unsigned words across multiple aligned requests.
+
+    Use this helper only when multi-request write semantics are acceptable to
+    the caller.
+    """
 
     effective_max = max(1, (max_per_request // 2) * 2)
     start = parse_device(device)
@@ -599,7 +653,11 @@ async def write_dwords_chunked(
     values: list[int],
     max_dwords_per_request: int = 500,
 ) -> None:
-    """Write contiguous unsigned dwords across multiple aligned requests."""
+    """Write contiguous unsigned dwords across multiple aligned requests.
+
+    Each chunk boundary is aligned to full dwords so one 32-bit value remains
+    intact inside one request.
+    """
 
     if max_dwords_per_request <= 0:
         raise ValueError("max_dwords_per_request must be at least 1")
@@ -670,10 +728,13 @@ async def open_and_connect(
     client with ``auto_connect=False`` and then calling ``await client.connect()``.
 
     Args:
-        host: PLC IP address or hostname.
+        host: PLC IP address, hostname, or a :class:`HostLinkConnectionOptions`
+            instance.
         port: Host Link port. Defaults to ``8501``.
         transport: Transport string such as ``"tcp"`` or ``"udp"``.
         timeout: Socket timeout in seconds.
+        append_lf_on_send: Whether an LF byte is appended after the terminating
+            CR when sending commands.
 
     Returns:
         A connected :class:`AsyncHostLinkClient`.
