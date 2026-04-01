@@ -7,6 +7,7 @@ name = "kv-hostlink"
 version = "0.1.4"
 description = "Python library for KEYENCE KV series Host Link (Upper Link) communication."
 authors = [{ name = "fa-yoshinobu" }]
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = []
 readme = "README.md"
@@ -14,7 +15,6 @@ readme = "README.md"
 license-files = ["LICENSE"]
 keywords = ["keyence", "kv", "hostlink", "upper-link", "plc", "tcp", "udp"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",

@@ -660,11 +660,15 @@ Communication protocol.</p>
 <p>This published site intentionally focuses on the recommended high-level helper
 API:</p>
 <ul>
+<li><code>HostLinkConnectionOptions</code></li>
 <li><code>open_and_connect</code></li>
+<li><code>normalize_address</code></li>
 <li><code>read_typed</code></li>
 <li><code>write_typed</code></li>
-<li><code>read_words</code></li>
-<li><code>read_dwords</code></li>
+<li><code>read_words_single_request</code></li>
+<li><code>read_dwords_single_request</code></li>
+<li><code>read_words_chunked</code></li>
+<li><code>read_dwords_chunked</code></li>
 <li><code>write_bit_in_word</code></li>
 <li><code>read_named</code></li>
 <li><code>poll</code></li>
@@ -676,16 +680,16 @@ published user site and remain repository-maintainer material.</p>
 <li>High-level typed reads and writes for <code>U</code>, <code>S</code>, <code>D</code>, <code>L</code>, and <code>F</code></li>
 <li>Mixed named snapshots with <code>read_named</code></li>
 <li>Repeated snapshot streaming with <code>poll</code></li>
-<li>Contiguous block helpers for words and dwords</li>
+<li>Explicit contiguous helpers for <code>single_request</code> and <code>chunked</code> reads</li>
 <li>Strict lint, type-check, and test coverage in CI</li>
 </ul>
 <h2 id="quick-start">Quick Start</h2>
 <h3 id="basic-usage">Basic Usage</h3>
-<pre><code class="language-python">from hostlink import open_and_connect, read_named, read_typed, write_typed
+<pre><code class="language-python">from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, read_typed, write_typed
 
 async def main() -&gt; None:
-    client = await open_and_connect(&quot;192.168.250.100&quot;, 8501)
-    async with client:
+    options = HostLinkConnectionOptions(host=&quot;192.168.250.100&quot;, port=8501)
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, &quot;DM0&quot;, &quot;U&quot;)
         await write_typed(client, &quot;DM10&quot;, &quot;U&quot;, dm0)
 

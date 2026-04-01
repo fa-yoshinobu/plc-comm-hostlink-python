@@ -356,10 +356,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#await-open_and_connecthost-port8501-transporttcp-timeout30" class="md-nav__link">
+  <a href="#await-open_and_connectoptions-or-await-open_and_connecthost" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)
+        await open_and_connect(options) or await open_and_connect(host, ...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalize_addressaddress-default_suffix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize_address(address, default_suffix="")
       
     </span>
   </a>
@@ -423,10 +434,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#await-read_wordsclient-device-count" class="md-nav__link">
+  <a href="#await-read_words_single_requestclient-device-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await read_words(client, device, count)
+        await read_words_single_request(client, device, count)
       
     </span>
   </a>
@@ -434,10 +445,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#await-read_dwordsclient-device-count" class="md-nav__link">
+  <a href="#await-read_dwords_single_requestclient-device-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await read_dwords(client, device, count)
+        await read_dwords_single_request(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_words_chunkedclient-device-count-chunk_words" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_words_chunked(client, device, count, chunk_words=...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_dwords_chunkedclient-device-count-chunk_dwords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_dwords_chunked(client, device, count, chunk_dwords=...)
       
     </span>
   </a>
@@ -694,10 +727,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#await-open_and_connecthost-port8501-transporttcp-timeout30" class="md-nav__link">
+  <a href="#await-open_and_connectoptions-or-await-open_and_connecthost" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)
+        await open_and_connect(options) or await open_and_connect(host, ...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalize_addressaddress-default_suffix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        normalize_address(address, default_suffix="")
       
     </span>
   </a>
@@ -761,10 +805,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#await-read_wordsclient-device-count" class="md-nav__link">
+  <a href="#await-read_words_single_requestclient-device-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await read_words(client, device, count)
+        await read_words_single_request(client, device, count)
       
     </span>
   </a>
@@ -772,10 +816,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#await-read_dwordsclient-device-count" class="md-nav__link">
+  <a href="#await-read_dwords_single_requestclient-device-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        await read_dwords(client, device, count)
+        await read_dwords_single_request(client, device, count)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_words_chunkedclient-device-count-chunk_words" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_words_chunked(client, device, count, chunk_words=...)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#await-read_dwords_chunkedclient-device-count-chunk_dwords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        await read_dwords_chunked(client, device, count, chunk_dwords=...)
       
     </span>
   </a>
@@ -904,14 +970,18 @@
 <p>It intentionally excludes raw protocol methods and low-level client operations.</p>
 <h2 id="imports">Imports</h2>
 <pre><code class="language-python">from hostlink import (
+    HostLinkConnectionOptions,
     open_and_connect,
+    normalize_address,
     read_typed,
     write_typed,
     write_bit_in_word,
     read_named,
     poll,
-    read_words,
-    read_dwords,
+    read_words_single_request,
+    read_dwords_single_request,
+    read_words_chunked,
+    read_dwords_chunked,
 )
 from hostlink.errors import (
     HostLinkBaseError,
@@ -928,22 +998,32 @@ from hostlink.errors import (
 <li><code>HostLinkConnectionError</code>: connect, disconnect, socket, or timeout failure</li>
 </ul>
 <h2 id="connection-helper">Connection Helper</h2>
-<h3 id="await-open_and_connecthost-port8501-transporttcp-timeout30"><code>await open_and_connect(host, port=8501, transport="tcp", timeout=3.0)</code></h3>
+<h3 id="await-open_and_connectoptions-or-await-open_and_connecthost"><code>await open_and_connect(options)</code> or <code>await open_and_connect(host, ...)</code></h3>
 <p>Create and connect a client for use with the helper functions.</p>
 <p>Parameters:</p>
 <ul>
+<li><code>options</code>: <code>HostLinkConnectionOptions(host, port=8501, transport="tcp", timeout=3.0, append_lf_on_send=False)</code></li>
 <li><code>host</code>: PLC IP address or hostname</li>
 <li><code>port</code>: Host Link port, default <code>8501</code></li>
 <li><code>transport</code>: <code>"tcp"</code> or <code>"udp"</code></li>
 <li><code>timeout</code>: socket timeout in seconds</li>
+<li><code>append_lf_on_send</code>: append <code>LF</code> after the protocol <code>CR</code></li>
 </ul>
 <p>Returns:</p>
 <ul>
 <li>A connected async client object for use with the helpers below</li>
 </ul>
 <p>Example:</p>
-<pre><code class="language-python">async with await open_and_connect(&quot;192.168.250.100&quot;, 8501) as client:
+<pre><code class="language-python">options = HostLinkConnectionOptions(host=&quot;192.168.250.100&quot;, port=8501)
+async with await open_and_connect(options) as client:
     ...
+</code></pre>
+<h3 id="normalize_addressaddress-default_suffix"><code>normalize_address(address, default_suffix="")</code></h3>
+<p>Normalize a user-supplied device string into canonical Host Link form.</p>
+<p>Examples:</p>
+<pre><code class="language-python">normalize_address(&quot;dm100&quot;)      # DM100
+normalize_address(&quot;dm100.a&quot;)    # DM100.A
+normalize_address(&quot;dm100&quot;, default_suffix=&quot;U&quot;)  # DM100.U
 </code></pre>
 <h2 id="typed-helpers">Typed Helpers</h2>
 <p>Supported dtype codes:</p>
@@ -1012,8 +1092,8 @@ from hostlink.errors import (
 <pre><code class="language-python">await write_typed(client, &quot;DM100&quot;, &quot;D&quot;, 123456)
 </code></pre>
 <h2 id="contiguous-block-helpers">Contiguous Block Helpers</h2>
-<h3 id="await-read_wordsclient-device-count"><code>await read_words(client, device, count)</code></h3>
-<p>Read contiguous unsigned 16-bit words.</p>
+<h3 id="await-read_words_single_requestclient-device-count"><code>await read_words_single_request(client, device, count)</code></h3>
+<p>Read contiguous unsigned 16-bit words using exactly one PLC request.</p>
 <p>Parameters:</p>
 <ul>
 <li><code>device</code>: start address such as <code>"DM200"</code></li>
@@ -1023,8 +1103,9 @@ from hostlink.errors import (
 <ul>
 <li><code>list[int]</code></li>
 </ul>
-<h3 id="await-read_dwordsclient-device-count"><code>await read_dwords(client, device, count)</code></h3>
-<p>Read contiguous unsigned 32-bit values from adjacent words.</p>
+<p>If the request does not fit in one PLC operation, this helper returns an error.</p>
+<h3 id="await-read_dwords_single_requestclient-device-count"><code>await read_dwords_single_request(client, device, count)</code></h3>
+<p>Read contiguous unsigned 32-bit values from adjacent words using exactly one PLC request.</p>
 <p>Parameters:</p>
 <ul>
 <li><code>device</code>: start address such as <code>"DM300"</code></li>
@@ -1035,9 +1116,15 @@ from hostlink.errors import (
 <li><code>list[int]</code></li>
 </ul>
 <p>Example:</p>
-<pre><code class="language-python">words = await read_words(client, &quot;DM200&quot;, 8)
-dwords = await read_dwords(client, &quot;DM300&quot;, 4)
+<pre><code class="language-python">words = await read_words_single_request(client, &quot;DM200&quot;, 8)
+dwords = await read_dwords_single_request(client, &quot;DM300&quot;, 4)
 </code></pre>
+<h3 id="await-read_words_chunkedclient-device-count-chunk_words"><code>await read_words_chunked(client, device, count, chunk_words=...)</code></h3>
+<p>Read a large contiguous word range using explicit multi-request chunking.</p>
+<h3 id="await-read_dwords_chunkedclient-device-count-chunk_dwords"><code>await read_dwords_chunked(client, device, count, chunk_dwords=...)</code></h3>
+<p>Read a large contiguous dword range using explicit multi-request chunking.</p>
+<p><code>*_chunked</code> is the opt-in surface for protocol-defined chunk boundaries.
+It must not be confused with <code>*_single_request</code>.</p>
 <h2 id="bit-in-word">Bit in Word</h2>
 <h3 id="await-write_bit_in_wordclient-device-bit_index-value"><code>await write_bit_in_word(client, device, bit_index, value)</code></h3>
 <p>Update a single bit inside a word device by read-modify-write.</p>

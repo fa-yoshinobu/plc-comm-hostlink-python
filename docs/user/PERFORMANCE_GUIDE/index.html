@@ -612,8 +612,8 @@
 <h2 id="4-bulk-reads">4. Bulk Reads</h2>
 <p>Prefer the high-level batch helpers instead of many single-value reads.</p>
 <ul>
-<li>Use <code>read_words</code> for contiguous 16-bit word blocks.</li>
-<li>Use <code>read_dwords</code> for contiguous 32-bit values.</li>
+<li>Use <code>read_words_single_request</code> and <code>read_dwords_single_request</code> when one logical block must stay on one PLC request.</li>
+<li>Use <code>read_words_chunked</code> and <code>read_dwords_chunked</code> only when multi-request contiguous reads are explicitly acceptable.</li>
 <li>Use <code>read_named</code> when the snapshot mixes types or bit-in-word values.</li>
 </ul>
 <p>These helpers reduce round-trips and usually outperform repeated <code>read_typed</code> calls.</p>

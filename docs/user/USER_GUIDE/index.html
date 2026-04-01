@@ -655,14 +655,18 @@
 <p>This guide covers the recommended high-level helper API only.</p>
 <p>Use these helpers for normal application code:</p>
 <ul>
+<li><code>HostLinkConnectionOptions</code></li>
 <li><code>open_and_connect</code></li>
+<li><code>normalize_address</code></li>
 <li><code>read_typed</code></li>
 <li><code>write_typed</code></li>
 <li><code>write_bit_in_word</code></li>
 <li><code>read_named</code></li>
 <li><code>poll</code></li>
-<li><code>read_words</code></li>
-<li><code>read_dwords</code></li>
+<li><code>read_words_single_request</code></li>
+<li><code>read_dwords_single_request</code></li>
+<li><code>read_words_chunked</code></li>
+<li><code>read_dwords_chunked</code></li>
 </ul>
 <p>Raw protocol methods and low-level client APIs are intentionally left to the
 maintainer documentation.</p>
@@ -672,11 +676,12 @@ maintainer documentation.</p>
 <h2 id="connect-once">Connect Once</h2>
 <pre><code class="language-python">import asyncio
 
-from hostlink import open_and_connect
+from hostlink import HostLinkConnectionOptions, open_and_connect
 
 
 async def main() -&gt; None:
-    async with await open_and_connect(&quot;192.168.250.100&quot;, 8501) as client:
+    options = HostLinkConnectionOptions(host=&quot;192.168.250.100&quot;, port=8501)
+    async with await open_and_connect(options) as client:
         print(&quot;Connected&quot;)
 
 
@@ -684,7 +689,8 @@ if __name__ == &quot;__main__&quot;:
     asyncio.run(main())
 </code></pre>
 <p><code>open_and_connect</code> returns a connected async client object that is then used by
-the helper functions below.</p>
+the helper functions below. <code>HostLinkConnectionOptions</code> is the recommended way
+to keep transport and timeout settings explicit.</p>
 <h2 id="typed-read-and-write">Typed Read and Write</h2>
 <p>Supported dtype codes:</p>
 <table>
@@ -725,11 +731,12 @@ the helper functions below.</p>
 </table>
 <pre><code class="language-python">import asyncio
 
-from hostlink import open_and_connect, read_typed, write_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, write_typed
 
 
 async def main() -&gt; None:
-    async with await open_and_connect(&quot;192.168.250.100&quot;) as client:
+    options = HostLinkConnectionOptions(host=&quot;192.168.250.100&quot;)
+    async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, &quot;DM0&quot;, &quot;U&quot;)
         signed = await read_typed(client, &quot;DM10&quot;, &quot;S&quot;)
         counter = await read_typed(client, &quot;DM20&quot;, &quot;D&quot;)
@@ -747,13 +754,16 @@ if __name__ == &quot;__main__&quot;:
 <p><code>F</code> is implemented in the helper layer by converting two <code>.U</code> words as
 float32.</p>
 <h2 id="block-reads">Block Reads</h2>
-<p>Use block helpers when you need contiguous data from a word area.</p>
-<pre><code class="language-python">words = await read_words(client, &quot;DM200&quot;, 8)
-dwords = await read_dwords(client, &quot;DM300&quot;, 4)
+<p>Use explicit contiguous helpers when you need data from one word area.</p>
+<pre><code class="language-python">words = await read_words_single_request(client, &quot;DM200&quot;, 8)
+dwords = await read_dwords_single_request(client, &quot;DM300&quot;, 4)
+
+large_words = await read_words_chunked(client, &quot;DM1000&quot;, 1000)
+large_dwords = await read_dwords_chunked(client, &quot;DM2000&quot;, 120)
 </code></pre>
 <ul>
-<li><code>read_words</code> returns <code>list[int]</code></li>
-<li><code>read_dwords</code> returns <code>list[int]</code> assembled from adjacent words</li>
+<li><code>*_single_request</code> returns an error instead of silently splitting one logical read</li>
+<li><code>*_chunked</code> is the explicit opt-in surface for multi-request contiguous reads</li>
 </ul>
 <h2 id="bit-in-word">Bit in Word</h2>
 <p>Use <code>write_bit_in_word</code> for bit updates inside word devices such as <code>DM</code>, <code>EM</code>,
@@ -875,7 +885,7 @@ except HostLinkError as ex:
 </thead>
 <tbody>
 <tr>
-<td><code>open_and_connect</code>, <code>read_typed</code>, <code>write_typed</code>, <code>read_words</code>, <code>read_dwords</code>, <code>write_bit_in_word</code>, <code>read_named</code>, <code>poll</code></td>
+<td><code>HostLinkConnectionOptions</code>, <code>open_and_connect</code>, <code>read_typed</code>, <code>write_typed</code>, <code>read_words_single_request</code>, <code>read_dwords_single_request</code>, <code>read_words_chunked</code>, <code>read_dwords_chunked</code>, <code>write_bit_in_word</code>, <code>read_named</code>, <code>poll</code></td>
 <td><code>samples/high_level_async.py</code></td>
 <td>Full async walkthrough of the helper layer</td>
 </tr>
