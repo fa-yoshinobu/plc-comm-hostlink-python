@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive `docsrc/user/USER_GUIDE.md` for end-users.
 - Documentation for `AsyncHostLinkClient` in `docsrc/user/API_REFERENCE.md`.
-- Connectivity verification evidence: `docsrc/validation/reports/QA_REPORT_20260319_KV7500.md`.
+- Internal connectivity verification evidence: `internal_docs/validation/reports/QA_REPORT_20260319_KV7500.md`.
 - Stability and stress test samples in `samples/` directory.
 
 ### Changed

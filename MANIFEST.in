@@ -1,2 +1,1 @@
-prune docsrc/maintainer
-prune docsrc/validation
+prune internal_docs

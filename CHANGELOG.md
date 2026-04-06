@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `scripts/check_user_samples.py` to validate user-facing sample scripts by compiling them and running `--help`.
 - Added `release_check.bat` as a one-step release gate that runs CI (lint/format/mypy/docs coverage/samples/tests) and then rebuilds the published MkDocs site.
 - Added three high-level user samples: `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, and `samples/polling_monitor.py`.
-- Added `MANIFEST.in` pruning for `docsrc/maintainer/` and `docsrc/validation/` so source distributions omit maintainer-only docs.
+- Added `MANIFEST.in` pruning for `internal_docs/` so source distributions omit maintainer-only docs.
 
 ### Changed
 - Updated README, user docs, and samples to describe the current helper API coverage, including API-to-sample mapping tables.
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive `docsrc/user/USER_GUIDE.md` for end-users.
 - Documentation for `AsyncHostLinkClient` in `docsrc/user/API_REFERENCE.md`.
-- Connectivity verification evidence: `docsrc/validation/reports/QA_REPORT_20260319_KV7500.md`.
+- Internal connectivity verification evidence: `internal_docs/validation/reports/QA_REPORT_20260319_KV7500.md`.
 - Stability and stress test samples in `samples/` directory.
 
 ### Changed

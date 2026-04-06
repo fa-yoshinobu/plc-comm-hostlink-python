@@ -53,8 +53,8 @@ include-package-data = true
 [tool.setuptools.exclude-package-data]
 "*" = [
     "TODO.md",
-    "docsrc/maintainer/*",
-    "docsrc/validation/*",
+    "internal_docs/*",
+    "internal_docs/**/*",
     "tests/*",
     "scripts/*",
     "samples/*"

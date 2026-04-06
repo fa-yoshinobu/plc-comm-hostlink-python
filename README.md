@@ -8,46 +8,32 @@
 
 # KV Host Link Protocol for Python
 
-![Illustration](docsrc/assets/kv.png)
+![Illustration](https://raw.githubusercontent.com/fa-yoshinobu/plc-comm-hostlink-python/main/docsrc/assets/kv.png)
 
-High-performance Python library for KEYENCE KV series PLCs using the Host Link
-(Upper Link) protocol.
+High-performance Python library for KEYENCE KV series PLCs using the Host Link (Upper Link) protocol.
 
 This README intentionally covers the recommended high-level helper API only:
-`HostLinkConnectionOptions`, `open_and_connect`, `normalize_address`,
-`read_typed`, `write_typed`, `write_bit_in_word`, `read_named`, `poll`,
-`read_words_single_request`, `read_dwords_single_request`,
-`read_words_chunked`, and `read_dwords_chunked`.
 
-Low-level client methods and protocol-level details are kept in maintainer
-documentation.
-
-## Key Features
-
-- High-level helper API for typed reads, writes, snapshots, and polling
-- Typed helpers for `U`, `S`, `D`, `L`, and helper-level `F`
-- Mixed snapshots with `read_named`
-- Batch-friendly polling with `poll`
-- Contiguous block helpers with explicit `single_request` and `chunked` entry points
-- Hardware-verified against KV-7500
+- `HostLinkConnectionOptions`
+- `open_and_connect`
+- `normalize_address`
+- `read_typed`
+- `write_typed`
+- `write_bit_in_word`
+- `read_named`
+- `poll`
+- `read_words_single_request`
+- `read_dwords_single_request`
+- `read_words_chunked`
+- `read_dwords_chunked`
 
 ## Installation
-
-Install the latest PyPI release:
 
 ```bash
 pip install kv-hostlink
 ```
 
-For local development:
-
-```bash
-git clone https://github.com/fa-yoshinobu/plc-comm-hostlink-python.git
-cd plc-comm-hostlink-python
-pip install -e .
-```
-
-Published metadata lives at https://pypi.org/project/kv-hostlink/, where wheel/tarball downloads are also available.
+Published metadata lives at <https://pypi.org/project/kv-hostlink/>, where wheel and tarball downloads are also available.
 
 ## Quick Start
 
@@ -79,6 +65,31 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## Supported PLC Registers
+
+Start with these public high-level families first:
+
+- word devices: `DM`, `EM`, `FM`, `W`, `ZF`, `TM`, `Z`
+- bit devices: `R`, `MR`, `LR`, `CR`, `X`, `Y`, `M`, `L`
+- typed forms: `DM100:S`, `DM100:D`, `DM100:L`, `DM100:F`
+- bit-in-word forms: `DM100.3`, `DM100.A`
+- timer/counter scalar forms: `T10:D`, `C10:D`
+
+See the full public table in [Supported PLC Registers](docsrc/user/SUPPORTED_REGISTERS.md).
+
+## Public Documentation
+
+- [Getting Started](docsrc/user/GETTING_STARTED.md)
+- [Supported PLC Registers](docsrc/user/SUPPORTED_REGISTERS.md)
+- [Latest Communication Verification](docsrc/user/LATEST_COMMUNICATION_VERIFICATION.md)
+- [User Guide](docsrc/user/USER_GUIDE.md)
+- [API Reference](docsrc/user/API_REFERENCE.md)
+- [Troubleshooting](docsrc/user/TROUBLESHOOTING.md)
+- [Performance Guide](docsrc/user/PERFORMANCE_GUIDE.md)
+- [Samples](samples/README.md)
+
+Maintainer-only notes and retained evidence live under `internal_docs/`.
+
 ## Common Workflows
 
 Address normalization:
@@ -97,78 +108,17 @@ words = await read_words_single_request(client, "DM100", 10)
 dwords = await read_dwords_single_request(client, "DM200", 4)
 ```
 
-Explicit chunked contiguous reads:
-
-```python
-large_words = await read_words_chunked(client, "DM1000", 1000)
-large_dwords = await read_dwords_chunked(client, "DM2000", 120)
-```
-
 Bit-in-word update:
 
 ```python
 await write_bit_in_word(client, "DM50", bit_index=3, value=True)
 ```
 
-Polling:
-
-```python
-async for snapshot in poll(client, ["DM100", "DM101:L", "DM50.3"], interval=1.0):
-    print(snapshot)
-```
-
-## Sample Programs
-
-User-facing high-level examples:
-
-- `samples/high_level_async.py`
-- `samples/high_level_sync.py`
-- `samples/basic_high_level_rw.py`
-- `samples/named_snapshot.py`
-- `samples/polling_monitor.py`
-
-API and workflow to sample mapping:
-
-| API / workflow | Primary sample | Purpose |
-|---|---|---|
-| `HostLinkConnectionOptions`, `open_and_connect`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | End-to-end async walkthrough of the full helper surface |
-| Synchronous CLI entrypoint for the same helper surface | `samples/high_level_sync.py` | Shows how to wrap the async helper API behind `asyncio.run` |
-| `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read/write mirror example |
-| `read_named` | `samples/named_snapshot.py` | Mixed typed and bit-in-word snapshot example |
-| `poll` | `samples/polling_monitor.py` | Repeated snapshot monitoring loop |
-
-Run examples:
-
-```bash
-python samples/high_level_async.py --host 192.168.250.100
-python samples/high_level_sync.py --host 192.168.250.100
-python samples/basic_high_level_rw.py --host 192.168.250.100
-python samples/named_snapshot.py --host 192.168.250.100
-python samples/polling_monitor.py --host 192.168.250.100 --poll-count 5
-```
-
-## Documentation
-
-User documentation:
-
-- [User Guide](docsrc/user/USER_GUIDE.md)
-- [API Reference](docsrc/user/API_REFERENCE.md)
-- [Troubleshooting](docsrc/user/TROUBLESHOOTING.md)
-- [Performance Tuning](docsrc/user/PERFORMANCE_GUIDE.md)
-- [Samples](samples/README.md)
-
-Maintainer and QA documentation:
-
-- [QA Evidence](docsrc/validation/reports/)
-- [Protocol Specification](docsrc/maintainer/PROTOCOL_SPEC.md)
-- [Specification Coverage](docsrc/maintainer/SPEC_COVERAGE.md)
-- [API Unification Policy](docsrc/maintainer/API_UNIFICATION_POLICY.md)
-
 ## Verified Hardware
 
-- CPU: KV-7500
-- Ethernet: built-in Ethernet port and KV-XLE02
-- Transport: TCP and UDP
+- CPU: `KV-7500`
+- Ethernet: built-in Ethernet port and `KV-XLE02`
+- Transport: `TCP` and `UDP`
 
 ## Development and Release Checks
 
@@ -176,11 +126,6 @@ Maintainer and QA documentation:
 run_ci.bat
 release_check.bat
 ```
-
-`run_ci.bat` runs lint, format, mypy, high-level docs coverage checks,
-user-facing sample validation, and tests.
-
-`release_check.bat` runs `run_ci.bat` and then rebuilds the published docs.
 
 ## License
 
