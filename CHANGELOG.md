@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.6 - 2026-04-14
+
+### Changed
+- Reorganized the public MkDocs content around end-user getting-started, supported-register, and latest-verification pages while keeping maintainer docs internal.
+- Separated local and publish docs builds so publication settings no longer affect local documentation checks.
+- Tightened source-distribution packaging so maintainer-only docs stay out of shipped release artifacts.
+
 ## 0.1.5 - 2026-04-01
 
 ## 0.1.4 - 2026-03-29
@@ -46,4 +53,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial implementation of KEYENCE KV Host Link protocol for Python.
 - Support for TCP/UDP transport.
 - Comprehensive unit tests and SPEC coverage documentation.
-
