@@ -27,16 +27,42 @@ def build_command(command: str, *params: str, append_lf: bool = False) -> bytes:
 def decode_response(raw: bytes) -> str:
     if not raw:
         raise HostLinkProtocolError("Empty response")
+    raw = raw.rstrip(b"\r\n")
+    if not raw:
+        raise HostLinkProtocolError(f"Malformed response frame: {raw!r}")
     try:
         text = raw.decode("ascii")
     except UnicodeDecodeError as exc:
         raise HostLinkProtocolError(f"Response is not ASCII: {raw!r}") from exc
 
-    # Response terminator is CRLF, but accept CR/LF permutations defensively.
-    text = text.rstrip("\r\n")
     if not text:
         raise HostLinkProtocolError(f"Malformed response frame: {raw!r}")
     return text
+
+
+def decode_comment_response(raw: bytes) -> str:
+    """Decode comment responses which may be UTF-8 or Shift_JIS.
+
+    Normal Host Link responses are ASCII, but PLC comments often contain
+    localized text. This decoder preserves trailing spaces so callers can
+    decide whether to strip padding.
+    """
+
+    if not raw:
+        raise HostLinkProtocolError("Empty response")
+    payload = raw.rstrip(b"\r\n")
+    if not payload:
+        raise HostLinkProtocolError(f"Malformed response frame: {raw!r}")
+
+    try:
+        return payload.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+
+    try:
+        return payload.decode("shift_jis")
+    except UnicodeDecodeError as exc:
+        raise HostLinkProtocolError("Response could not be decoded as UTF-8 or Shift_JIS") from exc
 
 
 def ensure_success(response_text: str) -> str:

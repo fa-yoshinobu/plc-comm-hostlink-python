@@ -80,6 +80,13 @@ RDC_DEVICE_TYPES = {
     "T",
     "C",
     "CM",
+    "X",
+    "Y",
+    "M",
+    "L",
+    "D",
+    "E",
+    "F",
 }
 WS_DEVICE_TYPES = {"T", "C"}
 

@@ -67,6 +67,12 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             plc.read_comments("VB0")
 
+    def test_rdc_accepts_xym_alias_device_types(self) -> None:
+        plc = FakeHostLinkClient()
+        plc.queue("DM COMMENT                      ")
+        self.assertEqual(plc.read_comments("D10"), "DM COMMENT")
+        self.assertEqual(plc.sent_frames[-1], b"RDC D10\r")
+
     def test_urd_32bit_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):

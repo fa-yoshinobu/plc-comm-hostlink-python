@@ -32,6 +32,7 @@ from .device import (
 from .errors import HostLinkConnectionError, HostLinkProtocolError
 from .protocol import (
     build_frame,
+    decode_comment_response,
     decode_response,
     ensure_success,
     parse_data_tokens,
@@ -111,8 +112,8 @@ class HostLinkBase:
     def _build_command(self, body: str) -> bytes:
         return build_frame(body, append_lf=self.append_lf_on_send)
 
-    def _process_response(self, response: bytes) -> str:
-        return ensure_success(decode_response(response))
+    def _process_response(self, response: bytes, *, decoder: Callable[[bytes], str] = decode_response) -> str:
+        return ensure_success(decoder(response))
 
     def _get_change_mode_cmd(self, mode: int | str) -> str:
         if isinstance(mode, str):
@@ -273,10 +274,10 @@ class HostLinkClient(HostLinkBase):
                 self._sock = None
                 self._rx_buffer = b""
 
-    def send_raw(self, body: str) -> str:
+    def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
         with self._lock:
             response = self._exchange(self._build_command(body))
-            return self._process_response(response)
+            return self._process_response(response, decoder=decoder)
 
     def _expect_ok(self, body: str) -> None:
         response = self.send_raw(body)
@@ -492,7 +493,7 @@ class HostLinkClient(HostLinkBase):
         addr = parse_device(device)
         validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
         token = self._device_token(device, drop_suffix=True)
-        response = self.send_raw(f"RDC {token}")
+        response = self.send_raw(f"RDC {token}", decoder=decode_comment_response)
         return response.rstrip(" ") if strip_padding else response
 
     def switch_bank(self, bank_no: int) -> None:
@@ -616,10 +617,10 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._udp_transport = None
                 self._udp_protocol = None
 
-    async def send_raw(self, body: str) -> str:
+    async def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
         async with self._lock:
             response = await self._exchange(self._build_command(body))
-            return self._process_response(response)
+            return self._process_response(response, decoder=decoder)
 
     async def _expect_ok(self, body: str) -> None:
         response = await self.send_raw(body)
@@ -658,9 +659,9 @@ class AsyncHostLinkClient(HostLinkBase):
     async def _recv_tcp_line(self) -> bytes:
         assert self._reader is not None
         # Responses typically end in \r\n. readuntil(\r) gets everything including \r.
-        # Leading \n from previous frames are handled by strip() or subsequent readuntil.
+        # Leading \n from previous frames are trimmed without affecting padding spaces.
         line = await self._reader.readuntil(b"\r")
-        return line.strip()
+        return line.strip(b"\r\n")
 
     # --- Async Commands ---
 
@@ -827,7 +828,7 @@ class AsyncHostLinkClient(HostLinkBase):
         addr = parse_device(device)
         validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
         token = self._device_token(device, drop_suffix=True)
-        response = await self.send_raw(f"RDC {token}")
+        response = await self.send_raw(f"RDC {token}", decoder=decode_comment_response)
         return response.rstrip(" ") if strip_padding else response
 
     async def switch_bank(self, bank_no: int) -> None:

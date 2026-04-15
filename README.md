@@ -19,6 +19,7 @@ This README intentionally covers the recommended high-level helper API only:
 - `normalize_address`
 - `read_typed`
 - `write_typed`
+- `read_comments`
 - `write_bit_in_word`
 - `read_named`
 - `poll`
@@ -56,7 +57,7 @@ async def main() -> None:
 
         snapshot = await read_named(
             client,
-            ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0"],
+            ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0", "DM20:COMMENT"],
         )
         print(snapshot)
 
@@ -72,6 +73,7 @@ Start with these public high-level families first:
 - word devices: `DM`, `EM`, `FM`, `W`, `ZF`, `TM`, `Z`
 - bit devices: `R`, `MR`, `LR`, `CR`, `X`, `Y`, `M`, `L`
 - typed forms: `DM100:S`, `DM100:D`, `DM100:L`, `DM100:F`
+- comment form: `DM100:COMMENT`
 - bit-in-word forms: `DM100.3`, `DM100.A`
 - timer/counter scalar forms: `T10:D`, `C10:D`
 
@@ -113,6 +115,14 @@ Bit-in-word update:
 ```python
 await write_bit_in_word(client, "DM50", bit_index=3, value=True)
 ```
+
+Comment read:
+
+```python
+comment = await read_comments(client, "DM100")
+```
+
+XYM aliases are also accepted for comment reads, for example `D10`, `E20`, `F30`, `M100`, `L200`, `X100`, and `Y100`.
 
 ## Verified Hardware
 

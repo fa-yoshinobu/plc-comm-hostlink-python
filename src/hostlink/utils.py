@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 _OPTIMIZABLE_READ_NAMED_DEVICE_TYPES = frozenset(
     device_type for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items() if default_format == ".U"
 )
+_DIRECT_BIT_DEVICE_TYPES = frozenset(
+    device_type for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items() if default_format == ""
+)
 
 _READ_PLAN_WORD_WIDTH = {
     "U": 1,
@@ -32,6 +35,7 @@ _READ_PLAN_WORD_WIDTH = {
     "L": 2,
     "F": 2,
     "BIT_IN_WORD": 1,
+    "DIRECT_BIT": 1,
 }
 
 
@@ -49,6 +53,7 @@ class _ReadPlanSegment:
     start_address: DeviceAddress
     start_number: int
     count: int
+    mode: str
     requests: tuple[_ReadPlanRequest, ...]
 
 
@@ -86,7 +91,7 @@ async def read_typed(
     client: AsyncHostLinkClient,
     device: str,
     dtype: str,
-) -> int | float | str:
+) -> int | float | bool | str:
     """
     Read a single device value through the high-level helper API.
 
@@ -126,11 +131,23 @@ async def read_typed(
 
             temperature = await read_typed(client, "DM200", "F")
     """
-    key = dtype.upper().lstrip(".")
+    key = dtype.upper().lstrip(".").strip()
+    if key == "":
+        addr = parse_device(device)
+        suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(addr.device_type, "")
+        key = suffix.lstrip(".") if suffix else "BIT"
+
+    if key == "BIT":
+        raw = await client.read(device, data_format=None)
+        values = raw if isinstance(raw, list) else [raw]
+        if not values:
+            raise HostLinkProtocolError(f"No value returned for {device!r}")
+        return _parse_bool_token(values[0])
+
     if key == "F":
         lo_word, hi_word = await read_words(client, device, 2)
         return _words_to_float32(lo_word, hi_word)
-    fmt = f".{dtype.lstrip('.')}"
+    fmt = f".{key}"
     result = await client.read(device, data_format=fmt)
     values = result if isinstance(result, list) else [result]
     if not values:
@@ -139,11 +156,32 @@ async def read_typed(
     return int(raw) if isinstance(raw, str) else raw
 
 
+async def read_comments(
+    client: AsyncHostLinkClient,
+    device: str,
+    *,
+    strip_padding: bool = True,
+) -> str:
+    """Read one PLC comment string through the high-level helper API.
+
+    Args:
+        client: Connected asynchronous Host Link client.
+        device: Base device address such as ``"DM100"``.
+        strip_padding: Whether to trim trailing spaces from the fixed-width
+            Host Link ``RDC`` response.
+
+    Returns:
+        The PLC comment text for ``device``.
+    """
+
+    return await client.read_comments(device, strip_padding=strip_padding)
+
+
 async def write_typed(
     client: AsyncHostLinkClient,
     device: str,
     dtype: str,
-    value: int | float | str,
+    value: int | float | bool | str,
 ) -> None:
     """
     Write a single device value through the high-level helper API.
@@ -167,14 +205,33 @@ async def write_typed(
 
             await write_typed(client, "DM200", "F", 12.5)
     """
-    key = dtype.upper().lstrip(".")
+    key = dtype.upper().lstrip(".").strip()
+    if key == "":
+        addr = parse_device(device)
+        suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(addr.device_type, "")
+        key = suffix.lstrip(".") if suffix else "BIT"
+
     if key == "F":
         lo_word, hi_word = _float32_to_words(float(value))
         await client.write_consecutive(device, [lo_word, hi_word], data_format=".U")
         return
-    fmt = f".{dtype.lstrip('.')}"
-    write_val: int | str = str(value) if isinstance(value, float) else value
+    if key == "BIT":
+        await client.write(device, 1 if bool(value) else 0, data_format=None)
+        return
+    fmt = f".{key}"
+    write_val: int | str = str(value) if isinstance(value, float) else value  # type: ignore[assignment]
     await client.write(device, write_val, data_format=fmt)
+
+
+def _parse_bool_token(token: int | str) -> bool:
+    if isinstance(token, int):
+        return token != 0
+    text = token.strip().upper()
+    if text in {"1", "ON", "TRUE"}:
+        return True
+    if text in {"0", "OFF", "FALSE"}:
+        return False
+    raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
 
 
 async def write_bit_in_word(
@@ -234,6 +291,7 @@ async def read_named(
     - ``"DM100:L"`` -- signed 32-bit int
     - ``"DM100.3"`` -- bit 3 within word (bool)
     - ``"DM100.A"`` -- bit 10 within word (bool); bits 10-15 use hex digits A-F
+    - ``"DM100:COMMENT"`` -- PLC comment text (str)
 
     Bit-in-word indices use hexadecimal notation (0-F), matching the KEYENCE address
     format. Bits 0-9 can be written as decimal digits; bits 10-15 must be written as
@@ -316,7 +374,12 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
             return base.strip(), "BIT_IN_WORD", int(bit_str, 16)
         except ValueError:
             pass
-    return address.strip(), "U", None
+    parsed = parse_device(address)
+    if parsed.suffix:
+        return address.strip(), parsed.suffix.lstrip(".").upper(), None
+    suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(parsed.device_type, "")
+    dtype = suffix.lstrip(".") if suffix else ""
+    return address.strip(), dtype, None
 
 
 async def _read_named_sequential(
@@ -331,6 +394,8 @@ async def _read_named_sequential(
             values = raw if isinstance(raw, list) else [raw]
             word = int(values[0]) if isinstance(values[0], str) else int(values[0])
             result[address] = bool((word >> (bit_idx or 0)) & 1)
+        elif dtype == "COMMENT":
+            result[address] = await read_comments(client, base)
         else:
             result[address] = await read_typed(client, base, dtype)
     return result
@@ -359,18 +424,21 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
         current_start: DeviceAddress | None = None
         current_start_number = 0
         current_end_exclusive = 0
+        current_mode = "WORDS"
 
         for request in sorted_requests:
             request_start = request.base_address.number
             request_end_exclusive = request_start + _get_word_width(request.kind)
+            request_mode = "DIRECT_BITS" if request.kind == "DIRECT_BIT" else "WORDS"
 
-            if current_start is None or request_start > current_end_exclusive:
+            if current_start is None or request_start > current_end_exclusive or current_mode != request_mode:
                 if current_start is not None:
                     segments.append(
                         _ReadPlanSegment(
                             start_address=current_start,
                             start_number=current_start_number,
                             count=current_end_exclusive - current_start_number,
+                            mode=current_mode,
                             requests=tuple(pending),
                         )
                     )
@@ -379,6 +447,7 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
                 current_start = DeviceAddress(request.base_address.device_type, request.base_address.number, "")
                 current_start_number = request_start
                 current_end_exclusive = request_end_exclusive
+                current_mode = request_mode
             elif request_end_exclusive > current_end_exclusive:
                 current_end_exclusive = request_end_exclusive
 
@@ -390,6 +459,7 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
                     start_address=current_start,
                     start_number=current_start_number,
                     count=current_end_exclusive - current_start_number,
+                    mode=current_mode,
                     requests=tuple(pending),
                 )
             )
@@ -406,6 +476,13 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
 
     if parsed.suffix:
         return None
+    if dtype == "" and parsed.device_type in _DIRECT_BIT_DEVICE_TYPES:
+        return _ReadPlanRequest(
+            index=index,
+            address=address,
+            base_address=parsed,
+            kind="DIRECT_BIT",
+        )
     if parsed.device_type not in _OPTIMIZABLE_READ_NAMED_DEVICE_TYPES:
         return None
 
@@ -436,10 +513,16 @@ async def _execute_read_named_plan(
     resolved: list[int | float | bool | str | None] = [None] * len(plan.requests_in_input_order)
 
     for segment in plan.segments:
-        words = await read_words(client, segment.start_address.to_text(), segment.count)
-        for request in segment.requests:
-            offset = request.base_address.number - segment.start_number
-            resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
+        if segment.mode == "DIRECT_BITS":
+            tokens = await client.read_consecutive(segment.start_address.to_text(), segment.count, data_format=None)
+            for request in segment.requests:
+                offset = request.base_address.number - segment.start_number
+                resolved[request.index] = _resolve_direct_bit_value(tokens, offset)
+        else:
+            words = await read_words(client, segment.start_address.to_text(), segment.count)
+            for request in segment.requests:
+                offset = request.base_address.number - segment.start_number
+                resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
 
     result: dict[str, int | float | bool | str] = {}
     for request in plan.requests_in_input_order:
@@ -465,7 +548,16 @@ def _resolve_planned_value(words: list[int], offset: int, kind: str, bit_index: 
         return _words_to_float32(words[offset], words[offset + 1])
     if kind == "BIT_IN_WORD":
         return bool((words[offset] >> bit_index) & 1)
+    if kind == "DIRECT_BIT":
+        raise HostLinkProtocolError("Direct bit values must be resolved from bit tokens.")
     raise HostLinkProtocolError(f"Unsupported read plan value kind: {kind}")
+
+
+def _resolve_direct_bit_value(tokens: list[int | str], offset: int) -> bool:
+    try:
+        return _parse_bool_token(tokens[offset])
+    except IndexError as exc:
+        raise HostLinkProtocolError("Batched direct bit response was too short") from exc
 
 
 def _get_word_width(kind: str) -> int:

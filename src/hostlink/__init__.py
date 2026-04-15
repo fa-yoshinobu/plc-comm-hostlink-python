@@ -7,6 +7,7 @@ from :mod:`hostlink.utils`:
 - :class:`HostLinkConnectionOptions`
 - :func:`read_typed`
 - :func:`write_typed`
+- :func:`read_comments`
 - :func:`read_words_single_request`
 - :func:`read_dwords_single_request`
 - :func:`read_words_chunked`
@@ -35,6 +36,7 @@ from .utils import (
     normalize_address,
     open_and_connect,
     poll,
+    read_comments,
     read_dwords,
     read_dwords_chunked,
     read_dwords_single_request,
@@ -66,6 +68,7 @@ __all__ = [
     "normalize_address",
     "open_and_connect",
     "poll",
+    "read_comments",
     "read_dwords",
     "read_dwords_chunked",
     "read_dwords_single_request",

@@ -9,6 +9,7 @@ Use these helpers for normal application code:
 - `normalize_address`
 - `read_typed`
 - `write_typed`
+- `read_comments`
 - `write_bit_in_word`
 - `read_named`
 - `poll`
@@ -87,6 +88,17 @@ if __name__ == "__main__":
 `F` is implemented in the helper layer by converting two `.U` words as
 float32.
 
+## Comments
+
+Use `read_comments` for the PLC comment text stored on supported devices.
+
+```python
+comment = await read_comments(client, "DM100")
+print(comment)
+```
+
+XYM aliases are also accepted for comment reads, for example `D10`, `E20`, `F30`, `M100`, `L200`, `X100`, and `Y100`.
+
 ## Block Reads
 
 Use explicit contiguous helpers when you need data from one word area.
@@ -128,13 +140,14 @@ Supported notation:
 | `"DM100:D"` | unsigned 32-bit |
 | `"DM100:L"` | signed 32-bit |
 | `"DM100:F"` | float32 |
+| `"DM100:COMMENT"` | comment text |
 | `"DM100.3"` | bit 3 inside the word |
 | `"DM100.A"` | bit 10 inside the word |
 
 ```python
 snapshot = await read_named(
     client,
-    ["DM100", "DM101:S", "DM102:D", "DM104:F", "DM200.0", "DM200.A"],
+    ["DM100", "DM101:S", "DM102:D", "DM104:F", "DM150:COMMENT", "DM200.0", "DM200.A"],
 )
 print(snapshot)
 ```
@@ -187,7 +200,7 @@ except HostLinkError as ex:
 
 | API / workflow | Sample | Purpose |
 |---|---|---|
-| `HostLinkConnectionOptions`, `open_and_connect`, `read_typed`, `write_typed`, `read_words_single_request`, `read_dwords_single_request`, `read_words_chunked`, `read_dwords_chunked`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | Full async walkthrough of the helper layer |
+| `HostLinkConnectionOptions`, `open_and_connect`, `read_typed`, `write_typed`, `read_comments`, `read_words_single_request`, `read_dwords_single_request`, `read_words_chunked`, `read_dwords_chunked`, `write_bit_in_word`, `read_named`, `poll` | `samples/high_level_async.py` | Full async walkthrough of the helper layer |
 | Synchronous entrypoint over the helper layer | `samples/high_level_sync.py` | CLI wrapper that uses `asyncio.run` internally |
 | `read_typed`, `write_typed` | `samples/basic_high_level_rw.py` | Focused typed read and write example |
 | `read_named` | `samples/named_snapshot.py` | Mixed snapshot example |

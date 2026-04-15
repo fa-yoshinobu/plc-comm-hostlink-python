@@ -10,6 +10,7 @@ from hostlink import (
     HostLinkError,
     HostLinkProtocolError,
     poll,
+    read_comments,
     read_named,
     read_typed,
     write_typed,
@@ -30,6 +31,9 @@ class MockSyncServer:
         stype = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
         self.sock = socket.socket(socket.AF_INET, stype)
         self.sock.bind((self.host, 0))
+        if self.transport == "tcp":
+            # Make the listening socket ready before clients attempt to connect.
+            self.sock.listen(1)
         self.port = self.sock.getsockname()[1]
         self.running = True
         self.thread = threading.Thread(target=self._run)
@@ -37,7 +41,6 @@ class MockSyncServer:
 
     def _run(self):
         if self.transport == "tcp":
-            self.sock.listen(1)
             self.sock.settimeout(0.5)
             while self.running:
                 try:
@@ -156,6 +159,8 @@ class TestComprehensiveSync(unittest.TestCase):
     def test_read_comments(self):
         self.server.responses["RDC R0"] = "TEST COMMENT                    "
         self.assertEqual(self.client.read_comments("R0"), "TEST COMMENT")
+        self.server.responses["RDC D10"] = "DM COMMENT                      "
+        self.assertEqual(self.client.read_comments("D10"), "DM COMMENT")
 
     def test_switch_bank(self):
         self.client.switch_bank(5)
@@ -282,6 +287,18 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(self.server.last_received, ["RDS DM100.U 8"])
+
+    async def test_async_read_comments_helper_and_read_named_comment(self):
+        self.server.responses["RDC DM150"] = "MAIN COMMENT                    "
+        comment = await read_comments(self.client, "DM150")
+        self.assertEqual(comment, "MAIN COMMENT")
+
+        self.server.last_received.clear()
+        self.server.responses["RD DM100.U"] = "321"
+        self.server.responses["RDC DM101"] = "ALARM COMMENT                   "
+        result = await read_named(self.client, ["DM100", "DM101:COMMENT"])
+        self.assertEqual(result, {"DM100": 321, "DM101:COMMENT": "ALARM COMMENT"})
+        self.assertEqual(self.server.last_received, ["RD DM100.U", "RDC DM101"])
 
     async def test_async_poll_reuses_compiled_read_plan(self):
         self.server.responses["RDS DM100.U 3"] = "1 0 16320"
