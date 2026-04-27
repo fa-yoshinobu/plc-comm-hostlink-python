@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from .errors import HostLinkProtocolError
 
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
+BIT_BANK_DEVICE_TYPES = {"R", "MR", "LR", "CR"}
 
 # KEYENCE expression + XYM expression
 DEVICE_RANGES = {
@@ -35,7 +36,7 @@ DEVICE_RANGES = {
     "VM": (0, 589823, 10),
     "X": (0, 0x1999F, 16),
     "Y": (0, 0x63999F, 16),
-    "M": (0, 15999, 10),
+    "M": (0, 63999, 10),
     "L": (0, 15999, 10),
     "D": (0, 65534, 10),
     "E": (0, 65534, 10),
@@ -172,7 +173,11 @@ class DeviceAddress:
 
     def to_text(self) -> str:
         _, _, base = DEVICE_RANGES[self.device_type]
-        if base == 16:
+        if self.device_type in BIT_BANK_DEVICE_TYPES:
+            bank = self.number // 100
+            bit = self.number % 100
+            number = f"{bank}{bit:02d}"
+        elif base == 16:
             number = format(self.number, "X")
         else:
             number = str(self.number)
@@ -210,6 +215,10 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
         raise HostLinkProtocolError(f"Invalid device number for {device_type}: {number_text!r}") from exc
     if number < lo or number > hi:
         raise HostLinkProtocolError(f"Device number out of range: {device_type}{number_text} (allowed: {lo}..{hi})")
+    if device_type in BIT_BANK_DEVICE_TYPES and number % 100 > 15:
+        raise HostLinkProtocolError(
+            f"Invalid bit-bank device number: {device_type}{number_text} (lower two digits must be 00..15)"
+        )
     return DeviceAddress(device_type=device_type, number=number, suffix=suffix)
 
 

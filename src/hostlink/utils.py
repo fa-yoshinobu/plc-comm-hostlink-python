@@ -219,7 +219,7 @@ async def write_typed(
         await client.write(device, 1 if bool(value) else 0, data_format=None)
         return
     fmt = f".{key}"
-    write_val: int | str = str(value) if isinstance(value, float) else value  # type: ignore[assignment]
+    write_val: int | str = str(value) if isinstance(value, float) else value
     await client.write(device, write_val, data_format=fmt)
 
 

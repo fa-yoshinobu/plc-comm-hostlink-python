@@ -78,6 +78,7 @@ Start with these public high-level families first:
 - timer/counter scalar forms: `T10:D`, `C10:D`
 
 See the full public table in [Supported PLC Registers](docsrc/user/SUPPORTED_REGISTERS.md).
+For model-specific published ranges, call `client.read_device_range_catalog()` or `device_range_catalog_for_model("KV-8000")`.
 
 ## Public Documentation
 

@@ -21,9 +21,18 @@ workflows, but the helpers above are the recommended entry points for normal
 application code and generated user documentation.
 """
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTraceDirection, HostLinkTraceFrame, ModelInfo
+from .device_ranges import (
+    KvDeviceRangeCatalog,
+    KvDeviceRangeCategory,
+    KvDeviceRangeEntry,
+    KvDeviceRangeNotation,
+    KvDeviceRangeSegment,
+    available_device_range_models,
+    device_range_catalog_for_model,
+)
 from .errors import (
     HostLinkBaseError,
     HostLinkConnectionError,
@@ -64,6 +73,13 @@ __all__ = [
     "HostLinkError",
     "HostLinkProtocolError",
     "decode_error_code",
+    "KvDeviceRangeCatalog",
+    "KvDeviceRangeCategory",
+    "KvDeviceRangeEntry",
+    "KvDeviceRangeNotation",
+    "KvDeviceRangeSegment",
+    "available_device_range_models",
+    "device_range_catalog_for_model",
     "HostLinkConnectionOptions",
     "normalize_address",
     "open_and_connect",
