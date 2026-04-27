@@ -115,6 +115,9 @@ class TestComprehensiveSync(unittest.TestCase):
         self.server.responses["?K"] = "63"
         info = self.client.query_model()
         self.assertEqual(info.code, "63")
+        catalog = self.client.read_device_range_catalog()
+        self.assertEqual(catalog.model, "KV-X500")
+        self.assertEqual(catalog.model_code, "63")
         self.server.responses["?M"] = "1"
         self.assertEqual(self.client.confirm_operating_mode(), 1)
 
@@ -125,13 +128,13 @@ class TestComprehensiveSync(unittest.TestCase):
 
     def test_forced_set_reset(self):
         self.client.forced_set("R0")
-        self.assertEqual(self.server.last_received[-1], "ST R0")
+        self.assertEqual(self.server.last_received[-1], "ST R000")
         self.client.forced_reset("R1")
-        self.assertEqual(self.server.last_received[-1], "RS R1")
+        self.assertEqual(self.server.last_received[-1], "RS R001")
         self.client.forced_set_consecutive("R10", 5)
-        self.assertEqual(self.server.last_received[-1], "STS R10 5")
-        self.client.forced_reset_consecutive("R20", 3)
-        self.assertEqual(self.server.last_received[-1], "RSS R20 3")
+        self.assertEqual(self.server.last_received[-1], "STS R010 5")
+        self.client.forced_reset_consecutive("R100", 3)
+        self.assertEqual(self.server.last_received[-1], "RSS R100 3")
 
     def test_write_set_value(self):
         self.client.write_set_value("T0", 100)
@@ -141,7 +144,7 @@ class TestComprehensiveSync(unittest.TestCase):
 
     def test_monitor(self):
         self.client.register_monitor_bits("R0", "R1", "R2")
-        self.assertEqual(self.server.last_received[-1], "MBS R0 R1 R2")
+        self.assertEqual(self.server.last_received[-1], "MBS R000 R001 R002")
         self.client.register_monitor_words("DM0", "DM1")
         self.assertEqual(self.server.last_received[-1], "MWS DM0.U DM1.U")
         self.server.responses["MBR"] = "1 0 1"
@@ -157,7 +160,7 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(self.server.last_received[-1], "UWR 01 200 .S 2 789 1011")
 
     def test_read_comments(self):
-        self.server.responses["RDC R0"] = "TEST COMMENT                    "
+        self.server.responses["RDC R000"] = "TEST COMMENT                    "
         self.assertEqual(self.client.read_comments("R0"), "TEST COMMENT")
         self.server.responses["RDC D10"] = "DM COMMENT                      "
         self.assertEqual(self.client.read_comments("D10"), "DM COMMENT")
