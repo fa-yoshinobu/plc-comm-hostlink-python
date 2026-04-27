@@ -15,6 +15,7 @@ from hostlink import (
     read_typed,
     write_typed,
 )
+from hostlink.device import DeviceAddress, parse_device
 
 
 class MockSyncServer:
@@ -151,6 +152,17 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(self.client.read_monitor_bits(), [1, 0, 1])
         self.server.responses["MWR"] = "100 200"
         self.assertEqual(self.client.read_monitor_words(), ["100", "200"])
+
+    def test_xym_bit_device_numbers_use_decimal_bank_and_hex_bit(self):
+        self.assertEqual(parse_device("X390").number, 39 * 16)
+        self.assertEqual(parse_device("X400").number, 40 * 16)
+        self.assertEqual(DeviceAddress("X", 39 * 16 + 15).to_text(), "X39F")
+        self.assertEqual(DeviceAddress("X", 40 * 16).to_text(), "X400")
+
+        with self.assertRaises(HostLinkProtocolError):
+            parse_device("X3F0")
+        with self.assertRaises(HostLinkProtocolError):
+            parse_device("Y19A0")
 
     def test_expansion_unit(self):
         self.server.responses["URD 01 100 .U 2"] = "123 456"

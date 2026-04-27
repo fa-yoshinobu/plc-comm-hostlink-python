@@ -48,6 +48,10 @@ def _run_command(client: _FakeHostLinkClient, vec: dict[str, Any]) -> None:
         client.read(vec["device"], data_format=vec["data_format"])
     elif cmd == "read_consecutive_legacy":
         client.read_consecutive_legacy(vec["device"], vec["count"])
+    elif cmd == "register_monitor_bits":
+        client.register_monitor_bits(*vec["devices"])
+    elif cmd == "register_monitor_words":
+        client.register_monitor_words(*vec["devices"])
     elif cmd == "write_set_value":
         client.write_set_value(vec["device"], vec["value"])
     else:

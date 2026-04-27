@@ -9,6 +9,7 @@ from .errors import HostLinkProtocolError
 
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 BIT_BANK_DEVICE_TYPES = {"R", "MR", "LR", "CR"}
+XYM_BIT_DEVICE_TYPES = {"X", "Y"}
 
 # KEYENCE expression + XYM expression
 DEVICE_RANGES = {
@@ -34,8 +35,8 @@ DEVICE_RANGES = {
     "AT": (0, 7, 10),
     "CM": (0, 7599, 10),
     "VM": (0, 589823, 10),
-    "X": (0, 0x1999F, 16),
-    "Y": (0, 0x63999F, 16),
+    "X": (0, 1999 * 16 + 15, 10),
+    "Y": (0, 63999 * 16 + 15, 10),
     "M": (0, 63999, 10),
     "L": (0, 15999, 10),
     "D": (0, 65534, 10),
@@ -44,7 +45,7 @@ DEVICE_RANGES = {
 }
 
 FORCE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB"}
-MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB"}
+MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
 MWS_DEVICE_TYPES = {
     "R",
     "B",
@@ -52,6 +53,8 @@ MWS_DEVICE_TYPES = {
     "LR",
     "CR",
     "VB",
+    "X",
+    "Y",
     "DM",
     "EM",
     "FM",
@@ -174,9 +177,9 @@ class DeviceAddress:
     def to_text(self) -> str:
         _, _, base = DEVICE_RANGES[self.device_type]
         if self.device_type in BIT_BANK_DEVICE_TYPES:
-            bank = self.number // 100
-            bit = self.number % 100
-            number = f"{bank}{bit:02d}"
+            number = _format_bit_bank_number(self.number)
+        elif self.device_type in XYM_BIT_DEVICE_TYPES:
+            number = _format_xym_bit_number(self.number)
         elif base == 16:
             number = format(self.number, "X")
         else:
@@ -210,11 +213,14 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
 
     lo, hi, base = DEVICE_RANGES[device_type]
     try:
-        number = int(number_text, base)
+        number = _parse_xym_bit_number(device_type, number_text) if device_type in XYM_BIT_DEVICE_TYPES else int(number_text, base)
     except ValueError as exc:
         raise HostLinkProtocolError(f"Invalid device number for {device_type}: {number_text!r}") from exc
     if number < lo or number > hi:
-        raise HostLinkProtocolError(f"Device number out of range: {device_type}{number_text} (allowed: {lo}..{hi})")
+        raise HostLinkProtocolError(
+            f"Device number out of range: {device_type}{number_text} "
+            f"(allowed: {_format_device_number(device_type, lo)}..{_format_device_number(device_type, hi)})"
+        )
     if device_type in BIT_BANK_DEVICE_TYPES and number % 100 > 15:
         raise HostLinkProtocolError(
             f"Invalid bit-bank device number: {device_type}{number_text} (lower two digits must be 00..15)"
@@ -229,6 +235,41 @@ def parse_device_text(text: str, *, default_suffix: str = "") -> str:
     if suffix != addr.suffix:
         addr = DeviceAddress(addr.device_type, addr.number, suffix)
     return addr.to_text()
+
+
+def _format_bit_bank_number(number: int) -> str:
+    bank = number // 100
+    bit = number % 100
+    return f"{bank}{bit:02d}"
+
+
+def _format_xym_bit_number(number: int) -> str:
+    bank = number // 16
+    bit = number % 16
+    return f"{bank}{bit:X}"
+
+
+def _format_device_number(device_type: str, number: int) -> str:
+    if device_type in BIT_BANK_DEVICE_TYPES:
+        return _format_bit_bank_number(number)
+    if device_type in XYM_BIT_DEVICE_TYPES:
+        return _format_xym_bit_number(number)
+
+    _, _, base = DEVICE_RANGES[device_type]
+    return format(number, "X") if base == 16 else str(number)
+
+
+def _parse_xym_bit_number(device_type: str, number_text: str) -> int:
+    bank_text = "0" if len(number_text) == 1 else number_text[:-1]
+    if not bank_text.isdigit():
+        raise HostLinkProtocolError(
+            f"Invalid X/Y device number: {device_type}{number_text} "
+            "(bank digits must be decimal and bit digit must be 0..F)"
+        )
+
+    bank = int(bank_text, 10)
+    bit = int(number_text[-1], 16)
+    return bank * 16 + bit
 
 
 def resolve_effective_format(device_type: str, suffix: str) -> str:
@@ -266,15 +307,15 @@ def validate_device_count(device_type: str, effective_format: str, count: int) -
 
 
 def validate_device_span(device_type: str, start_number: int, effective_format: str, count: int = 1) -> None:
-    lo, hi, base = DEVICE_RANGES[device_type]
+    lo, hi, _ = DEVICE_RANGES[device_type]
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
     word_width = 2 if effective_format in {".D", ".L"} else 1
     end_number = start_number + (count * word_width) - 1
     if start_number < lo or start_number > hi or end_number > hi:
-        start_text = format(start_number, "X") if base == 16 else str(start_number)
-        end_text = format(end_number, "X") if base == 16 else str(end_number)
+        start_text = _format_device_number(device_type, start_number)
+        end_text = _format_device_number(device_type, end_number)
         raise HostLinkProtocolError(
             f"Device span out of range: {device_type}{start_text}..{device_type}{end_text} "
             f"with format '{effective_format}'"
