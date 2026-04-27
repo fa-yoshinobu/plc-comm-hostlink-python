@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.7 - 2026-04-27
+
+### Added
+- Added the embedded KEYENCE KV device range catalog and `read_device_range_catalog()` helpers.
+
+### Changed
+- Aligned Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range.
+- Normalized `R`, `MR`, `LR`, and `CR` bit-bank addresses and rejected invalid lower-two-digit bit numbers.
+
 ## 0.1.6 - 2026-04-14
 
 ### Changed
