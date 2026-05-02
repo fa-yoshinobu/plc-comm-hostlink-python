@@ -236,11 +236,7 @@ def _summarize_entry_bounds(segments: tuple[KvDeviceRangeSegment, ...]) -> tuple
         and segment.point_count == first.point_count
         for segment in segments[1:]
     )
-    return (
-        (first.lower_bound, first.upper_bound, first.point_count)
-        if all_same
-        else (first.lower_bound, None, None)
-    )
+    return (first.lower_bound, first.upper_bound, first.point_count) if all_same else (first.lower_bound, None, None)
 
 
 def _entry_notation(
