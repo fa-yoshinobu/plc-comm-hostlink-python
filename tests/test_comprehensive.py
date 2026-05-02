@@ -159,9 +159,9 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(DeviceAddress("X", 39 * 16 + 15).to_text(), "X39F")
         self.assertEqual(DeviceAddress("X", 40 * 16).to_text(), "X400")
 
-        with self.assertRaises(HostLinkProtocolError):
+        with self.assertRaisesRegex(HostLinkProtocolError, "bank digits must be decimal"):
             parse_device("X3F0")
-        with self.assertRaises(HostLinkProtocolError):
+        with self.assertRaisesRegex(HostLinkProtocolError, "bank digits must be decimal"):
             parse_device("Y19A0")
 
     def test_expansion_unit(self):
