@@ -213,7 +213,11 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
 
     lo, hi, base = DEVICE_RANGES[device_type]
     try:
-        number = _parse_xym_bit_number(device_type, number_text) if device_type in XYM_BIT_DEVICE_TYPES else int(number_text, base)
+        number = (
+            _parse_xym_bit_number(device_type, number_text)
+            if device_type in XYM_BIT_DEVICE_TYPES
+            else int(number_text, base)
+        )
     except HostLinkProtocolError:
         raise
     except ValueError as exc:
