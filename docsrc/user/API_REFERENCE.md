@@ -10,6 +10,9 @@ It intentionally excludes raw protocol methods and low-level client operations.
 from hostlink import (
     HostLinkConnectionOptions,
     open_and_connect,
+    parse_address,
+    try_parse_address,
+    format_address,
     normalize_address,
     read_typed,
     write_typed,
@@ -20,6 +23,8 @@ from hostlink import (
     read_dwords_single_request,
     read_words_chunked,
     read_dwords_chunked,
+    read_expansion_unit_buffer,
+    write_expansion_unit_buffer,
 )
 from hostlink.errors import (
     HostLinkBaseError,
@@ -73,6 +78,24 @@ Examples:
 normalize_address("dm100")      # DM100
 normalize_address("dm100.a")    # DM100.A
 normalize_address("dm100", default_suffix="U")  # DM100.U
+```
+
+### `parse_address`, `try_parse_address`, and `format_address`
+
+Use the public address helpers when UI or adapter code needs validated address
+metadata instead of private parser copies.
+
+Examples:
+
+```python
+parsed = parse_address("dm100.a")
+parsed.text         # DM100.A
+parsed.base_device  # DM100
+parsed.dtype        # BIT_IN_WORD
+parsed.bit_index    # 10
+
+try_parse_address("DM1A") is None
+format_address(parsed)  # DM100.A
 ```
 
 ## Typed Helpers
@@ -172,6 +195,35 @@ Read a large contiguous dword range using explicit multi-request chunking.
 
 `*_chunked` is the opt-in surface for protocol-defined chunk boundaries.
 It must not be confused with `*_single_request`.
+
+## Expansion Unit Buffer Helpers
+
+### `await read_expansion_unit_buffer(client, unit_no, address, count, data_format="")`
+
+Read buffer memory in an expansion unit through the high-level helper surface.
+This sends one `URD` request; it does not split the operation.
+
+Parameters:
+
+- `unit_no`: expansion unit number, `0` to `48`
+- `address`: buffer memory address, `0` to `59999`
+- `count`: number of values to read
+- `data_format`: optional suffix such as `U`, `S`, `D`, `L`, or `H`
+
+Returns:
+
+- `list[int | str]`
+
+### `await write_expansion_unit_buffer(client, unit_no, address, values, data_format="")`
+
+Write buffer memory in an expansion unit through one `UWR` request.
+
+Example:
+
+```python
+values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
+await write_expansion_unit_buffer(client, 1, 200, values, data_format="U")
+```
 
 ## Bit in Word
 

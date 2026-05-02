@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import struct
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -85,6 +85,97 @@ class HostLinkConnectionOptions:
     transport: str = "tcp"
     timeout: float = 3.0
     append_lf_on_send: bool = False
+
+
+@dataclass(frozen=True)
+class HostLinkAddress:
+    """Parsed public Host Link address helper result.
+
+    Attributes:
+        text: Canonical address text, preserving logical helper notation such
+            as ``"DM100:F"`` or ``"DM100.A"``.
+        base_device: Canonical base device token used by low-level Host Link
+            commands.
+        dtype: Logical data type code such as ``"U"``, ``"D"``, ``"F"``,
+            ``"COMMENT"``, or ``"BIT_IN_WORD"``.
+        bit_index: Bit index for ``"BIT_IN_WORD"`` addresses, otherwise
+            ``None``.
+    """
+
+    text: str
+    base_device: str
+    dtype: str
+    bit_index: int | None = None
+
+    @property
+    def is_bit_in_word(self) -> bool:
+        """Whether this address targets one bit inside a word device."""
+
+        return self.dtype == "BIT_IN_WORD"
+
+
+def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
+    """Parse a public Host Link helper address.
+
+    This is the public companion to :func:`normalize_address`. It keeps UI and
+    adapter code from duplicating private parser details while preserving the
+    logical helper forms accepted by :func:`read_named`.
+
+    Args:
+        address: User-facing address such as ``"dm100"``, ``"dm100:f"``, or
+            ``"dm100.a"``.
+        default_suffix: Optional default Host Link suffix for base device
+            normalization.
+
+    Returns:
+        A :class:`HostLinkAddress` with canonical text and parsed metadata.
+
+    Examples:
+        Parse a bit-in-word address::
+
+            parsed = parse_address("dm100.a")
+            assert parsed.text == "DM100.A"
+            assert parsed.bit_index == 10
+    """
+
+    canonical = normalize_address(address, default_suffix=default_suffix)
+    base, dtype, bit_index = _parse_address(canonical)
+    base_device = parse_device_text(base)
+    return HostLinkAddress(canonical, base_device, dtype, bit_index)
+
+
+def try_parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress | None:
+    """Try to parse a public Host Link helper address.
+
+    Args:
+        address: User-facing address text.
+        default_suffix: Optional default Host Link suffix.
+
+    Returns:
+        A parsed :class:`HostLinkAddress`, or ``None`` if validation fails.
+    """
+
+    try:
+        return parse_address(address, default_suffix=default_suffix)
+    except HostLinkProtocolError:
+        return None
+
+
+def format_address(address: HostLinkAddress | str, *, default_suffix: str = "") -> str:
+    """Return canonical Host Link helper address text.
+
+    Args:
+        address: A parsed :class:`HostLinkAddress` or raw address string.
+        default_suffix: Optional default Host Link suffix used when ``address``
+            is a raw string.
+
+    Returns:
+        Canonical address text.
+    """
+
+    if isinstance(address, HostLinkAddress):
+        return address.text
+    return normalize_address(address, default_suffix=default_suffix)
 
 
 async def read_typed(
@@ -760,6 +851,70 @@ async def write_dwords_chunked(
         chunk_device = DeviceAddress(start.device_type, start.number + (offset * 2), "").to_text()
         await write_dwords_single_request(client, chunk_device, values[offset : offset + chunk])
         offset += chunk
+
+
+async def read_expansion_unit_buffer(
+    client: AsyncHostLinkClient,
+    unit_no: int,
+    address: int,
+    count: int,
+    *,
+    data_format: str = "",
+) -> list[int | str]:
+    """Read buffer memory in an expansion unit.
+
+    This high-level helper exposes the existing Host Link ``URD`` command
+    through the same helper namespace as typed and contiguous access. Validation
+    and command framing remain owned by the connected client.
+
+    Args:
+        client: Connected asynchronous Host Link client.
+        unit_no: Expansion unit number, ``0`` to ``48``.
+        address: Buffer memory address, ``0`` to ``59999``.
+        count: Number of values to read.
+        data_format: Optional Host Link data suffix such as ``"U"``, ``"S"``,
+            ``"D"``, ``"L"``, or ``"H"``.
+
+    Returns:
+        Values returned by the PLC after Host Link token parsing.
+
+    Examples:
+        Read two unsigned buffer words from unit 1::
+
+            values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
+    """
+
+    return await client.read_expansion_unit_buffer(unit_no, address, count, data_format=data_format)
+
+
+async def write_expansion_unit_buffer(
+    client: AsyncHostLinkClient,
+    unit_no: int,
+    address: int,
+    values: Sequence[int | str],
+    *,
+    data_format: str = "",
+) -> None:
+    """Write buffer memory in an expansion unit.
+
+    This high-level helper exposes the existing Host Link ``UWR`` command
+    without adding hidden chunking or fallback behavior.
+
+    Args:
+        client: Connected asynchronous Host Link client.
+        unit_no: Expansion unit number, ``0`` to ``48``.
+        address: Buffer memory address, ``0`` to ``59999``.
+        values: Values to write in one request.
+        data_format: Optional Host Link data suffix such as ``"U"``, ``"S"``,
+            ``"D"``, ``"L"``, or ``"H"``.
+
+    Examples:
+        Write two signed buffer words to unit 1::
+
+            await write_expansion_unit_buffer(client, 1, 200, [-1, 2], data_format="S")
+    """
+
+    await client.write_expansion_unit_buffer(unit_no, address, values, data_format=data_format)
 
 
 async def read_words(

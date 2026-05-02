@@ -16,6 +16,9 @@ This README intentionally covers the recommended high-level helper API only:
 
 - `HostLinkConnectionOptions`
 - `open_and_connect`
+- `parse_address`
+- `try_parse_address`
+- `format_address`
 - `normalize_address`
 - `read_typed`
 - `write_typed`
@@ -27,6 +30,8 @@ This README intentionally covers the recommended high-level helper API only:
 - `read_dwords_single_request`
 - `read_words_chunked`
 - `read_dwords_chunked`
+- `read_expansion_unit_buffer`
+- `write_expansion_unit_buffer`
 
 ## Installation
 
@@ -93,15 +98,27 @@ For model-specific published ranges, call `client.read_device_range_catalog()` o
 
 Maintainer-only notes and retained evidence live under `internal_docs/`.
 
+## Samples
+
+- [high_level_async.py](samples/high_level_async.py)
+- [high_level_sync.py](samples/high_level_sync.py)
+- [basic_high_level_rw.py](samples/basic_high_level_rw.py)
+- [named_snapshot.py](samples/named_snapshot.py)
+- [polling_monitor.py](samples/polling_monitor.py)
+
 ## Common Workflows
 
 Address normalization:
 
 ```python
-from hostlink import normalize_address
+from hostlink import format_address, normalize_address, parse_address
 
 print(normalize_address("dm100"))    # DM100
 print(normalize_address("dm100.a"))  # DM100.A
+
+parsed = parse_address("dm100.a")
+print(parsed.base_device, parsed.bit_index)  # DM100 10
+print(format_address(parsed))                # DM100.A
 ```
 
 Typed block reads:
@@ -115,6 +132,15 @@ Bit-in-word update:
 
 ```python
 await write_bit_in_word(client, "DM50", bit_index=3, value=True)
+```
+
+Expansion unit buffer access:
+
+```python
+from hostlink import read_expansion_unit_buffer, write_expansion_unit_buffer
+
+buffer_words = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
+await write_expansion_unit_buffer(client, 1, 200, buffer_words, data_format="U")
 ```
 
 Comment read:

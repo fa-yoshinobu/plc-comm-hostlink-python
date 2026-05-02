@@ -11,11 +11,16 @@ UTILS_PATH = ROOT / "src" / "hostlink" / "utils.py"
 INIT_PATH = ROOT / "src" / "hostlink" / "__init__.py"
 
 REQUIRED_FUNCTIONS = {
+    "parse_address": ("Args:", "Returns:", "Examples:"),
+    "try_parse_address": ("Args:", "Returns:"),
+    "format_address": ("Args:", "Returns:"),
     "read_typed": ("Args:", "Returns:", "Examples:"),
     "write_typed": ("Args:", "Examples:"),
     "write_bit_in_word": ("Args:", "Examples:"),
     "read_named": ("Args:", "Returns:", "Examples:"),
     "poll": ("Args:", "Yields:", "Usage::"),
+    "read_expansion_unit_buffer": ("Args:", "Returns:", "Examples:"),
+    "write_expansion_unit_buffer": ("Args:", "Examples:"),
     "read_words": ("Args:", "Returns:"),
     "read_dwords": ("Args:", "Returns:"),
     "open_and_connect": ("Args:", "Returns:", "Usage::"),

@@ -2,11 +2,11 @@
 """
 KEYENCE Host Link - High-Level Asynchronous API Sample
 ======================================================
-Demonstrates all high-level *async* utility helpers shipped with the
+Demonstrates the core high-level *async* utility helpers shipped with the
 hostlink package (HostLinkConnectionOptions, open_and_connect,
-read_typed, write_typed, read_named, read_words_single_request,
+parse_address, format_address, normalize_address, read_typed, write_typed, read_named, read_words_single_request,
 read_dwords_single_request, read_words_chunked, read_dwords_chunked,
-write_bit_in_word, poll, normalize_address).
+write_bit_in_word, poll).
 
 Usage
 -----
@@ -26,8 +26,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from hostlink import (
     HostLinkConnectionOptions,
+    format_address,
     normalize_address,
     open_and_connect,
+    parse_address,
     poll,
     read_dwords_chunked,
     read_dwords_single_request,
@@ -89,6 +91,9 @@ async def demo_open_and_connect(host: str, port: int) -> None:
 def demo_normalize_address() -> None:
     print(f"[normalize_address] dm100 -> {normalize_address('dm100')}")
     print(f"[normalize_address] dm100.a -> {normalize_address('dm100.a')}")
+    parsed = parse_address("dm100.a")
+    print(f"[parse_address] dm100.a -> base={parsed.base_device} bit={parsed.bit_index}")
+    print(f"[format_address] parsed -> {format_address(parsed)}")
 
 
 async def demo_typed_rw(client) -> None:

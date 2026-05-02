@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.9 - 2026-05-02
+
+### Added
+- Added public address helper APIs: `parse_address`, `try_parse_address`, and `format_address`.
+- Added high-level async expansion unit buffer helpers for `URD` / `UWR`.
+
+### Changed
+- Documented the helper naming, explicit connection option, address helper, and semantic atomicity policy.
+
 ## 0.1.8 - 2026-04-27
 
 ### Changed

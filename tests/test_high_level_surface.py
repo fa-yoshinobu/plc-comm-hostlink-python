@@ -5,14 +5,19 @@ from unittest.mock import AsyncMock, patch
 
 from hostlink import (
     HostLinkConnectionOptions,
+    format_address,
     normalize_address,
     open_and_connect,
+    parse_address,
     read_dwords_chunked,
     read_dwords_single_request,
+    read_expansion_unit_buffer,
     read_words_chunked,
     read_words_single_request,
+    try_parse_address,
     write_dwords_chunked,
     write_dwords_single_request,
+    write_expansion_unit_buffer,
     write_words_chunked,
     write_words_single_request,
 )
@@ -21,6 +26,19 @@ from hostlink import (
 class TestAddressSurface(unittest.TestCase):
     def test_normalize_address_uppercases_and_preserves_bit_suffix(self) -> None:
         self.assertEqual(normalize_address("dm100.a"), "DM100.A")
+
+    def test_parse_address_returns_public_metadata(self) -> None:
+        parsed = parse_address("dm100.a")
+        self.assertEqual(parsed.text, "DM100.A")
+        self.assertEqual(parsed.base_device, "DM100")
+        self.assertEqual(parsed.dtype, "BIT_IN_WORD")
+        self.assertEqual(parsed.bit_index, 10)
+        self.assertTrue(parsed.is_bit_in_word)
+        self.assertEqual(format_address(parsed), "DM100.A")
+
+    def test_try_parse_address_returns_none_for_invalid_text(self) -> None:
+        self.assertIsNone(try_parse_address("DM1A"))
+        self.assertEqual(format_address("dm100:f"), "DM100:F")
 
 
 class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
@@ -93,3 +111,19 @@ class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
         await write_dwords_chunked(client, "DM0", [1, 2, 3], max_dwords_per_request=2)
         self.assertEqual(client.write_consecutive.await_args_list[0].args, ("DM0", [1, 0, 2, 0]))
         self.assertEqual(client.write_consecutive.await_args_list[1].args, ("DM4", [3, 0]))
+
+    async def test_read_expansion_unit_buffer_helper(self) -> None:
+        client = AsyncMock()
+        client.read_expansion_unit_buffer.return_value = [123, 456]
+
+        values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
+
+        self.assertEqual(values, [123, 456])
+        client.read_expansion_unit_buffer.assert_awaited_once_with(1, 100, 2, data_format="U")
+
+    async def test_write_expansion_unit_buffer_helper(self) -> None:
+        client = AsyncMock()
+
+        await write_expansion_unit_buffer(client, 1, 200, [789, 1011], data_format="S")
+
+        client.write_expansion_unit_buffer.assert_awaited_once_with(1, 200, [789, 1011], data_format="S")

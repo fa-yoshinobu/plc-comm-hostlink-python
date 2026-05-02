@@ -6,6 +6,9 @@ Use these helpers for normal application code:
 
 - `HostLinkConnectionOptions`
 - `open_and_connect`
+- `parse_address`
+- `try_parse_address`
+- `format_address`
 - `normalize_address`
 - `read_typed`
 - `write_typed`
@@ -17,6 +20,8 @@ Use these helpers for normal application code:
 - `read_dwords_single_request`
 - `read_words_chunked`
 - `read_dwords_chunked`
+- `read_expansion_unit_buffer`
+- `write_expansion_unit_buffer`
 
 Raw protocol methods and low-level client APIs are intentionally left to the
 maintainer documentation.
@@ -113,6 +118,39 @@ large_dwords = await read_dwords_chunked(client, "DM2000", 120)
 
 - `*_single_request` returns an error instead of silently splitting one logical read
 - `*_chunked` is the explicit opt-in surface for multi-request contiguous reads
+
+## Address Helpers
+
+Use address helpers instead of copying private parsing logic into UI or adapter
+code.
+
+```python
+from hostlink import format_address, normalize_address, parse_address, try_parse_address
+
+print(normalize_address("dm100.a"))  # DM100.A
+
+parsed = parse_address("dm100.a")
+print(parsed.base_device)  # DM100
+print(parsed.bit_index)    # 10
+print(format_address(parsed))
+
+if try_parse_address("DM1A") is None:
+    print("Invalid address")
+```
+
+## Expansion Unit Buffers
+
+Use `read_expansion_unit_buffer` and `write_expansion_unit_buffer` for KV
+expansion unit buffer memory. These helpers expose the Host Link `URD` and
+`UWR` commands through the high-level async surface. They keep one helper call
+as one protocol request.
+
+```python
+from hostlink import read_expansion_unit_buffer, write_expansion_unit_buffer
+
+words = await read_expansion_unit_buffer(client, unit_no=1, address=100, count=2, data_format="U")
+await write_expansion_unit_buffer(client, unit_no=1, address=200, values=words, data_format="U")
+```
 
 ## Bit in Word
 
