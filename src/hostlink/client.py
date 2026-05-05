@@ -40,6 +40,8 @@ from .protocol import (
     split_data_tokens,
 )
 
+UDP_RECEIVE_BUFFER_SIZE = 65_535
+
 
 class HostLinkTraceDirection(Enum):
     SEND = "send"
@@ -297,7 +299,7 @@ class HostLinkClient(HostLinkBase):
             self._fire_trace(HostLinkTraceDirection.SEND, payload)
             self._sock.sendall(payload)
             if self.transport == "udp":
-                response = self._sock.recv(self.buffer_size)
+                response = self._sock.recv(UDP_RECEIVE_BUFFER_SIZE)
             else:
                 response = self._recv_tcp_line()
             self._fire_trace(HostLinkTraceDirection.RECEIVE, response)

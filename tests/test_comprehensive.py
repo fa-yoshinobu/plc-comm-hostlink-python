@@ -122,6 +122,19 @@ class TestComprehensiveSync(unittest.TestCase):
         self.server.responses["?M"] = "1"
         self.assertEqual(self.client.confirm_operating_mode(), 1)
 
+    def test_udp_send_raw_accepts_large_datagram_response(self):
+        server = MockSyncServer(transport="udp")
+        server.start()
+        client = HostLinkClient("127.0.0.1", port=server.port, transport="udp", auto_connect=True)
+        try:
+            large_response = "7" * 9000
+            server.responses["LARGE"] = large_response
+
+            self.assertEqual(client.send_raw("LARGE"), large_response)
+        finally:
+            client.close()
+            server.stop()
+
     def test_set_time(self):
         dt = datetime(2026, 3, 18, 15, 30, 45)
         self.client.set_time(dt)
