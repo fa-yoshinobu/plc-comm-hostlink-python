@@ -10,6 +10,12 @@
 
 ![Illustration](https://raw.githubusercontent.com/fa-yoshinobu/plc-comm-hostlink-python/main/docsrc/assets/kv.png)
 
+[![Release](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/release.yml/badge.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/release.yml)
+
+[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![MkDocs](https://img.shields.io/badge/MkDocs-526CFE?logo=materialformkdocs&logoColor=white)](https://www.mkdocs.org/)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?logo=githubpages&logoColor=white)](https://pages.github.com/)
+
 High-performance Python library for KEYENCE KV series PLCs using the Host Link (Upper Link) protocol.
 
 This README intentionally covers the recommended high-level helper API only:
