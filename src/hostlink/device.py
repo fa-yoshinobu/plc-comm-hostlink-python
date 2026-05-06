@@ -36,7 +36,7 @@ DEVICE_RANGES = {
     "CM": (0, 7599, 10),
     "VM": (0, 589823, 10),
     "X": (0, 1999 * 16 + 15, 10),
-    "Y": (0, 63999 * 16 + 15, 10),
+    "Y": (0, 1999 * 16 + 15, 10),
     "M": (0, 63999, 10),
     "L": (0, 15999, 10),
     "D": (0, 65534, 10),
@@ -249,6 +249,14 @@ def _format_bit_bank_number(number: int) -> str:
     return f"{bank}{bit:02d}"
 
 
+def bit_bank_logical_number(number: int) -> int:
+    return (number // 100) * 16 + (number % 100)
+
+
+def bit_bank_number_from_logical(number: int) -> int:
+    return (number // 16) * 100 + (number % 16)
+
+
 def _format_xym_bit_number(number: int) -> str:
     bank = number // 16
     bit = number % 16
@@ -318,9 +326,16 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
     word_width = 2 if effective_format in {".D", ".L"} else 1
-    end_number = start_number + (count * word_width) - 1
-    if start_number < lo or start_number > hi or end_number > hi:
+    start_span_number = bit_bank_logical_number(start_number) if device_type in BIT_BANK_DEVICE_TYPES else start_number
+    hi_span_number = bit_bank_logical_number(hi) if device_type in BIT_BANK_DEVICE_TYPES else hi
+    end_span_number = start_span_number + (count * word_width) - 1
+    if start_number < lo or start_number > hi or end_span_number > hi_span_number:
         start_text = _format_device_number(device_type, start_number)
+        end_number = (
+            bit_bank_number_from_logical(end_span_number)
+            if device_type in BIT_BANK_DEVICE_TYPES
+            else end_span_number
+        )
         end_text = _format_device_number(device_type, end_number)
         raise HostLinkProtocolError(
             f"Device span out of range: {device_type}{start_text}..{device_type}{end_text} "
