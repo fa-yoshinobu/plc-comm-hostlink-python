@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Corrected XYM `X` / `Y` alias catalog bounds so published ranges such as `X0-999F` are exposed as decimal-bank plus hexadecimal-bit logical counts.
+- Batched `read_named()` direct-bit reads across `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`.
+
 ## [0.1.2] - 2026-03-19
 
 ### Added

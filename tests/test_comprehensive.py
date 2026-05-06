@@ -171,11 +171,14 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(parse_device("X400").number, 40 * 16)
         self.assertEqual(DeviceAddress("X", 39 * 16 + 15).to_text(), "X39F")
         self.assertEqual(DeviceAddress("X", 40 * 16).to_text(), "X400")
+        self.assertEqual(parse_device("Y1999F").number, 1999 * 16 + 15)
 
         with self.assertRaisesRegex(HostLinkProtocolError, "bank digits must be decimal"):
             parse_device("X3F0")
         with self.assertRaisesRegex(HostLinkProtocolError, "bank digits must be decimal"):
             parse_device("Y19A0")
+        with self.assertRaisesRegex(HostLinkProtocolError, "out of range"):
+            parse_device("Y20000")
 
     def test_expansion_unit(self):
         self.server.responses["URD 01 100 .U 2"] = "123 456"
@@ -315,6 +318,22 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(self.server.last_received, ["RDS DM100.U 8"])
+
+    async def test_async_read_named_batches_bit_bank_direct_bits_across_display_bank_boundary(self):
+        self.server.responses["RDS CR3614 4"] = "0 1 0 1"
+
+        result = await read_named(self.client, ["CR3614", "CR3615", "CR3700", "CR3701"])
+
+        self.assertEqual(
+            result,
+            {
+                "CR3614": False,
+                "CR3615": True,
+                "CR3700": False,
+                "CR3701": True,
+            },
+        )
+        self.assertEqual(self.server.last_received, ["RDS CR3614 4"])
 
     async def test_async_read_comments_helper_and_read_named_comment(self):
         self.server.responses["RDC DM150"] = "MAIN COMMENT                    "

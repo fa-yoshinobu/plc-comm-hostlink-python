@@ -14,7 +14,15 @@ from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE, DeviceAddress, parse_device, parse_device_text
+from .device import (
+    BIT_BANK_DEVICE_TYPES,
+    DEFAULT_FORMAT_BY_DEVICE_TYPE,
+    DeviceAddress,
+    bit_bank_logical_number,
+    bit_bank_number_from_logical,
+    parse_device,
+    parse_device_text,
+)
 from .errors import HostLinkProtocolError
 
 if TYPE_CHECKING:
@@ -508,7 +516,7 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
     for bucket in requests_by_device_type.values():
         sorted_requests = sorted(
             bucket,
-            key=lambda req: (req.base_address.number, -_get_word_width(req.kind)),
+            key=lambda req: (_read_plan_number(req), -_get_word_width(req.kind)),
         )
 
         pending: list[_ReadPlanRequest] = []
@@ -518,7 +526,7 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
         current_mode = "WORDS"
 
         for request in sorted_requests:
-            request_start = request.base_address.number
+            request_start = _read_plan_number(request)
             request_end_exclusive = request_start + _get_word_width(request.kind)
             request_mode = "DIRECT_BITS" if request.kind == "DIRECT_BIT" else "WORDS"
 
@@ -607,12 +615,12 @@ async def _execute_read_named_plan(
         if segment.mode == "DIRECT_BITS":
             tokens = await client.read_consecutive(segment.start_address.to_text(), segment.count, data_format=None)
             for request in segment.requests:
-                offset = request.base_address.number - segment.start_number
+                offset = _read_plan_number(request) - segment.start_number
                 resolved[request.index] = _resolve_direct_bit_value(tokens, offset)
         else:
             words = await read_words(client, segment.start_address.to_text(), segment.count)
             for request in segment.requests:
-                offset = request.base_address.number - segment.start_number
+                offset = _read_plan_number(request) - segment.start_number
                 resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
 
     result: dict[str, int | float | bool | str] = {}
@@ -656,6 +664,21 @@ def _get_word_width(kind: str) -> int:
     if width is None:
         raise HostLinkProtocolError(f"Unsupported read plan value kind: {kind}")
     return width
+
+
+def _read_plan_number(request: _ReadPlanRequest) -> int:
+    if request.kind == "DIRECT_BIT" and request.base_address.device_type in BIT_BANK_DEVICE_TYPES:
+        return bit_bank_logical_number(request.base_address.number)
+    return request.base_address.number
+
+
+def _offset_device(start: DeviceAddress, word_offset: int) -> str:
+    number = (
+        bit_bank_number_from_logical(bit_bank_logical_number(start.number) + word_offset)
+        if start.device_type in BIT_BANK_DEVICE_TYPES
+        else start.number + word_offset
+    )
+    return DeviceAddress(start.device_type, number, "").to_text()
 
 
 def _words_to_float32(lo_word: int, hi_word: int) -> float:
@@ -774,7 +797,7 @@ async def read_words_chunked(
     offset = 0
     while remaining > 0:
         chunk = min(remaining, effective_max)
-        chunk_device = DeviceAddress(start.device_type, start.number + offset, "").to_text()
+        chunk_device = _offset_device(start, offset)
         result.extend(await read_words_single_request(client, chunk_device, chunk))
         offset += chunk
         remaining -= chunk
@@ -801,7 +824,7 @@ async def read_dwords_chunked(
     offset = 0
     while remaining > 0:
         chunk = min(remaining, max_dwords_per_request)
-        chunk_device = DeviceAddress(start.device_type, start.number + (offset * 2), "").to_text()
+        chunk_device = _offset_device(start, offset * 2)
         result.extend(await read_dwords_single_request(client, chunk_device, chunk))
         offset += chunk
         remaining -= chunk
@@ -825,7 +848,7 @@ async def write_words_chunked(
     offset = 0
     while offset < len(values):
         chunk = min(len(values) - offset, effective_max)
-        chunk_device = DeviceAddress(start.device_type, start.number + offset, "").to_text()
+        chunk_device = _offset_device(start, offset)
         await write_words_single_request(client, chunk_device, values[offset : offset + chunk])
         offset += chunk
 
@@ -848,7 +871,7 @@ async def write_dwords_chunked(
     offset = 0
     while offset < len(values):
         chunk = min(len(values) - offset, max_dwords_per_request)
-        chunk_device = DeviceAddress(start.device_type, start.number + (offset * 2), "").to_text()
+        chunk_device = _offset_device(start, offset * 2)
         await write_dwords_single_request(client, chunk_device, values[offset : offset + chunk])
         offset += chunk
 

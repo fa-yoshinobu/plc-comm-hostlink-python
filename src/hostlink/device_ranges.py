@@ -275,8 +275,24 @@ def _parse_segment_number(
     normalized = _trim_leading_ascii_letters(normalized)
     if not normalized:
         return None
+    if default_device in {"X", "Y"}:
+        return _parse_xym_segment_number(normalized)
     base = 16 if notation == KvDeviceRangeNotation.HEXADECIMAL else 10
     return int(normalized, base)
+
+
+def _parse_xym_segment_number(text: str) -> int | None:
+    bank_text = "" if len(text) == 1 else text[:-1]
+    if any(character < "0" or character > "9" for character in bank_text):
+        return None
+
+    try:
+        bit = int(text[-1], 16)
+    except ValueError:
+        return None
+
+    bank = int(bank_text, 10) if bank_text else 0
+    return bank * 16 + bit
 
 
 def _trim_leading_ascii_letters(value: str) -> str:
