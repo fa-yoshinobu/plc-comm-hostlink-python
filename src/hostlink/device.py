@@ -108,7 +108,7 @@ DEFAULT_FORMAT_BY_DEVICE_TYPE = {
     "W": ".U",
     "TM": ".U",
     "Z": ".U",
-    "AT": ".U",
+    "AT": ".D",
     "CM": ".U",
     "VM": ".U",
     "T": ".D",
@@ -325,7 +325,7 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
-    word_width = 2 if effective_format in {".D", ".L"} else 1
+    word_width = 1 if device_type == "AT" else (2 if effective_format in {".D", ".L"} else 1)
     start_span_number = bit_bank_logical_number(start_number) if device_type in BIT_BANK_DEVICE_TYPES else start_number
     hi_span_number = bit_bank_logical_number(hi) if device_type in BIT_BANK_DEVICE_TYPES else hi
     end_span_number = start_span_number + (count * word_width) - 1

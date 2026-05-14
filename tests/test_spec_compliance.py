@@ -102,6 +102,22 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             validate_device_span("DM", 65534, ".D", 1)
 
+    def test_validate_device_span_treats_at_32bit_as_device_points(self) -> None:
+        validate_device_span("AT", 7, ".D", 1)
+        validate_device_span("AT", 0, ".D", 8)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("AT", 1, ".D", 8)
+
+    def test_at_uses_32bit_default_format(self) -> None:
+        plc = FakeHostLinkClient()
+        plc.queue("0000000000")
+        plc.read("AT7")
+        self.assertEqual(plc.sent_frames[-1], b"RD AT7.D\r")
+
+        plc.queue("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000")
+        plc.read_consecutive("AT0", 8)
+        self.assertEqual(plc.sent_frames[-1], b"RDS AT0.D 8\r")
+
     def test_validate_expansion_buffer_span_rejects_32bit_end_crossing(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
             validate_expansion_buffer_span(59999, ".D", 1)
