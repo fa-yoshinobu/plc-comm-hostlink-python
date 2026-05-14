@@ -139,6 +139,14 @@ class TestComprehensiveSync(unittest.TestCase):
         dt = datetime(2026, 3, 18, 15, 30, 45)
         self.client.set_time(dt)
         self.assertEqual(self.server.last_received[-1], "WRT 26 03 18 15 30 45 3")
+        for value, expected in [
+            (datetime(2026, 3, 15, 1, 2, 3), "WRT 26 03 15 01 02 03 0"),
+            (datetime(2026, 3, 16, 1, 2, 3), "WRT 26 03 16 01 02 03 1"),
+            (datetime(2026, 3, 21, 1, 2, 3), "WRT 26 03 21 01 02 03 6"),
+        ]:
+            with self.subTest(value=value):
+                self.client.set_time(value)
+                self.assertEqual(self.server.last_received[-1], expected)
 
     def test_forced_set_reset(self):
         self.client.forced_set("R0")
