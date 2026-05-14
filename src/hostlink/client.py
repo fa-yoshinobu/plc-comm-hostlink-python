@@ -514,9 +514,8 @@ class HostLinkClient(HostLinkBase):
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", count)
         validate_expansion_buffer_span(address, suffix or ".U", count)
-        parts = ["URD", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
-        parts.append(effective_suffix)
+        parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(count))
         response = self.send_raw(" ".join(parts))
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
@@ -537,9 +536,8 @@ class HostLinkClient(HostLinkBase):
         validate_expansion_buffer_count(suffix or ".U", len(values))
         validate_expansion_buffer_span(address, suffix or ".U", len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
-        parts = ["UWR", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
-        parts.append(effective_suffix)
+        parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(len(values)))
         parts.append(payload)
         self._expect_ok(" ".join(parts))
@@ -852,9 +850,8 @@ class AsyncHostLinkClient(HostLinkBase):
         suffix = normalize_suffix(data_format)
         validate_expansion_buffer_count(suffix or ".U", count)
         validate_expansion_buffer_span(address, suffix or ".U", count)
-        parts = ["URD", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
-        parts.append(effective_suffix)
+        parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(count))
         response = await self.send_raw(" ".join(parts))
         return parse_data_tokens(split_data_tokens(response), data_format=suffix)
@@ -875,9 +872,8 @@ class AsyncHostLinkClient(HostLinkBase):
         validate_expansion_buffer_count(suffix or ".U", len(values))
         validate_expansion_buffer_span(address, suffix or ".U", len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
-        parts = ["UWR", f"{unit_no:02d}", str(address)]
         effective_suffix = suffix or ".U"
-        parts.append(effective_suffix)
+        parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(len(values)))
         parts.append(payload)
         await self._expect_ok(" ".join(parts))

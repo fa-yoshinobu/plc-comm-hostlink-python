@@ -148,8 +148,8 @@ Monitor register size limit:
 
 - `RDC <device>`
 - `BE <bank_no>` (`0..15`)
-- `URD <unit_no> <address> [.fmt] <count>`
-- `UWR <unit_no> <address> [.fmt] <count> <v1> ... <vn>`
+- `URD <unit_no> <address>[.fmt] <count>`
+- `UWR <unit_no> <address>[.fmt] <count> <v1> ... <vn>`
 
 `RDC` allowed types:
 

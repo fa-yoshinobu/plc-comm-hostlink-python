@@ -181,11 +181,11 @@ class TestComprehensiveSync(unittest.TestCase):
             parse_device("Y20000")
 
     def test_expansion_unit(self):
-        self.server.responses["URD 01 100 .U 2"] = "123 456"
+        self.server.responses["URD 01 100.U 2"] = "123 456"
         vals = self.client.read_expansion_unit_buffer(1, 100, 2)
         self.assertEqual(vals, [123, 456])
         self.client.write_expansion_unit_buffer(1, 200, [789, 1011], data_format=".S")
-        self.assertEqual(self.server.last_received[-1], "UWR 01 200 .S 2 789 1011")
+        self.assertEqual(self.server.last_received[-1], "UWR 01 200.S 2 789 1011")
 
     def test_read_comments(self):
         self.server.responses["RDC R000"] = "TEST COMMENT                    "
@@ -374,11 +374,11 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.server.last_received[-1], "WRE DM10.U 2 5 6")
 
     async def test_async_expansion(self):
-        self.server.responses["URD 00 500 .U 1"] = "999"
+        self.server.responses["URD 00 500.U 1"] = "999"
         val = await self.client.read_expansion_unit_buffer(0, 500, 1)
         self.assertEqual(val, [999])
         await self.client.write_expansion_unit_buffer(0, 600, [111])
-        self.assertEqual(self.server.last_received[-1], "UWR 00 600 .U 1 111")
+        self.assertEqual(self.server.last_received[-1], "UWR 00 600.U 1 111")
 
 
 if __name__ == "__main__":

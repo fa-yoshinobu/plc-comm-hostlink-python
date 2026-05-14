@@ -4,7 +4,9 @@ This file tracks the remaining tasks and issues for the Host Link Communication 
 
 ## 1. Protocol Implementation Gaps
 - [x] **Expansion Unit Access helper surface**: Add high-level helpers for accessing buffer memory in expansion units, backed by low-level `URD` / `UWR` methods and stub tests.
-- [ ] **Expansion Unit Access live validation**: Verify the helper surface against a real KV PLC with an expansion unit installed.
+- [x] **Expansion Unit Access live validation**: Verified `URD` / `UWR` against a
+  KV-X500 at `192.168.250.100:8501` on 2026-05-14 with expansion units `0`,
+  `1`, and `2` using same-value writeback/readback.
 
 ## 2. Cross-Stack API Alignment
 
