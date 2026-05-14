@@ -122,6 +122,19 @@ class HostLinkAddress:
         return self.dtype == "BIT_IN_WORD"
 
 
+@dataclass(frozen=True)
+class TimerCounterValue:
+    """Composite timer/counter read result.
+
+    Host Link ``RD Tn.D`` and ``RD Cn.D`` replies contain the contact/status,
+    current value, and preset value in that order.
+    """
+
+    status: int
+    current: int
+    preset: int
+
+
 def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
     """Parse a public Host Link helper address.
 
@@ -257,6 +270,48 @@ async def read_typed(
         return int(raw) if isinstance(raw, str) else raw
     raw = values[0]
     return int(raw) if isinstance(raw, str) else raw
+
+
+async def read_timer_counter(client: AsyncHostLinkClient, device: str) -> TimerCounterValue:
+    """Read a timer/counter composite value as status, current, and preset.
+
+    Existing :func:`read_typed` and :func:`read_named` keep their compatibility
+    behavior of returning the preset value for ``T``/``C`` devices. Use this
+    helper when the contact/status or current value is required too.
+    """
+
+    addr = parse_device(device)
+    if addr.device_type not in {"T", "C"}:
+        raise HostLinkProtocolError("read_timer_counter requires a T or C device.")
+
+    target = DeviceAddress(addr.device_type, addr.number, "").to_text()
+    result = await client.read(target, data_format=".D")
+    values = result if isinstance(result, list) else [result]
+    if len(values) < 3:
+        raise HostLinkProtocolError(
+            f"Timer/counter response for {target!r} did not contain status/current/preset."
+        )
+    return TimerCounterValue(
+        status=int(values[0]),
+        current=int(values[1]),
+        preset=int(values[2]),
+    )
+
+
+async def read_timer(client: AsyncHostLinkClient, device: str) -> TimerCounterValue:
+    """Read a timer composite value."""
+
+    if parse_device(device).device_type != "T":
+        raise HostLinkProtocolError("read_timer requires a T device.")
+    return await read_timer_counter(client, device)
+
+
+async def read_counter(client: AsyncHostLinkClient, device: str) -> TimerCounterValue:
+    """Read a counter composite value."""
+
+    if parse_device(device).device_type != "C":
+        raise HostLinkProtocolError("read_counter requires a C device.")
+    return await read_timer_counter(client, device)
 
 
 async def read_comments(

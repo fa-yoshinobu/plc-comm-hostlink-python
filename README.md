@@ -27,6 +27,7 @@ This README intentionally covers the recommended high-level helper API only:
 - `format_address`
 - `normalize_address`
 - `read_typed`
+- `read_timer_counter` / `read_timer` / `read_counter`
 - `write_typed`
 - `read_comments`
 - `write_bit_in_word`
@@ -88,6 +89,11 @@ Start with these public high-level families first:
 - bit-in-word forms: `DM100.3`, `DM100.A`
 - timer/counter scalar forms: `T10:D`, `C10:D`
 - digital trimmer scalar forms on supported PLCs: `AT0:D` / default `AT0`
+
+`read_typed(client, "T10", "D")` and `read_named(client, ["T10"])` return the
+timer/counter preset value for compatibility. Use
+`read_timer_counter(client, "T10")` when the Host Link composite fields are
+needed: `status`, `current`, and `preset`.
 
 `AT` is not listed in the WR/WRS device table, so write helpers reject AT before
 sending.

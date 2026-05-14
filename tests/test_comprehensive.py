@@ -12,6 +12,7 @@ from hostlink import (
     poll,
     read_comments,
     read_named,
+    read_timer_counter,
     read_typed,
     write_typed,
 )
@@ -318,6 +319,16 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, {"T10": 20, "C10": 30})
         self.assertEqual(self.server.last_received, ["RD T10.D", "RD C10.D"])
+
+    async def test_async_read_timer_counter_returns_status_current_and_preset(self):
+        self.server.responses["RD T10.D"] = "1,0000000010,0000000020"
+
+        result = await read_timer_counter(self.client, "T10")
+
+        self.assertEqual(result.status, 1)
+        self.assertEqual(result.current, 10)
+        self.assertEqual(result.preset, 20)
+        self.assertEqual(self.server.last_received, ["RD T10.D"])
 
     async def test_async_read_named_batches_contiguous_word_reads(self):
         self.server.responses["RDS DM100.U 8"] = "1025 65535 2 1 57920 1 0 16712"

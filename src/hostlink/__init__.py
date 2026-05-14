@@ -6,11 +6,15 @@ from :mod:`hostlink.utils`:
 - :func:`open_and_connect`
 - :class:`HostLinkConnectionOptions`
 - :class:`HostLinkAddress`
+- :class:`TimerCounterValue`
 - :func:`parse_address`
 - :func:`try_parse_address`
 - :func:`format_address`
 - :func:`normalize_address`
 - :func:`read_typed`
+- :func:`read_timer_counter`
+- :func:`read_timer`
+- :func:`read_counter`
 - :func:`write_typed`
 - :func:`read_comments`
 - :func:`read_words_single_request`
@@ -50,17 +54,21 @@ from .errors import (
 from .utils import (
     HostLinkAddress,
     HostLinkConnectionOptions,
+    TimerCounterValue,
     format_address,
     normalize_address,
     open_and_connect,
     parse_address,
     poll,
     read_comments,
+    read_counter,
     read_dwords,
     read_dwords_chunked,
     read_dwords_single_request,
     read_expansion_unit_buffer,
     read_named,
+    read_timer,
+    read_timer_counter,
     read_typed,
     read_words,
     read_words_chunked,
@@ -95,16 +103,20 @@ __all__ = [
     "device_range_catalog_for_model",
     "HostLinkAddress",
     "HostLinkConnectionOptions",
+    "TimerCounterValue",
     "format_address",
     "normalize_address",
     "open_and_connect",
     "parse_address",
     "poll",
     "read_comments",
+    "read_counter",
     "read_dwords",
     "read_dwords_chunked",
     "read_dwords_single_request",
     "read_named",
+    "read_timer",
+    "read_timer_counter",
     "read_typed",
     "read_words",
     "read_words_chunked",
