@@ -160,6 +160,7 @@ XYM aliases are also accepted for comment reads, for example `D10`, `E20`, `F30`
 ## Verified Hardware
 
 - CPU: `KV-7500`
+- CPU: `KV-X500`
 - Ethernet: built-in Ethernet port and `KV-XLE02`
 - Transport: `TCP` and `UDP`
 

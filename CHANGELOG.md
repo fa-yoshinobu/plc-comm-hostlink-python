@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.10 - 2026-05-14
+
+### Changed
+- Added `KV-X500` to the README verified hardware list.
+
 ### Fixed
 - Corrected XYM `X` / `Y` alias catalog bounds so published ranges such as `X0-999F` are exposed as decimal-bank plus hexadecimal-bit logical counts.
 - Batched `read_named()` direct-bit reads across `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`.
