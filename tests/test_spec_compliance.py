@@ -118,6 +118,14 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         plc.read_consecutive("AT0", 8)
         self.assertEqual(plc.sent_frames[-1], b"RDS AT0.D 8\r")
 
+    def test_at_write_is_rejected_before_send(self) -> None:
+        plc = FakeHostLinkClient()
+        with self.assertRaises(HostLinkProtocolError):
+            plc.write("AT0", 3533)
+        with self.assertRaises(HostLinkProtocolError):
+            plc.write_consecutive("AT0", [3533, 5543])
+        self.assertEqual(plc.sent_frames, [])
+
     def test_validate_expansion_buffer_span_rejects_32bit_end_crossing(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
             validate_expansion_buffer_span(59999, ".D", 1)

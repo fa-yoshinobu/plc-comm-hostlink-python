@@ -93,6 +93,7 @@ RDC_DEVICE_TYPES = {
     "F",
 }
 WS_DEVICE_TYPES = {"T", "C"}
+WR_DEVICE_TYPES = set(DEVICE_RANGES) - {"AT"}
 
 DEFAULT_FORMAT_BY_DEVICE_TYPE = {
     "R": "",

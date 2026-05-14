@@ -16,6 +16,7 @@ from .device import (
     MBS_DEVICE_TYPES,
     MWS_DEVICE_TYPES,
     RDC_DEVICE_TYPES,
+    WR_DEVICE_TYPES,
     WS_DEVICE_TYPES,
     DeviceAddress,
     normalize_suffix,
@@ -405,6 +406,8 @@ class HostLinkClient(HostLinkBase):
 
     def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        validate_device_type("WR", addr.device_type, WR_DEVICE_TYPES)
         payload = self._format_value(value, suffix)
         self._expect_ok(f"WR {token} {payload}")
 
@@ -419,6 +422,7 @@ class HostLinkClient(HostLinkBase):
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
+        validate_device_type("WRS", addr.device_type, WR_DEVICE_TYPES)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
@@ -435,6 +439,7 @@ class HostLinkClient(HostLinkBase):
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
+        validate_device_type("WRE", addr.device_type, WR_DEVICE_TYPES)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
@@ -741,6 +746,8 @@ class AsyncHostLinkClient(HostLinkBase):
 
     async def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
         token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        validate_device_type("WR", addr.device_type, WR_DEVICE_TYPES)
         payload = self._format_value(value, suffix)
         await self._expect_ok(f"WR {token} {payload}")
 
@@ -755,6 +762,7 @@ class AsyncHostLinkClient(HostLinkBase):
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
+        validate_device_type("WRS", addr.device_type, WR_DEVICE_TYPES)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
@@ -771,6 +779,7 @@ class AsyncHostLinkClient(HostLinkBase):
             raise HostLinkProtocolError("values must not be empty")
         token, suffix = self._device_with_format(device, data_format, len(values))
         addr = parse_device(token)
+        validate_device_type("WRE", addr.device_type, WR_DEVICE_TYPES)
         effective_format = resolve_effective_format(addr.device_type, suffix)
         validate_device_count(addr.device_type, effective_format, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
