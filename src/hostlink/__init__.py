@@ -32,7 +32,7 @@ workflows, but the helpers above are the recommended entry points for normal
 application code and generated user documentation.
 """
 
-__version__ = "0.1.9"
+__version__ = "0.1.11"
 
 from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTraceDirection, HostLinkTraceFrame, ModelInfo
 from .device_ranges import (

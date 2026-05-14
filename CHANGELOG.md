@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.1.11 - 2026-05-14
+
+### Added
+- Added `TimerCounterValue` plus `read_timer_counter()`, `read_timer()`, and
+  `read_counter()` helpers for full `T` / `C` composite values.
+
 ### Changed
 - Documented that `WS` / `WSS` timer/counter preset writes are supported only
   by KV-8000/7000-series CPU units; other CPU units return abnormal response
