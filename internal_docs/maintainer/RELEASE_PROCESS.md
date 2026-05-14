@@ -6,8 +6,8 @@ This is the minimum release checklist for this repository.
 
 Check these before tagging:
 
-- [User Guide](../user/USER_GUIDE.md)
-- [CHANGELOG](../CHANGELOG.md)
+- [User Guide](../../docsrc/user/USER_GUIDE.md)
+- [CHANGELOG](../../CHANGELOG.md)
 - [Protocol Spec](PROTOCOL_SPEC.md)
 
 ## 2. Run Local Verification
