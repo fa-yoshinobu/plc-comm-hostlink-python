@@ -251,6 +251,10 @@ async def read_typed(
     values = result if isinstance(result, list) else [result]
     if not values:
         raise HostLinkProtocolError(f"No value returned for {device!r}")
+    addr = parse_device(device)
+    if addr.device_type in {"T", "C"} and key in {"D", "L"}:
+        raw = values[-1]
+        return int(raw) if isinstance(raw, str) else raw
     raw = values[0]
     return int(raw) if isinstance(raw, str) else raw
 

@@ -297,6 +297,11 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"DM0:F": 1.25, "DM2:F": 12.5})
         self.assertEqual(self.server.last_received, ["RDS DM0.U 4"])
 
+    async def test_async_timer_counter_composite_read_returns_set_value(self):
+        self.server.responses["RD T0.D"] = "0,0000000010,0000000020"
+
+        self.assertEqual(await read_typed(self.client, "T0", "D"), 20)
+
     async def test_async_read_named_batches_contiguous_word_reads(self):
         self.server.responses["RDS DM100.U 8"] = "1025 65535 2 1 57920 1 0 16712"
 

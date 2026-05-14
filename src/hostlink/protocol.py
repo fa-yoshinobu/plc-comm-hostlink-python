@@ -72,7 +72,7 @@ def ensure_success(response_text: str) -> str:
 
 
 def split_data_tokens(response_text: str) -> list[str]:
-    return [token for token in response_text.split(" ") if token != ""]
+    return [token for token in re.split(r"[ ,]+", response_text) if token != ""]
 
 
 def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
