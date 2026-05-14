@@ -9,12 +9,16 @@ It intentionally excludes raw protocol methods and low-level client operations.
 ```python
 from hostlink import (
     HostLinkConnectionOptions,
+    TimerCounterValue,
     open_and_connect,
     parse_address,
     try_parse_address,
     format_address,
     normalize_address,
     read_typed,
+    read_timer_counter,
+    read_timer,
+    read_counter,
     write_typed,
     write_bit_in_word,
     read_named,
@@ -130,6 +134,37 @@ Example:
 ```python
 value = await read_typed(client, "DM100", "F")
 ```
+
+For `T` and `C` devices, `read_typed(client, "T10", "D")` returns the preset
+value for compatibility with earlier helper behavior. Use
+`read_timer_counter` when the contact/status and current value are also needed.
+
+### `await read_timer_counter(client, device)`
+
+Read a timer or counter as the Host Link composite response:
+
+- `status`: contact state, `0` or `1`
+- `current`: current timer/counter value
+- `preset`: preset/set value
+
+Parameters:
+
+- `client`: connected client from `open_and_connect`
+- `device`: timer or counter base device such as `"T10"` or `"C10"`
+
+Returns:
+
+- `TimerCounterValue(status: int, current: int, preset: int)`
+
+Example:
+
+```python
+tc = await read_timer_counter(client, "T10")
+print(tc.status, tc.current, tc.preset)
+```
+
+`read_timer(client, "T10")` and `read_counter(client, "C10")` are stricter
+aliases that validate the expected device family before reading.
 
 ### `await write_typed(client, device, dtype, value)`
 

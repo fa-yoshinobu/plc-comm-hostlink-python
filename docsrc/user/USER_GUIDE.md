@@ -11,6 +11,9 @@ Use these helpers for normal application code:
 - `format_address`
 - `normalize_address`
 - `read_typed`
+- `read_timer_counter`
+- `read_timer`
+- `read_counter`
 - `write_typed`
 - `read_comments`
 - `write_bit_in_word`
@@ -92,6 +95,28 @@ if __name__ == "__main__":
 
 `F` is implemented in the helper layer by converting two `.U` words as
 float32.
+
+## Timer and Counter Composite Values
+
+`read_typed(client, "T10", "D")` and `read_named(client, ["T10"])` return the
+preset value for compatibility. When an application needs the full Host Link
+timer/counter response, use `read_timer_counter`.
+
+```python
+from hostlink import read_counter, read_timer, read_timer_counter
+
+timer = await read_timer(client, "T0")
+counter = await read_counter(client, "C10")
+same_counter = await read_timer_counter(client, "C10")
+
+print(timer.status, timer.current, timer.preset)
+print(counter.status, counter.current, counter.preset)
+print(same_counter.status, same_counter.current, same_counter.preset)
+```
+
+The fields map directly to the PLC response order: contact/status, current
+value, and preset/set value. Timer/counter devices still depend on the
+corresponding ladder circuit existing in the PLC program.
 
 ## Comments
 
@@ -179,6 +204,7 @@ Supported notation:
 | `"DM100:L"` | signed 32-bit |
 | `"DM100:F"` | float32 |
 | `"DM100:COMMENT"` | comment text |
+| `"T10"` / `"C10"` | timer/counter preset value |
 | `"DM100.3"` | bit 3 inside the word |
 | `"DM100.A"` | bit 10 inside the word |
 
