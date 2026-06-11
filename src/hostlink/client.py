@@ -218,6 +218,217 @@ class HostLinkBase:
             return str(value)
         return str(value).strip()
 
+    def _build_read_command(self, device: str, data_format: str | None = None) -> tuple[str, str]:
+        token, suffix = self._device_with_format(device, data_format)
+        return f"RD {token}", suffix
+
+    @staticmethod
+    def _decode_read_response(response: str, data_format: str) -> int | str | list[int | str]:
+        values = parse_data_tokens(split_data_tokens(response), data_format=data_format)
+        if len(values) == 1:
+            return values[0]
+        return values
+
+    def _build_read_consecutive_command(
+        self,
+        command: str,
+        device: str,
+        count: int,
+        data_format: str | None = None,
+    ) -> tuple[str, str]:
+        token, suffix = self._device_with_format(device, data_format, count)
+        addr = parse_device(token)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, count)
+        return f"{command} {token} {count}", suffix
+
+    @staticmethod
+    def _decode_data_response(response: str, data_format: str = "") -> list[int | str]:
+        return parse_data_tokens(split_data_tokens(response), data_format=data_format)
+
+    def _build_read_comments_command(self, device: str) -> str:
+        addr = parse_device(device)
+        validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
+        token = self._device_token(device, drop_suffix=True)
+        return f"RDC {token}"
+
+    @staticmethod
+    def _decode_read_comments_response(response: str, *, strip_padding: bool = True) -> str:
+        return response.rstrip(" ") if strip_padding else response
+
+    def _build_write_command(self, device: str, value: int | str, data_format: str | None = None) -> str:
+        token, suffix = self._device_with_format(device, data_format)
+        addr = parse_device(token)
+        validate_device_type("WR", addr.device_type, WR_DEVICE_TYPES)
+        payload = self._format_value(value, suffix)
+        return f"WR {token} {payload}"
+
+    def _build_write_consecutive_command(
+        self,
+        command: str,
+        device: str,
+        values: Sequence[int | str],
+        data_format: str | None = None,
+    ) -> str:
+        if not values:
+            raise HostLinkProtocolError("values must not be empty")
+        token, suffix = self._device_with_format(device, data_format, len(values))
+        addr = parse_device(token)
+        validate_device_type(command, addr.device_type, WR_DEVICE_TYPES)
+        effective_format = resolve_effective_format(addr.device_type, suffix)
+        validate_device_count(addr.device_type, effective_format, len(values))
+        payload = " ".join(self._format_value(v, suffix) for v in values)
+        return f"{command} {token} {len(values)} {payload}"
+
+    def _build_write_set_value_command(self, device: str, value: int | str, data_format: str | None = None) -> str:
+        token = self._ensure_timer_or_counter(device, data_format)
+        suffix = parse_device(token).suffix
+        payload = self._format_value(value, suffix)
+        return f"WS {token} {payload}"
+
+    def _build_write_set_value_consecutive_command(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        data_format: str | None = None,
+    ) -> str:
+        if not values:
+            raise HostLinkProtocolError("values must not be empty")
+        token = self._ensure_timer_or_counter(device, data_format, len(values))
+        suffix = parse_device(token).suffix
+        payload = " ".join(self._format_value(v, suffix) for v in values)
+        return f"WSS {token} {len(values)} {payload}"
+
+    def _build_register_monitor_bits_command(
+        self,
+        devices: Sequence[str] | tuple[Sequence[str], ...],
+    ) -> str:
+        targets = self._flatten_devices(devices)
+        if not targets:
+            raise HostLinkProtocolError("At least one device is required")
+        if len(targets) > 120:
+            raise HostLinkProtocolError("Maximum 120 devices can be registered")
+        tokens: list[str] = []
+        for device in targets:
+            addr = parse_device(device)
+            validate_device_type("MBS", addr.device_type, MBS_DEVICE_TYPES)
+            tokens.append(self._device_token(device, drop_suffix=True))
+        return "MBS " + " ".join(tokens)
+
+    def _build_register_monitor_words_command(
+        self,
+        devices: Sequence[str] | tuple[Sequence[str], ...],
+    ) -> str:
+        targets = self._flatten_devices(devices)
+        if not targets:
+            raise HostLinkProtocolError("At least one device is required")
+        if len(targets) > 120:
+            raise HostLinkProtocolError("Maximum 120 devices can be registered")
+        tokens: list[str] = []
+        for device in targets:
+            addr = parse_device(device)
+            validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
+            tok, _ = self._device_with_format(device, None)
+            tokens.append(tok)
+        return "MWS " + " ".join(tokens)
+
+    def _decode_monitor_bits_response(self, response: str) -> list[int | str]:
+        return self._decode_data_response(response)
+
+    @staticmethod
+    def _decode_monitor_words_response(response: str) -> list[str]:
+        return split_data_tokens(response)
+
+    def _build_change_mode_command(self, mode: int | str) -> str:
+        return self._get_change_mode_cmd(mode)
+
+    @staticmethod
+    def _build_clear_error_command() -> str:
+        return "ER"
+
+    @staticmethod
+    def _build_check_error_no_command() -> str:
+        return "?E"
+
+    @staticmethod
+    def _build_query_model_command() -> str:
+        return "?K"
+
+    @staticmethod
+    def _decode_query_model_response(response: str) -> ModelInfo:
+        return ModelInfo(code=response, model=MODEL_CODES.get(response))
+
+    @staticmethod
+    def _build_confirm_operating_mode_command() -> str:
+        return "?M"
+
+    @staticmethod
+    def _decode_confirm_operating_mode_response(response: str) -> int:
+        return int(response)
+
+    def _build_set_time_command(
+        self,
+        value: datetime | tuple[int, int, int, int, int, int, int] | None = None,
+    ) -> str:
+        return self._get_set_time_cmd(value)
+
+    def _build_forced_command(self, command: str, device: str) -> str:
+        addr = parse_device(device)
+        validate_device_type(command, addr.device_type, FORCE_DEVICE_TYPES)
+        return f"{command} {self._device_token(device, drop_suffix=True)}"
+
+    def _build_forced_consecutive_command(self, command: str, device: str, count: int) -> str:
+        validate_range("count", count, 1, 16)
+        addr = parse_device(device)
+        validate_device_type(command, addr.device_type, FORCE_DEVICE_TYPES)
+        return f"{command} {self._device_token(device, drop_suffix=True)} {count}"
+
+    @staticmethod
+    def _build_switch_bank_command(bank_no: int) -> str:
+        validate_range("bank_no", bank_no, 0, 15)
+        return f"BE {bank_no}"
+
+    def _build_read_expansion_unit_buffer_command(
+        self,
+        unit_no: int,
+        address: int,
+        count: int,
+        data_format: str = "",
+    ) -> tuple[str, str]:
+        validate_range("unit_no", unit_no, 0, 48)
+        validate_range("address", address, 0, 59999)
+        suffix = normalize_suffix(data_format)
+        validate_expansion_buffer_count(suffix or ".U", count)
+        validate_expansion_buffer_span(address, suffix or ".U", count)
+        effective_suffix = suffix or ".U"
+        parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
+        parts.append(str(count))
+        return " ".join(parts), suffix
+
+    def _decode_expansion_unit_buffer_response(self, response: str, data_format: str) -> list[int | str]:
+        return self._decode_data_response(response, data_format=data_format)
+
+    def _build_write_expansion_unit_buffer_command(
+        self,
+        unit_no: int,
+        address: int,
+        values: Sequence[int | str],
+        data_format: str = "",
+    ) -> str:
+        if not values:
+            raise HostLinkProtocolError("values must not be empty")
+        validate_range("unit_no", unit_no, 0, 48)
+        validate_range("address", address, 0, 59999)
+        suffix = normalize_suffix(data_format)
+        validate_expansion_buffer_count(suffix or ".U", len(values))
+        validate_expansion_buffer_span(address, suffix or ".U", len(values))
+        payload = " ".join(self._format_value(v, suffix) for v in values)
+        effective_suffix = suffix or ".U"
+        parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
+        parts.append(str(len(values)))
+        parts.append(payload)
+        return " ".join(parts)
+
 
 class HostLinkClient(HostLinkBase):
     """Synchronous client for KEYENCE KV Host Link protocol."""
@@ -337,79 +548,57 @@ class HostLinkClient(HostLinkBase):
     # --- Commands ---
 
     def change_mode(self, mode: int | str) -> None:
-        self._expect_ok(self._get_change_mode_cmd(mode))
+        self._expect_ok(self._build_change_mode_command(mode))
 
     def clear_error(self) -> None:
-        self._expect_ok("ER")
+        self._expect_ok(self._build_clear_error_command())
 
     def check_error_no(self) -> str:
-        return self.send_raw("?E")
+        return self.send_raw(self._build_check_error_no_command())
 
     def query_model(self) -> ModelInfo:
-        code = self.send_raw("?K")
-        return ModelInfo(code=code, model=MODEL_CODES.get(code))
+        response = self.send_raw(self._build_query_model_command())
+        return self._decode_query_model_response(response)
 
     def read_device_range_catalog(self) -> KvDeviceRangeCatalog:
         return device_range_catalog_for_query_model(self.query_model())
 
     def confirm_operating_mode(self) -> int:
-        return int(self.send_raw("?M"))
+        response = self.send_raw(self._build_confirm_operating_mode_command())
+        return self._decode_confirm_operating_mode_response(response)
 
     def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
-        self._expect_ok(self._get_set_time_cmd(value))
+        self._expect_ok(self._build_set_time_command(value))
 
     def forced_set(self, device: str) -> None:
-        addr = parse_device(device)
-        validate_device_type("ST", addr.device_type, FORCE_DEVICE_TYPES)
-        self._expect_ok(f"ST {self._device_token(device, drop_suffix=True)}")
+        self._expect_ok(self._build_forced_command("ST", device))
 
     def forced_reset(self, device: str) -> None:
-        addr = parse_device(device)
-        validate_device_type("RS", addr.device_type, FORCE_DEVICE_TYPES)
-        self._expect_ok(f"RS {self._device_token(device, drop_suffix=True)}")
+        self._expect_ok(self._build_forced_command("RS", device))
 
     def forced_set_consecutive(self, device: str, count: int) -> None:
-        validate_range("count", count, 1, 16)
-        addr = parse_device(device)
-        validate_device_type("STS", addr.device_type, FORCE_DEVICE_TYPES)
-        self._expect_ok(f"STS {self._device_token(device, drop_suffix=True)} {count}")
+        self._expect_ok(self._build_forced_consecutive_command("STS", device, count))
 
     def forced_reset_consecutive(self, device: str, count: int) -> None:
-        validate_range("count", count, 1, 16)
-        addr = parse_device(device)
-        validate_device_type("RSS", addr.device_type, FORCE_DEVICE_TYPES)
-        self._expect_ok(f"RSS {self._device_token(device, drop_suffix=True)} {count}")
+        self._expect_ok(self._build_forced_consecutive_command("RSS", device, count))
 
     def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
-        response = self.send_raw(f"RD {token}")
-        values = parse_data_tokens(split_data_tokens(response), data_format=suffix)
-        if len(values) == 1:
-            return values[0]
-        return values
+        body, suffix = self._build_read_command(device, data_format)
+        response = self.send_raw(body)
+        return self._decode_read_response(response, suffix)
 
     def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format, count)
-        addr = parse_device(token)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, count)
-        response = self.send_raw(f"RDS {token} {count}")
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
+        response = self.send_raw(body)
+        return self._decode_data_response(response, suffix)
 
     def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format, count)
-        addr = parse_device(token)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, count)
-        response = self.send_raw(f"RDE {token} {count}")
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
+        response = self.send_raw(body)
+        return self._decode_data_response(response, suffix)
 
     def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        token, suffix = self._device_with_format(device, data_format)
-        addr = parse_device(token)
-        validate_device_type("WR", addr.device_type, WR_DEVICE_TYPES)
-        payload = self._format_value(value, suffix)
-        self._expect_ok(f"WR {token} {payload}")
+        self._expect_ok(self._build_write_command(device, value, data_format))
 
     def write_consecutive(
         self,
@@ -418,15 +607,7 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format, len(values))
-        addr = parse_device(token)
-        validate_device_type("WRS", addr.device_type, WR_DEVICE_TYPES)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        self._expect_ok(f"WRS {token} {len(values)} {payload}")
+        self._expect_ok(self._build_write_consecutive_command("WRS", device, values, data_format))
 
     def write_consecutive_legacy(
         self,
@@ -435,21 +616,10 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format, len(values))
-        addr = parse_device(token)
-        validate_device_type("WRE", addr.device_type, WR_DEVICE_TYPES)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        self._expect_ok(f"WRE {token} {len(values)} {payload}")
+        self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
     def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        token = self._ensure_timer_or_counter(device, data_format)
-        suffix = parse_device(token).suffix
-        payload = self._format_value(value, suffix)
-        self._expect_ok(f"WS {token} {payload}")
+        self._expect_ok(self._build_write_set_value_command(device, value, data_format))
 
     def write_set_value_consecutive(
         self,
@@ -458,72 +628,35 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token = self._ensure_timer_or_counter(device, data_format, len(values))
-        suffix = parse_device(token).suffix
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        self._expect_ok(f"WSS {token} {len(values)} {payload}")
+        self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     def register_monitor_bits(self, *devices: str) -> None:
-        targets = self._flatten_devices(devices)
-        if not targets:
-            raise HostLinkProtocolError("At least one device is required")
-        if len(targets) > 120:
-            raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens: list[str] = []
-        for device in targets:
-            addr = parse_device(device)
-            validate_device_type("MBS", addr.device_type, MBS_DEVICE_TYPES)
-            tokens.append(self._device_token(device, drop_suffix=True))
-        self._expect_ok("MBS " + " ".join(tokens))
+        self._expect_ok(self._build_register_monitor_bits_command(devices))
 
     def register_monitor_words(self, *devices: str) -> None:
-        targets = self._flatten_devices(devices)
-        if not targets:
-            raise HostLinkProtocolError("At least one device is required")
-        if len(targets) > 120:
-            raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens: list[str] = []
-        for device in targets:
-            addr = parse_device(device)
-            validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
-            tok, _ = self._device_with_format(device, None)
-            tokens.append(tok)
-        self._expect_ok("MWS " + " ".join(tokens))
+        self._expect_ok(self._build_register_monitor_words_command(devices))
 
     def read_monitor_bits(self) -> list[int | str]:
         response = self.send_raw("MBR")
-        return parse_data_tokens(split_data_tokens(response))
+        return self._decode_monitor_bits_response(response)
 
     def read_monitor_words(self) -> list[str]:
         response = self.send_raw("MWR")
-        return split_data_tokens(response)
+        return self._decode_monitor_words_response(response)
 
     def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
-        addr = parse_device(device)
-        validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
-        token = self._device_token(device, drop_suffix=True)
-        response = self.send_raw(f"RDC {token}", decoder=decode_comment_response)
-        return response.rstrip(" ") if strip_padding else response
+        response = self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
+        return self._decode_read_comments_response(response, strip_padding=strip_padding)
 
     def switch_bank(self, bank_no: int) -> None:
-        validate_range("bank_no", bank_no, 0, 15)
-        self._expect_ok(f"BE {bank_no}")
+        self._expect_ok(self._build_switch_bank_command(bank_no))
 
     def read_expansion_unit_buffer(
         self, unit_no: int, address: int, count: int, *, data_format: str = ""
     ) -> list[int | str]:
-        validate_range("unit_no", unit_no, 0, 48)
-        validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", count)
-        validate_expansion_buffer_span(address, suffix or ".U", count)
-        effective_suffix = suffix or ".U"
-        parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
-        parts.append(str(count))
-        response = self.send_raw(" ".join(parts))
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
+        response = self.send_raw(body)
+        return self._decode_expansion_unit_buffer_response(response, suffix)
 
     def write_expansion_unit_buffer(
         self,
@@ -533,19 +666,7 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str = "",
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        validate_range("unit_no", unit_no, 0, 48)
-        validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", len(values))
-        validate_expansion_buffer_span(address, suffix or ".U", len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        effective_suffix = suffix or ".U"
-        parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
-        parts.append(str(len(values)))
-        parts.append(payload)
-        self._expect_ok(" ".join(parts))
+        self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
 
 
 class AsyncHostLinkClient(HostLinkBase):
@@ -675,81 +796,59 @@ class AsyncHostLinkClient(HostLinkBase):
     # --- Async Commands ---
 
     async def change_mode(self, mode: int | str) -> None:
-        await self._expect_ok(self._get_change_mode_cmd(mode))
+        await self._expect_ok(self._build_change_mode_command(mode))
 
     async def clear_error(self) -> None:
-        await self._expect_ok("ER")
+        await self._expect_ok(self._build_clear_error_command())
 
     async def check_error_no(self) -> str:
-        return await self.send_raw("?E")
+        return await self.send_raw(self._build_check_error_no_command())
 
     async def query_model(self) -> ModelInfo:
-        code = await self.send_raw("?K")
-        return ModelInfo(code=code, model=MODEL_CODES.get(code))
+        response = await self.send_raw(self._build_query_model_command())
+        return self._decode_query_model_response(response)
 
     async def read_device_range_catalog(self) -> KvDeviceRangeCatalog:
         return device_range_catalog_for_query_model(await self.query_model())
 
     async def confirm_operating_mode(self) -> int:
-        return int(await self.send_raw("?M"))
+        response = await self.send_raw(self._build_confirm_operating_mode_command())
+        return self._decode_confirm_operating_mode_response(response)
 
     async def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
-        await self._expect_ok(self._get_set_time_cmd(value))
+        await self._expect_ok(self._build_set_time_command(value))
 
     async def forced_set(self, device: str) -> None:
-        addr = parse_device(device)
-        validate_device_type("ST", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"ST {self._device_token(device, drop_suffix=True)}")
+        await self._expect_ok(self._build_forced_command("ST", device))
 
     async def forced_reset(self, device: str) -> None:
-        addr = parse_device(device)
-        validate_device_type("RS", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"RS {self._device_token(device, drop_suffix=True)}")
+        await self._expect_ok(self._build_forced_command("RS", device))
 
     async def forced_set_consecutive(self, device: str, count: int) -> None:
-        validate_range("count", count, 1, 16)
-        addr = parse_device(device)
-        validate_device_type("STS", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"STS {self._device_token(device, drop_suffix=True)} {count}")
+        await self._expect_ok(self._build_forced_consecutive_command("STS", device, count))
 
     async def forced_reset_consecutive(self, device: str, count: int) -> None:
-        validate_range("count", count, 1, 16)
-        addr = parse_device(device)
-        validate_device_type("RSS", addr.device_type, FORCE_DEVICE_TYPES)
-        await self._expect_ok(f"RSS {self._device_token(device, drop_suffix=True)} {count}")
+        await self._expect_ok(self._build_forced_consecutive_command("RSS", device, count))
 
     async def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
-        token, suffix = self._device_with_format(device, data_format)
-        response = await self.send_raw(f"RD {token}")
-        values = parse_data_tokens(split_data_tokens(response), data_format=suffix)
-        if len(values) == 1:
-            return values[0]
-        return values
+        body, suffix = self._build_read_command(device, data_format)
+        response = await self.send_raw(body)
+        return self._decode_read_response(response, suffix)
 
     async def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format, count)
-        addr = parse_device(token)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, count)
-        response = await self.send_raw(f"RDS {token} {count}")
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
+        response = await self.send_raw(body)
+        return self._decode_data_response(response, suffix)
 
     async def read_consecutive_legacy(
         self, device: str, count: int, *, data_format: str | None = None
     ) -> list[int | str]:
-        token, suffix = self._device_with_format(device, data_format, count)
-        addr = parse_device(token)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, count)
-        response = await self.send_raw(f"RDE {token} {count}")
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
+        response = await self.send_raw(body)
+        return self._decode_data_response(response, suffix)
 
     async def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        token, suffix = self._device_with_format(device, data_format)
-        addr = parse_device(token)
-        validate_device_type("WR", addr.device_type, WR_DEVICE_TYPES)
-        payload = self._format_value(value, suffix)
-        await self._expect_ok(f"WR {token} {payload}")
+        await self._expect_ok(self._build_write_command(device, value, data_format))
 
     async def write_consecutive(
         self,
@@ -758,15 +857,7 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format, len(values))
-        addr = parse_device(token)
-        validate_device_type("WRS", addr.device_type, WR_DEVICE_TYPES)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        await self._expect_ok(f"WRS {token} {len(values)} {payload}")
+        await self._expect_ok(self._build_write_consecutive_command("WRS", device, values, data_format))
 
     async def write_consecutive_legacy(
         self,
@@ -775,21 +866,10 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token, suffix = self._device_with_format(device, data_format, len(values))
-        addr = parse_device(token)
-        validate_device_type("WRE", addr.device_type, WR_DEVICE_TYPES)
-        effective_format = resolve_effective_format(addr.device_type, suffix)
-        validate_device_count(addr.device_type, effective_format, len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        await self._expect_ok(f"WRE {token} {len(values)} {payload}")
+        await self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
     async def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        token = self._ensure_timer_or_counter(device, data_format)
-        suffix = parse_device(token).suffix
-        payload = self._format_value(value, suffix)
-        await self._expect_ok(f"WS {token} {payload}")
+        await self._expect_ok(self._build_write_set_value_command(device, value, data_format))
 
     async def write_set_value_consecutive(
         self,
@@ -798,72 +878,35 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        token = self._ensure_timer_or_counter(device, data_format, len(values))
-        suffix = parse_device(token).suffix
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        await self._expect_ok(f"WSS {token} {len(values)} {payload}")
+        await self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     async def register_monitor_bits(self, *devices: str) -> None:
-        targets = self._flatten_devices(devices)
-        if not targets:
-            raise HostLinkProtocolError("At least one device is required")
-        if len(targets) > 120:
-            raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens: list[str] = []
-        for device in targets:
-            addr = parse_device(device)
-            validate_device_type("MBS", addr.device_type, MBS_DEVICE_TYPES)
-            tokens.append(self._device_token(device, drop_suffix=True))
-        await self._expect_ok("MBS " + " ".join(tokens))
+        await self._expect_ok(self._build_register_monitor_bits_command(devices))
 
     async def register_monitor_words(self, *devices: str) -> None:
-        targets = self._flatten_devices(devices)
-        if not targets:
-            raise HostLinkProtocolError("At least one device is required")
-        if len(targets) > 120:
-            raise HostLinkProtocolError("Maximum 120 devices can be registered")
-        tokens: list[str] = []
-        for device in targets:
-            addr = parse_device(device)
-            validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
-            tok, _ = self._device_with_format(device, None)
-            tokens.append(tok)
-        await self._expect_ok("MWS " + " ".join(tokens))
+        await self._expect_ok(self._build_register_monitor_words_command(devices))
 
     async def read_monitor_bits(self) -> list[int | str]:
         response = await self.send_raw("MBR")
-        return parse_data_tokens(split_data_tokens(response))
+        return self._decode_monitor_bits_response(response)
 
     async def read_monitor_words(self) -> list[str]:
         response = await self.send_raw("MWR")
-        return split_data_tokens(response)
+        return self._decode_monitor_words_response(response)
 
     async def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
-        addr = parse_device(device)
-        validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
-        token = self._device_token(device, drop_suffix=True)
-        response = await self.send_raw(f"RDC {token}", decoder=decode_comment_response)
-        return response.rstrip(" ") if strip_padding else response
+        response = await self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
+        return self._decode_read_comments_response(response, strip_padding=strip_padding)
 
     async def switch_bank(self, bank_no: int) -> None:
-        validate_range("bank_no", bank_no, 0, 15)
-        await self._expect_ok(f"BE {bank_no}")
+        await self._expect_ok(self._build_switch_bank_command(bank_no))
 
     async def read_expansion_unit_buffer(
         self, unit_no: int, address: int, count: int, *, data_format: str = ""
     ) -> list[int | str]:
-        validate_range("unit_no", unit_no, 0, 48)
-        validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", count)
-        validate_expansion_buffer_span(address, suffix or ".U", count)
-        effective_suffix = suffix or ".U"
-        parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
-        parts.append(str(count))
-        response = await self.send_raw(" ".join(parts))
-        return parse_data_tokens(split_data_tokens(response), data_format=suffix)
+        body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
+        response = await self.send_raw(body)
+        return self._decode_expansion_unit_buffer_response(response, suffix)
 
     async def write_expansion_unit_buffer(
         self,
@@ -873,19 +916,7 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str = "",
     ) -> None:
-        if not values:
-            raise HostLinkProtocolError("values must not be empty")
-        validate_range("unit_no", unit_no, 0, 48)
-        validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", len(values))
-        validate_expansion_buffer_span(address, suffix or ".U", len(values))
-        payload = " ".join(self._format_value(v, suffix) for v in values)
-        effective_suffix = suffix or ".U"
-        parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
-        parts.append(str(len(values)))
-        parts.append(payload)
-        await self._expect_ok(" ".join(parts))
+        await self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
 
 
 class _HostLinkUDPProtocol(asyncio.DatagramProtocol):

@@ -333,9 +333,7 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
     if start_number < lo or start_number > hi or end_span_number > hi_span_number:
         start_text = _format_device_number(device_type, start_number)
         end_number = (
-            bit_bank_number_from_logical(end_span_number)
-            if device_type in BIT_BANK_DEVICE_TYPES
-            else end_span_number
+            bit_bank_number_from_logical(end_span_number) if device_type in BIT_BANK_DEVICE_TYPES else end_span_number
         )
         end_text = _format_device_number(device_type, end_number)
         raise HostLinkProtocolError(

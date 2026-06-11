@@ -288,9 +288,7 @@ async def read_timer_counter(client: AsyncHostLinkClient, device: str) -> TimerC
     result = await client.read(target, data_format=".D")
     values = result if isinstance(result, list) else [result]
     if len(values) < 3:
-        raise HostLinkProtocolError(
-            f"Timer/counter response for {target!r} did not contain status/current/preset."
-        )
+        raise HostLinkProtocolError(f"Timer/counter response for {target!r} did not contain status/current/preset.")
     return TimerCounterValue(
         status=int(values[0]),
         current=int(values[1]),
