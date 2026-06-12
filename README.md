@@ -1,7 +1,7 @@
 # KV Host Link Protocol for Python
 
 [![CI](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml/badge.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml)
-[![Release](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/release.yml/badge.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/fa-yoshinobu/plc-comm-hostlink-python?label=release)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/kv-hostlink.svg)](https://pypi.org/project/kv-hostlink/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg)](https://fa-yoshinobu.github.io/plc-comm-hostlink-python/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
