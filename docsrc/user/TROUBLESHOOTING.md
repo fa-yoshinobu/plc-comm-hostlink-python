@@ -28,7 +28,7 @@ This guide provides solutions for common connectivity and protocol issues encoun
 **Solutions:**
 - **Bit Update Scope**: The user-facing helper layer supports bit-in-word updates such as `write_bit_in_word(client, "DM100", 3, True)`. Direct coil-force workflows are advanced operations and are not covered by the user guide.
 - **Model Limitation**: Some older CPUs do not support certain commands (e.g., `URD` expansion access).
-- **Format Mismatch**: Using `.D` or `.L` suffixes on devices that don't support 32-bit (rare, but possible).
+- **Format Mismatch**: Using `:D` or `:L` helper forms on devices that don't support 32-bit (rare, but possible).
 
 ### `E0: Abnormal device No.`
 **Occurs when:** The specified device address does not exist on this PLC.
@@ -47,10 +47,10 @@ This guide provides solutions for common connectivity and protocol issues encoun
 ## Unexpected Data
 
 ### Value Mismatch (Endian Issues)
-**Symptoms:** Reading `32-bit (.D/.L)` values gives strange results.
+**Symptoms:** Reading `32-bit (:D/:L)` values gives strange results.
 **Analysis:** Keyence stores 32-bit values with the **Low-word first** (e.g., DM100=Low, DM101=High).
-**Solutions:** The library handles this automatically when using `.D` or `.L`. Do not try to manually swap words unless you have a non-standard ladder configuration.
+**Solutions:** The library handles this automatically when using `:D` or `:L` in the public helper layer. Do not try to manually swap words unless you have a non-standard ladder configuration.
 
 ### Float Handling
-**Note:** The library supports `.F` for float32 helper reads and writes.
-**Solutions:** Use `.F` when the PLC side stores the value as IEEE 754 float32. If the device actually contains raw integer bits, read it as `.D` or `.L` instead.
+**Note:** The library supports `:F` for float32 helper reads and writes.
+**Solutions:** Use `:F` when the PLC side stores the value as IEEE 754 float32. If the device actually contains raw integer bits, read it as `:D` or `:L` instead.

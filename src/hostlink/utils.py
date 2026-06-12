@@ -18,8 +18,10 @@ from .device import (
     BIT_BANK_DEVICE_TYPES,
     DEFAULT_FORMAT_BY_DEVICE_TYPE,
     DeviceAddress,
+    NATIVE_32BIT_DEVICE_TYPES,
     bit_bank_logical_number,
     bit_bank_number_from_logical,
+    normalize_suffix,
     parse_device,
     parse_device_text,
 )
@@ -145,8 +147,8 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
     Args:
         address: User-facing address such as ``"dm100"``, ``"dm100:f"``, or
             ``"dm100.a"``.
-        default_suffix: Optional default Host Link suffix for base device
-            normalization.
+        default_suffix: Optional default data type for bare base-device
+            addresses. Public helper text uses ``:`` for this data type.
 
     Returns:
         A :class:`HostLinkAddress` with canonical text and parsed metadata.
@@ -170,7 +172,8 @@ def try_parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddr
 
     Args:
         address: User-facing address text.
-        default_suffix: Optional default Host Link suffix.
+        default_suffix: Optional default data type for bare base-device
+            addresses.
 
     Returns:
         A parsed :class:`HostLinkAddress`, or ``None`` if validation fails.
@@ -178,7 +181,7 @@ def try_parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddr
 
     try:
         return parse_address(address, default_suffix=default_suffix)
-    except HostLinkProtocolError:
+    except (HostLinkProtocolError, ValueError):
         return None
 
 
@@ -187,8 +190,8 @@ def format_address(address: HostLinkAddress | str, *, default_suffix: str = "") 
 
     Args:
         address: A parsed :class:`HostLinkAddress` or raw address string.
-        default_suffix: Optional default Host Link suffix used when ``address``
-            is a raw string.
+        default_suffix: Optional default data type used when ``address`` is a
+            bare raw string.
 
     Returns:
         Canonical address text.
@@ -265,7 +268,7 @@ async def read_typed(
     if not values:
         raise HostLinkProtocolError(f"No value returned for {device!r}")
     addr = parse_device(device)
-    if addr.device_type in {"T", "C"} and key in {"D", "L"}:
+    if addr.device_type in {"T", "C"} and key in {"U", "S", "D", "L", "H"}:
         raw = values[-1]
         return int(raw) if isinstance(raw, str) else raw
     raw = values[0]
@@ -526,10 +529,12 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
         return base.strip(), dtype.strip().upper(), None
     if "." in address:
         base, bit_str = address.split(".", 1)
-        try:
-            return base.strip(), "BIT_IN_WORD", int(bit_str, 16)
-        except ValueError:
-            pass
+        bit_text = bit_str.strip()
+        if len(bit_text) == 1 and bit_text.upper() in "0123456789ABCDEF":
+            return base.strip(), "BIT_IN_WORD", int(bit_text, 16)
+        raise ValueError(
+            f"Invalid bit-in-word index {bit_str!r}; use one hex digit 0-F or ':' for dtype."
+        )
     parsed = parse_device(address)
     if parsed.suffix:
         return address.strip(), parsed.suffix.lstrip(".").upper(), None
@@ -653,6 +658,8 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
 
     if dtype not in {"U", "S", "D", "L", "F"}:
         return None
+    if parsed.device_type in NATIVE_32BIT_DEVICE_TYPES and dtype in {"D", "L"}:
+        return None
 
     return _ReadPlanRequest(
         index=index,
@@ -756,19 +763,21 @@ def normalize_address(address: str, *, default_suffix: str = "") -> str:
 
     Args:
         address: User-facing address such as ``"dm100:f"`` or ``"DM100.a"``.
-        default_suffix: Optional default format used by :func:`parse_device_text`.
+        default_suffix: Optional default data type for bare addresses.
 
     Returns:
         Canonical uppercase address text.
     """
 
     base, dtype, bit_index = _parse_address(address)
-    base_text = parse_device_text(base, default_suffix=default_suffix)
+    base_text = parse_device_text(base)
     if dtype == "BIT_IN_WORD":
         assert bit_index is not None
         return f"{base_text}.{format(bit_index, 'X')}"
     if ":" in address:
         return f"{base_text}:{dtype}"
+    if default_suffix:
+        return f"{base_text}:{normalize_suffix(default_suffix).lstrip('.')}"
     return base_text
 
 

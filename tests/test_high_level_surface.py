@@ -26,6 +26,10 @@ from hostlink import (
 class TestAddressSurface(unittest.TestCase):
     def test_normalize_address_uppercases_and_preserves_bit_suffix(self) -> None:
         self.assertEqual(normalize_address("dm100.a"), "DM100.A")
+        self.assertEqual(normalize_address("dm100.d"), "DM100.D")
+        self.assertEqual(normalize_address("dm100", default_suffix="U"), "DM100:U")
+        self.assertEqual(normalize_address("dm100:f", default_suffix="U"), "DM100:F")
+        self.assertEqual(normalize_address("dm100.a", default_suffix="U"), "DM100.A")
 
     def test_parse_address_returns_public_metadata(self) -> None:
         parsed = parse_address("dm100.a")
@@ -36,8 +40,18 @@ class TestAddressSurface(unittest.TestCase):
         self.assertTrue(parsed.is_bit_in_word)
         self.assertEqual(format_address(parsed), "DM100.A")
 
+        bit_d = parse_address("dm100.d")
+        self.assertEqual(bit_d.dtype, "BIT_IN_WORD")
+        self.assertEqual(bit_d.bit_index, 13)
+
+        typed_default = parse_address("dm100", default_suffix="D")
+        self.assertEqual(typed_default.text, "DM100:D")
+        self.assertEqual(typed_default.dtype, "D")
+
     def test_try_parse_address_returns_none_for_invalid_text(self) -> None:
         self.assertIsNone(try_parse_address("DM1A"))
+        self.assertIsNone(try_parse_address("DM100.S"))
+        self.assertIsNone(try_parse_address("DM100.10"))
         self.assertEqual(format_address("dm100:f"), "DM100:F")
 
 

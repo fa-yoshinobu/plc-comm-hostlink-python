@@ -12,7 +12,8 @@ from enum import Enum
 from typing import Any, TypeVar, cast
 
 from .device import (
-    FORCE_DEVICE_TYPES,
+    FORCE_CONSECUTIVE_DEVICE_TYPES,
+    FORCE_SINGLE_DEVICE_TYPES,
     MBS_DEVICE_TYPES,
     MWS_DEVICE_TYPES,
     RDC_DEVICE_TYPES,
@@ -200,6 +201,7 @@ class HostLinkBase:
             suffix = resolve_effective_format(addr.device_type, "")
             addr = DeviceAddress(addr.device_type, addr.number, suffix)
         validate_device_span(addr.device_type, addr.number, addr.suffix, count)
+        validate_device_count(addr.device_type, addr.suffix, count)
         return addr.to_text()
 
     @staticmethod
@@ -374,13 +376,13 @@ class HostLinkBase:
 
     def _build_forced_command(self, command: str, device: str) -> str:
         addr = parse_device(device)
-        validate_device_type(command, addr.device_type, FORCE_DEVICE_TYPES)
+        validate_device_type(command, addr.device_type, FORCE_SINGLE_DEVICE_TYPES)
         return f"{command} {self._device_token(device, drop_suffix=True)}"
 
     def _build_forced_consecutive_command(self, command: str, device: str, count: int) -> str:
         validate_range("count", count, 1, 16)
         addr = parse_device(device)
-        validate_device_type(command, addr.device_type, FORCE_DEVICE_TYPES)
+        validate_device_type(command, addr.device_type, FORCE_CONSECUTIVE_DEVICE_TYPES)
         return f"{command} {self._device_token(device, drop_suffix=True)} {count}"
 
     @staticmethod

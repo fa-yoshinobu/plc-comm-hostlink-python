@@ -81,7 +81,7 @@ Examples:
 ```python
 normalize_address("dm100")      # DM100
 normalize_address("dm100.a")    # DM100.A
-normalize_address("dm100", default_suffix="U")  # DM100.U
+normalize_address("dm100", default_suffix="U")  # DM100:U
 ```
 
 ### `parse_address`, `try_parse_address`, and `format_address`

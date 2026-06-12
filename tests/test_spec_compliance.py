@@ -53,6 +53,12 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             plc.read_consecutive("TC0", 121)
 
+    def test_wss_timer_counter_count_limit_enforced(self) -> None:
+        plc = FakeHostLinkClient()
+        with self.assertRaises(HostLinkProtocolError):
+            plc.write_set_value_consecutive("T0", [0] * 121)
+        self.assertEqual(plc.sent_frames, [])
+
     def test_ws_only_accepts_t_or_c(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
@@ -67,6 +73,11 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
             plc.register_monitor_words("T0")
+
+    def test_mws_accepts_xym_word_alias_device_types(self) -> None:
+        plc = FakeHostLinkClient()
+        plc.register_monitor_words("D100", "E100", "F100", "M100", "L100")
+        self.assertEqual(plc.sent_frames[-1], b"MWS D100.U E100.U F100.U M100 L100\r")
 
     def test_rdc_rejects_unsupported_device_type(self) -> None:
         plc = FakeHostLinkClient()
@@ -108,6 +119,26 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             validate_device_span("AT", 1, ".D", 8)
 
+    def test_validate_device_span_treats_native_32bit_devices_as_device_points(self) -> None:
+        for device_type, last_number in (
+            ("T", 3999),
+            ("TC", 3999),
+            ("TS", 3999),
+            ("C", 3999),
+            ("CC", 3999),
+            ("CS", 3999),
+            ("Z", 12),
+        ):
+            with self.subTest(device_type=device_type):
+                validate_device_span(device_type, last_number, ".D", 1)
+
+        validate_device_span("T", 3880, ".D", 120)
+        validate_device_span("Z", 1, ".D", 12)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("T", 3881, ".D", 120)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("Z", 2, ".D", 12)
+
     def test_at_uses_32bit_default_format(self) -> None:
         plc = FakeHostLinkClient()
         plc.queue("0000000000")
@@ -136,11 +167,21 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
             plc.read("DM65534.D")
         self.assertEqual(plc.sent_frames, [])
 
-    def test_write_set_value_rejects_default_32bit_device_end_crossing(self) -> None:
+    def test_write_set_value_accepts_native_32bit_device_end(self) -> None:
         plc = FakeHostLinkClient()
+        plc.write_set_value("T3999", 100)
+        self.assertEqual(plc.sent_frames[-1], b"WS T3999.D 100\r")
+
+    def test_forced_commands_use_manual_device_sets_and_xym_aliases(self) -> None:
+        plc = FakeHostLinkClient()
+        plc.forced_set("X100")
+        self.assertEqual(plc.sent_frames[-1], b"ST X100\r")
+        plc.forced_reset("M100")
+        self.assertEqual(plc.sent_frames[-1], b"RS M100\r")
+        plc.forced_set_consecutive("L100", 4)
+        self.assertEqual(plc.sent_frames[-1], b"STS L100 4\r")
         with self.assertRaises(HostLinkProtocolError):
-            plc.write_set_value("T3999", 100)
-        self.assertEqual(plc.sent_frames, [])
+            plc.forced_set_consecutive("T100", 4)
 
     def test_parse_device_accepts_high_xym_m_addresses(self) -> None:
         self.assertEqual(parse_device("M63872").to_text(), "M63872")
@@ -214,6 +255,9 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
         xym = device_range_catalog_for_model("KV-3000/5000(XYM)")
         self.assertEqual(xym.entry("CR").address_range, "CR0000-CR3915")
+
+        kvx = device_range_catalog_for_model("KV-X500")
+        self.assertEqual(kvx.entry("Z").address_range, "Z1-10")
 
     def test_device_range_catalog_rejects_unsupported_model(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
