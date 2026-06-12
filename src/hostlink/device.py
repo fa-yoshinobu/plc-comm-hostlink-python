@@ -10,6 +10,7 @@ from .errors import HostLinkProtocolError
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 BIT_BANK_DEVICE_TYPES = {"R", "MR", "LR", "CR"}
 XYM_BIT_DEVICE_TYPES = {"X", "Y"}
+NATIVE_32BIT_DEVICE_TYPES = {"T", "TC", "TS", "C", "CC", "CS", "Z", "AT"}
 
 # KEYENCE expression + XYM expression
 DEVICE_RANGES = {
@@ -44,7 +45,9 @@ DEVICE_RANGES = {
     "F": (0, 32767, 10),
 }
 
-FORCE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB"}
+FORCE_SINGLE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
+FORCE_CONSECUTIVE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
+FORCE_DEVICE_TYPES = FORCE_SINGLE_DEVICE_TYPES
 MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
 MWS_DEVICE_TYPES = {
     "R",
@@ -55,9 +58,14 @@ MWS_DEVICE_TYPES = {
     "VB",
     "X",
     "Y",
+    "M",
+    "L",
     "DM",
     "EM",
     "FM",
+    "D",
+    "E",
+    "F",
     "W",
     "TM",
     "Z",
@@ -326,7 +334,7 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
-    word_width = 1 if device_type == "AT" else (2 if effective_format in {".D", ".L"} else 1)
+    word_width = 2 if effective_format in {".D", ".L"} and device_type not in NATIVE_32BIT_DEVICE_TYPES else 1
     start_span_number = bit_bank_logical_number(start_number) if device_type in BIT_BANK_DEVICE_TYPES else start_number
     hi_span_number = bit_bank_logical_number(hi) if device_type in BIT_BANK_DEVICE_TYPES else hi
     end_span_number = start_span_number + (count * word_width) - 1

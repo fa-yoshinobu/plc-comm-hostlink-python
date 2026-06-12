@@ -311,6 +311,11 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(await read_typed(self.client, "T0", "D"), 20)
 
+    async def test_async_timer_counter_16bit_typed_read_returns_set_value(self):
+        self.server.responses["RD T0.U"] = "0,00010,00020"
+
+        self.assertEqual(await read_typed(self.client, "T0", "U"), 20)
+
     async def test_async_read_named_timer_counter_composite_returns_set_value(self):
         self.server.responses["RD T10.D"] = "0,0000000010,0000000020"
         self.server.responses["RD C10.D"] = "0,0000000000,0000000030"
@@ -319,6 +324,14 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, {"T10": 20, "C10": 30})
         self.assertEqual(self.server.last_received, ["RD T10.D", "RD C10.D"])
+
+    async def test_async_read_named_native_32bit_z_uses_native_dword_read(self):
+        self.server.responses["RD Z1.D"] = "0000070000"
+
+        result = await read_named(self.client, ["Z1:D"])
+
+        self.assertEqual(result, {"Z1:D": 70000})
+        self.assertEqual(self.server.last_received, ["RD Z1.D"])
 
     async def test_async_read_timer_counter_returns_status_current_and_preset(self):
         self.server.responses["RD T10.D"] = "1,0000000010,0000000020"
