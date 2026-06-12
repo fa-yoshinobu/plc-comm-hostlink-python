@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.1.12 - 2026-06-12
+
+### Changed
+- Bumped the library revision for release alignment after the resolved live-validation pass.
 
 ### Fixed
 - Corrected XYM `X` / `Y` alias catalog bounds so published ranges such as `X0-999F` are exposed as decimal-bank plus hexadecimal-bit logical counts.
