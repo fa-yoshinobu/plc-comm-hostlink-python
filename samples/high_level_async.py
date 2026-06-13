@@ -83,12 +83,14 @@ async def demo_open_and_connect(host: str, port: int) -> None:
 
     Returns a connected client object for the helper functions below.
     """
+    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     client = await open_and_connect(HostLinkConnectionOptions(host=host, port=port))
     print(f"[open_and_connect] Connected to {host}:{port}")
     await client.close()
 
 
 def demo_normalize_address() -> None:
+    # Normalize helper-layer addresses before storing or displaying them.
     print(f"[normalize_address] dm100 -> {normalize_address('dm100')}")
     print(f"[normalize_address] dm100.a -> {normalize_address('dm100.a')}")
     parsed = parse_address("dm100.a")
@@ -110,11 +112,13 @@ async def demo_typed_rw(client) -> None:
     Use case: writing a signed 32-bit setpoint to DM200-DM201 from an
               asyncio-based HMI coroutine.
     """
+    # Read typed values from individual devices.
     val_s = await read_typed(client, "DM100", "S")
     val_l = await read_typed(client, "DM200", "L")
     val_f = await read_typed(client, "DM300", "F")
     print(f"[read_typed] DM100(S)={val_s}  DM200(L)={val_l}  DM300(F)={val_f}")
 
+    # Write only to DM test addresses that are safe in your PLC program.
     await write_typed(client, "DM100", "S", -500)
     await write_typed(client, "DM200", "L", 123456)
     await write_typed(client, "DM300", "F", 12.5)
@@ -131,12 +135,15 @@ async def demo_array_reads(client) -> None:
     Use case: reading a data table of 10 consecutive words in one
               Host Link command instead of 10 individual reads.
     """
+    # Read consecutive 16-bit words in one PLC request.
     words = await read_words_single_request(client, "DM0", 10)
     print(f"[read_words_single_request]  DM0-DM9  = {words}")
 
+    # Read consecutive 32-bit values in one PLC request.
     dwords = await read_dwords_single_request(client, "DM0", 4)
     print(f"[read_dwords_single_request] DM0-DM7 (as 4 x uint32) = {dwords}")
 
+    # Read larger areas only when explicit multi-request chunking is acceptable.
     large_words = await read_words_chunked(client, "DM1000", 1000)
     large_dwords = await read_dwords_chunked(client, "DM2000", 120)
     print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
@@ -154,6 +161,7 @@ async def demo_bit_in_word(client) -> None:
               without corrupting the other 15 bits - common when the PLC
               uses each bit for a different axis or function.
     """
+    # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
     await write_bit_in_word(client, "DM50", bit_index=4, value=True)
     print("[write_bit_in_word] Set   bit 4 of DM50")
     await write_bit_in_word(client, "DM50", bit_index=4, value=False)
@@ -175,6 +183,7 @@ async def demo_read_named(client) -> None:
     Use case: reading a heterogeneous parameter block in a single asyncio call -
               saves multiple round-trips when monitoring several device types.
     """
+    # Read a named mixed-type snapshot.
     snapshot = await read_named(
         client,
         [
@@ -197,6 +206,7 @@ async def demo_poll(client, count: int) -> None:
     """
     print(f"\nPolling {count} snapshots:")
     i = 0
+    # Poll a repeated named snapshot until this sample has printed enough rows.
     async for snap in poll(client, ["DM100", "DM200:L", "DM50.3"], interval=1.0):
         print(f"  [{i + 1}] {snap}")
         i += 1
@@ -216,6 +226,7 @@ async def run(args: argparse.Namespace) -> None:
     await demo_open_and_connect(args.host, args.port)
 
     # 2-6. connect once, run all demos
+    # Reuse one connection for the remaining helper demos.
     client = await open_and_connect(HostLinkConnectionOptions(host=args.host, port=args.port))
     try:
         await demo_typed_rw(client)

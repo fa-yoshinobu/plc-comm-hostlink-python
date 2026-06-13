@@ -1,58 +1,108 @@
-# Getting Started
+# Getting started
 
-## Start Here
+## Start here
 
-Use this package when you want the shortest Python path to KEYENCE KV Host Link communication through the public high-level API.
+This page gets you from an empty Python project to your first KEYENCE KV Host Link read. You will connect to your PLC at `192.168.250.100:8501`, read `DM0`, then write and restore a test register.
 
-Recommended first path:
+## Prerequisites
 
-1. Install `kv-hostlink`.
-2. Open one connection with `open_and_connect`.
-3. Read one safe `DM` word.
-4. Write only to a known-safe test word or bit after the first read is stable.
+| Requirement | Value |
+|---|---|
+| Python | Python 3.10 or newer. |
+| PLC network | Your KV PLC must be reachable from your PC. |
+| Host Link port | Use port `8501` for TCP or UDP unless your PLC connection node is configured differently. |
 
-## First PLC Registers To Try
+## Install
 
-Start with these first:
-
-- `DM0`
-- `DM10`
-- `DM100:S`
-- `DM200:D`
-- `DM50.3`
-
-Do not start with these:
-
-- large chunked reads
-- validation sweeps
-- addresses outside the current public register table
-
-## Minimal Async Pattern
-
-```python
-from hostlink import HostLinkConnectionOptions, open_and_connect
-
-options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+```bash
+pip install kv-hostlink
 ```
 
-## First Successful Run
+## Connect
 
-Recommended order:
+```python
+import asyncio
+from hostlink import HostLinkConnectionOptions, open_and_connect
 
-1. `read_typed(client, "DM0", "U")`
-2. `write_typed(client, "DM10", "U", value)` only on a safe test word
-3. `read_named(client, ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0"])`
 
-## Common Beginner Checks
+async def main() -> None:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options):
+        print("Connected")
 
-If the first read fails, check these in order:
 
-- correct host and port
-- start with `DM` instead of a timer/counter or less common area
-- use one scalar read before trying `.bit` or typed views
+asyncio.run(main())
+```
 
-## Next Pages
+Use `HostLinkConnectionOptions` so your host, port, transport, timeout, and line-ending options stay explicit.
 
-- [Supported PLC Registers](./SUPPORTED_REGISTERS.md)
-- [Latest Communication Verification](./LATEST_COMMUNICATION_VERIFICATION.md)
-- [User Guide](./USER_GUIDE.md)
+## First read
+
+```python
+import asyncio
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed
+
+
+async def main() -> None:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options) as client:
+        dm0 = await read_typed(client, "DM0", "U")
+        print(f"DM0 = {dm0}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Expected output:
+
+```text
+DM0 = 123
+```
+
+Your number will match the current value stored in `DM0` on your PLC.
+
+## First write
+
+```python
+import asyncio
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, write_typed
+
+
+async def main() -> None:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options) as client:
+        test_address = "DM100"
+        original = await read_typed(client, test_address, "U")
+        try:
+            await write_typed(client, test_address, "U", 1234)
+            readback = await read_typed(client, test_address, "U")
+            print(f"{test_address} = {readback}")
+        finally:
+            await write_typed(client, test_address, "U", original)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Only write to a test address that is safe for your machine and program.
+
+## Confirm success
+
+1. The connection opens without a timeout.
+2. The first read prints a value for `DM0`.
+3. The write example prints the value written to `DM100`.
+4. The `finally` block restores the original test-register value.
+
+## If it does not work
+
+| Symptom | Check |
+|---|---|
+| The connection fails immediately. | Default port is `8501`, not `1025`; double-check the connection node port. |
+| Reads fail while you are trying the first example. | Start with `DM` word reads; do not start with timer/counter or expansion buffer access. |
+| Timer/counter preset writes return `E1`. | Timer/Counter preset writes (`WS`/`WSS`) are only supported on KV-8000/7000-series. |
+
+## Next pages
+
+Continue with [Usage guide](USAGE_GUIDE.md), then check [Supported registers](SUPPORTED_REGISTERS.md) for device families and address forms.

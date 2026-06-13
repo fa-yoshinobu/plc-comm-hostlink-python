@@ -122,14 +122,6 @@ def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatal
     return _build_catalog(plc_profile, None)
 
 
-def device_range_catalog_for_query_model(model_info: object) -> KvDeviceRangeCatalog:
-    code = str(getattr(model_info, "code", ""))
-    model = getattr(model_info, "model", None)
-    if not model:
-        raise HostLinkProtocolError(f"Unsupported model code {code!r}; cannot resolve device range catalog.")
-    return _build_catalog_from_model(str(model), code)
-
-
 def _build_catalog(plc_profile: str, model_code: str | None) -> KvDeviceRangeCatalog:
     requested_plc_profile = _normalize_plc_profile(plc_profile)
     if not requested_plc_profile:
@@ -154,12 +146,6 @@ def _build_catalog(plc_profile: str, model_code: str | None) -> KvDeviceRangeCat
         resolved_plc_profile=resolved_plc_profile,
         entries=entries,
     )
-
-
-def _build_catalog_from_model(model: str, model_code: str | None) -> KvDeviceRangeCatalog:
-    table = _range_table()
-    resolved_model = _resolve_query_model_column(table, model)
-    return _build_catalog(_profile_for_model_header(resolved_model), model_code)
 
 
 def _build_entry(row: _RangeRow, model_index: int, resolved_model: str) -> KvDeviceRangeEntry:
@@ -362,43 +348,6 @@ def _profile_for_model_header(model_header: str) -> str:
 
 def _normalize_plc_profile(text: str) -> str:
     return text.strip().rstrip("\0")
-
-
-def _resolve_query_model_column(table: _RangeTable, requested_model: str) -> str:
-    normalized = _normalize_model_key(requested_model)
-    direct = _direct_model_match(table, normalized)
-    if direct is not None:
-        return direct
-
-    xym_suffix = "(XYM)"
-    wants_xym = normalized.endswith(xym_suffix)
-    base_model = normalized[: -len(xym_suffix)] if wants_xym else normalized
-
-    if base_model.startswith("KV-NANO") or base_model.startswith("KV-N"):
-        resolved_family = "KV-NANO"
-    elif base_model.startswith("KV-3000") or base_model.startswith("KV-5000") or base_model.startswith("KV-5500"):
-        resolved_family = "KV-3000/5000"
-    elif base_model.startswith("KV-7000") or base_model.startswith("KV-7300") or base_model.startswith("KV-7500"):
-        resolved_family = "KV-7000"
-    elif base_model.startswith("KV-8000"):
-        resolved_family = "KV-8000"
-    elif base_model.startswith("KV-X5") or base_model.startswith("KV-X3"):
-        resolved_family = "KV-X500"
-    else:
-        supported = ", ".join(table.model_headers)
-        raise HostLinkProtocolError(f"Unsupported model {requested_model!r}. Supported range models: {supported}.")
-
-    resolved_key = f"{resolved_family}(XYM)" if wants_xym else resolved_family
-    direct = _direct_model_match(table, resolved_key)
-    if direct is None:
-        raise HostLinkProtocolError(
-            f"Resolved model {resolved_key!r} was not found in the embedded device range table."
-        )
-    return direct
-
-
-def _direct_model_match(table: _RangeTable, normalized: str) -> str | None:
-    return next((header for header in table.model_headers if _normalize_model_key(header) == normalized), None)
 
 
 def _normalize_model_key(text: str) -> str:

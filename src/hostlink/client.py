@@ -31,7 +31,6 @@ from .device import (
     validate_expansion_buffer_span,
     validate_range,
 )
-from .device_ranges import KvDeviceRangeCatalog, device_range_catalog_for_query_model
 from .errors import HostLinkConnectionError, HostLinkProtocolError
 from .protocol import (
     build_frame,
@@ -562,9 +561,6 @@ class HostLinkClient(HostLinkBase):
         response = self.send_raw(self._build_query_model_command())
         return self._decode_query_model_response(response)
 
-    def read_device_range_catalog(self) -> KvDeviceRangeCatalog:
-        return device_range_catalog_for_query_model(self.query_model())
-
     def confirm_operating_mode(self) -> int:
         response = self.send_raw(self._build_confirm_operating_mode_command())
         return self._decode_confirm_operating_mode_response(response)
@@ -809,9 +805,6 @@ class AsyncHostLinkClient(HostLinkBase):
     async def query_model(self) -> ModelInfo:
         response = await self.send_raw(self._build_query_model_command())
         return self._decode_query_model_response(response)
-
-    async def read_device_range_catalog(self) -> KvDeviceRangeCatalog:
-        return device_range_catalog_for_query_model(await self.query_model())
 
     async def confirm_operating_mode(self) -> int:
         response = await self.send_raw(self._build_confirm_operating_mode_command())

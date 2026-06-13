@@ -9,6 +9,7 @@ from hostlink import (
     HostLinkClient,
     HostLinkError,
     HostLinkProtocolError,
+    device_range_catalog_for_plc_profile,
     poll,
     read_comments,
     read_named,
@@ -117,9 +118,10 @@ class TestComprehensiveSync(unittest.TestCase):
         self.server.responses["?K"] = "63"
         info = self.client.query_model()
         self.assertEqual(info.code, "63")
-        catalog = self.client.read_device_range_catalog()
+        catalog = device_range_catalog_for_plc_profile("keyence:kv-x500")
         self.assertEqual(catalog.plc_profile, "keyence:kv-x500")
-        self.assertEqual(catalog.model_code, "63")
+        self.assertEqual(catalog.model_code, "")
+        self.assertFalse(catalog.has_model_code)
         self.server.responses["?M"] = "1"
         self.assertEqual(self.client.confirm_operating_mode(), 1)
 
