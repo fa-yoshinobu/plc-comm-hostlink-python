@@ -118,7 +118,7 @@ class TestComprehensiveSync(unittest.TestCase):
         info = self.client.query_model()
         self.assertEqual(info.code, "63")
         catalog = self.client.read_device_range_catalog()
-        self.assertEqual(catalog.model, "KV-X500")
+        self.assertEqual(catalog.plc_profile, "keyence:kv-x500")
         self.assertEqual(catalog.model_code, "63")
         self.server.responses["?M"] = "1"
         self.assertEqual(self.client.confirm_operating_mode(), 1)

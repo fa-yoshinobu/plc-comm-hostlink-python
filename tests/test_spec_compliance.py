@@ -4,8 +4,8 @@ from hostlink import (
     HostLinkClient,
     KvDeviceRangeCategory,
     KvDeviceRangeNotation,
-    available_device_range_models,
-    device_range_catalog_for_model,
+    available_plc_profiles,
+    device_range_catalog_for_plc_profile,
 )
 from hostlink.device import parse_device, validate_device_span, validate_expansion_buffer_span
 from hostlink.errors import HostLinkProtocolError
@@ -74,10 +74,18 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             plc.register_monitor_words("T0")
 
-    def test_mws_accepts_xym_word_alias_device_types(self) -> None:
+    def test_mws_accepts_xym_word_alias_device_types_supported_by_kv_x500(self) -> None:
         plc = FakeHostLinkClient()
-        plc.register_monitor_words("D100", "E100", "F100", "M100", "L100")
-        self.assertEqual(plc.sent_frames[-1], b"MWS D100.U E100.U F100.U M100 L100\r")
+        plc.register_monitor_words("D100", "E100", "F100", "MR100", "LR100")
+        self.assertEqual(plc.sent_frames[-1], b"MWS D100.U E100.U F100.U MR100 LR100\r")
+
+    def test_mws_rejects_m_l_aliases_rejected_by_kv_x500(self) -> None:
+        plc = FakeHostLinkClient()
+        with self.assertRaises(HostLinkProtocolError):
+            plc.register_monitor_words("M100")
+        with self.assertRaises(HostLinkProtocolError):
+            plc.register_monitor_words("L100")
+        self.assertEqual(plc.sent_frames, [])
 
     def test_rdc_rejects_unsupported_device_type(self) -> None:
         plc = FakeHostLinkClient()
@@ -112,6 +120,17 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_validate_device_span_rejects_32bit_end_crossing(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
             validate_device_span("DM", 65534, ".D", 1)
+
+    def test_validate_device_span_uses_bit_width_for_typed_bit_devices(self) -> None:
+        validate_device_span("R", 199900, "", 16)
+        validate_device_span("R", 199900, ".U", 1)
+        validate_device_span("R", 199800, ".D", 1)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("R", 199900, ".U", 2)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("R", 199900, ".D", 1)
+        with self.assertRaises(HostLinkProtocolError):
+            validate_device_span("CR", 7900, ".U", 2)
 
     def test_validate_device_span_treats_at_32bit_as_device_points(self) -> None:
         validate_device_span("AT", 7, ".D", 1)
@@ -202,13 +221,14 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
                 with self.assertRaises(HostLinkProtocolError):
                     parse_device(text)
 
-    def test_device_range_catalog_resolves_runtime_models(self) -> None:
-        self.assertIn("KV-7000(XYM)", available_device_range_models())
+    def test_device_range_catalog_resolves_plc_profiles(self) -> None:
+        self.assertIn("keyence:kv-7000-xym", available_plc_profiles())
 
-        catalog = device_range_catalog_for_model("KV-8000A")
-        self.assertEqual(catalog.model, "KV-8000")
+        catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
+        self.assertEqual(catalog.plc_profile, "keyence:kv-8000")
         self.assertEqual(catalog.model_code, "")
         self.assertFalse(catalog.has_model_code)
+        self.assertEqual(catalog.resolved_plc_profile, "keyence:kv-8000")
         self.assertEqual(catalog.entry("DM").address_range, "DM00000-DM65534")
 
         tm = catalog.entry("TM")
@@ -216,7 +236,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertFalse(tm.is_bit_device)
 
     def test_device_range_catalog_splits_xym_alias_ranges(self) -> None:
-        catalog = device_range_catalog_for_model("KV-3000/5000(XYM)")
+        catalog = device_range_catalog_for_plc_profile("keyence:kv-3000-5000-xym")
         entry = catalog.entry("R")
 
         self.assertEqual(entry.device, "R")
@@ -232,7 +252,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertEqual(entry.segments[1].upper_bound, 999 * 16 + 15)
         self.assertEqual(catalog.entry("X").device_type, "R")
 
-        kv8000 = device_range_catalog_for_model("KV-8000(XYM)")
+        kv8000 = device_range_catalog_for_plc_profile("keyence:kv-8000-xym")
         r = kv8000.entry("R")
         self.assertEqual(r.upper_bound, 1999 * 16 + 15)
         self.assertEqual(r.point_count, 2000 * 16)
@@ -248,20 +268,24 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertEqual(catalog.entry("D").device_type, "DM")
 
     def test_device_range_catalog_publishes_corrected_ranges(self) -> None:
-        nano = device_range_catalog_for_model("KV-N24nn")
+        nano = device_range_catalog_for_plc_profile("keyence:kv-nano")
         self.assertEqual(nano.entry("CM").address_range, "CM0000-CM8999")
         self.assertFalse(nano.entry("EM").supported)
         self.assertIsNone(nano.entry("EM").address_range)
 
-        xym = device_range_catalog_for_model("KV-3000/5000(XYM)")
+        xym = device_range_catalog_for_plc_profile("keyence:kv-3000-5000-xym")
         self.assertEqual(xym.entry("CR").address_range, "CR0000-CR3915")
 
-        kvx = device_range_catalog_for_model("KV-X500")
+        kvx = device_range_catalog_for_plc_profile("keyence:kv-x500")
         self.assertEqual(kvx.entry("Z").address_range, "Z1-10")
 
-    def test_device_range_catalog_rejects_unsupported_model(self) -> None:
+    def test_device_range_catalog_rejects_unsupported_profile(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
-            device_range_catalog_for_model("KV-1000")
+            device_range_catalog_for_plc_profile("KV-X500")
+        with self.assertRaises(HostLinkProtocolError):
+            device_range_catalog_for_plc_profile("KEYENCE:KV-X500")
+        with self.assertRaises(HostLinkProtocolError):
+            device_range_catalog_for_plc_profile("keyence:kv-1000")
 
 
 if __name__ == "__main__":

@@ -80,11 +80,11 @@ class KvDeviceRangeEntry:
 
 @dataclass(frozen=True)
 class KvDeviceRangeCatalog:
-    model: str
+    plc_profile: str
     model_code: str
     has_model_code: bool
-    requested_model: str
-    resolved_model: str
+    requested_plc_profile: str
+    resolved_plc_profile: str
     entries: tuple[KvDeviceRangeEntry, ...]
 
     def entry(self, device_type: str) -> KvDeviceRangeEntry | None:
@@ -114,12 +114,12 @@ class _RangeTable:
     rows: tuple[_RangeRow, ...]
 
 
-def available_device_range_models() -> list[str]:
-    return list(_range_table().model_headers)
+def available_plc_profiles() -> list[str]:
+    return [_profile_for_model_header(header) for header in _range_table().model_headers]
 
 
-def device_range_catalog_for_model(model: str) -> KvDeviceRangeCatalog:
-    return _build_catalog(model, None)
+def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatalog:
+    return _build_catalog(plc_profile, None)
 
 
 def device_range_catalog_for_query_model(model_info: object) -> KvDeviceRangeCatalog:
@@ -127,16 +127,17 @@ def device_range_catalog_for_query_model(model_info: object) -> KvDeviceRangeCat
     model = getattr(model_info, "model", None)
     if not model:
         raise HostLinkProtocolError(f"Unsupported model code {code!r}; cannot resolve device range catalog.")
-    return _build_catalog(str(model), code)
+    return _build_catalog_from_model(str(model), code)
 
 
-def _build_catalog(model: str, model_code: str | None) -> KvDeviceRangeCatalog:
-    requested_model = model.strip()
-    if not requested_model:
-        raise HostLinkProtocolError("Model name must not be empty.")
+def _build_catalog(plc_profile: str, model_code: str | None) -> KvDeviceRangeCatalog:
+    requested_plc_profile = _normalize_plc_profile(plc_profile)
+    if not requested_plc_profile:
+        raise HostLinkProtocolError("PLC profile must not be empty.")
 
     table = _range_table()
-    resolved_model = _resolve_model_column(table, requested_model)
+    resolved_model = _model_header_for_profile(table, requested_plc_profile)
+    resolved_plc_profile = _profile_for_model_header(resolved_model)
     try:
         model_index = table.model_headers.index(resolved_model)
     except ValueError as exc:
@@ -146,13 +147,19 @@ def _build_catalog(model: str, model_code: str | None) -> KvDeviceRangeCatalog:
 
     entries = tuple(_build_entry(row, model_index, resolved_model) for row in table.rows)
     return KvDeviceRangeCatalog(
-        model=resolved_model,
+        plc_profile=resolved_plc_profile,
         model_code=model_code or "",
         has_model_code=model_code is not None,
-        requested_model=requested_model,
-        resolved_model=resolved_model,
+        requested_plc_profile=requested_plc_profile,
+        resolved_plc_profile=resolved_plc_profile,
         entries=entries,
     )
+
+
+def _build_catalog_from_model(model: str, model_code: str | None) -> KvDeviceRangeCatalog:
+    table = _range_table()
+    resolved_model = _resolve_query_model_column(table, model)
+    return _build_catalog(_profile_for_model_header(resolved_model), model_code)
 
 
 def _build_entry(row: _RangeRow, model_index: int, resolved_model: str) -> KvDeviceRangeEntry:
@@ -327,7 +334,37 @@ def _notation_for_device(
     return KvDeviceRangeNotation.HEXADECIMAL if device_type in {"B", "W", "VB", "X", "Y"} else fallback
 
 
-def _resolve_model_column(table: _RangeTable, requested_model: str) -> str:
+def _model_header_for_profile(table: _RangeTable, plc_profile: str) -> str:
+    normalized = _normalize_plc_profile(plc_profile)
+    for header in table.model_headers:
+        if _profile_for_model_header(header) == normalized:
+            return header
+    supported = ", ".join(available_plc_profiles())
+    raise HostLinkProtocolError(f"Unsupported PLC profile {plc_profile!r}. Supported PLC profiles: {supported}.")
+
+
+def _profile_for_model_header(model_header: str) -> str:
+    normalized = _normalize_model_key(model_header)
+    wants_xym = normalized.endswith("(XYM)")
+    base_model = normalized[: -len("(XYM)")] if wants_xym else normalized
+    profile_key = {
+        "KV-NANO": "kv-nano",
+        "KV-3000/5000": "kv-3000-5000",
+        "KV-7000": "kv-7000",
+        "KV-8000": "kv-8000",
+        "KV-X500": "kv-x500",
+    }.get(base_model)
+    if profile_key is None:
+        raise HostLinkProtocolError(f"Cannot map model header {model_header!r} to a PLC profile.")
+    suffix = "-xym" if wants_xym else ""
+    return f"keyence:{profile_key}{suffix}"
+
+
+def _normalize_plc_profile(text: str) -> str:
+    return text.strip().rstrip("\0")
+
+
+def _resolve_query_model_column(table: _RangeTable, requested_model: str) -> str:
     normalized = _normalize_model_key(requested_model)
     direct = _direct_model_match(table, normalized)
     if direct is not None:

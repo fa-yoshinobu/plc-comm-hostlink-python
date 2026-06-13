@@ -10,6 +10,7 @@ from .errors import HostLinkProtocolError
 SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 BIT_BANK_DEVICE_TYPES = {"R", "MR", "LR", "CR"}
 XYM_BIT_DEVICE_TYPES = {"X", "Y"}
+DIRECT_BIT_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
 NATIVE_32BIT_DEVICE_TYPES = {"T", "TC", "TS", "C", "CC", "CS", "Z", "AT"}
 
 # KEYENCE expression + XYM expression
@@ -58,8 +59,6 @@ MWS_DEVICE_TYPES = {
     "VB",
     "X",
     "Y",
-    "M",
-    "L",
     "DM",
     "EM",
     "FM",
@@ -334,10 +333,10 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
-    word_width = 2 if effective_format in {".D", ".L"} and device_type not in NATIVE_32BIT_DEVICE_TYPES else 1
+    device_width = _device_span_width(device_type, effective_format)
     start_span_number = bit_bank_logical_number(start_number) if device_type in BIT_BANK_DEVICE_TYPES else start_number
     hi_span_number = bit_bank_logical_number(hi) if device_type in BIT_BANK_DEVICE_TYPES else hi
-    end_span_number = start_span_number + (count * word_width) - 1
+    end_span_number = start_span_number + (count * device_width) - 1
     if start_number < lo or start_number > hi or end_span_number > hi_span_number:
         start_text = _format_device_number(device_type, start_number)
         end_number = (
@@ -348,6 +347,19 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
             f"Device span out of range: {device_type}{start_text}..{device_type}{end_text} "
             f"with format '{effective_format}'"
         )
+
+
+def _device_span_width(device_type: str, effective_format: str) -> int:
+    if device_type in DIRECT_BIT_DEVICE_TYPES:
+        if effective_format in {".U", ".S", ".H"}:
+            return 16
+        if effective_format in {".D", ".L"}:
+            return 32
+        return 1
+
+    if effective_format in {".D", ".L"} and device_type not in NATIVE_32BIT_DEVICE_TYPES:
+        return 2
+    return 1
 
 
 def validate_expansion_buffer_count(effective_format: str, count: int) -> None:

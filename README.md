@@ -108,7 +108,7 @@ CPU units. Manuals state that other CPU units do not support those commands
 and return abnormal response `E1` when they are executed.
 
 See the full public table in [Supported PLC Registers](docsrc/user/SUPPORTED_REGISTERS.md).
-For model-specific published ranges, call `client.read_device_range_catalog()` or `device_range_catalog_for_model("KV-8000")`.
+For model-specific published ranges, call `client.read_device_range_catalog()` or `device_range_catalog_for_plc_profile("keyence:kv-8000")`.
 
 ## Public Documentation
 
