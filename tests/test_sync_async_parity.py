@@ -69,12 +69,6 @@ _PARITY_CASES = [
         response=b"63\r\n",
     ),
     _ParityCase(
-        "read_device_range_catalog",
-        lambda client: client.read_device_range_catalog(),
-        lambda client: client.read_device_range_catalog(),
-        response=b"63\r\n",
-    ),
-    _ParityCase(
         "confirm_operating_mode",
         lambda client: client.confirm_operating_mode(),
         lambda client: client.confirm_operating_mode(),

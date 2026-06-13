@@ -20,10 +20,12 @@ exclude_docs: |
 nav:
   - Overview: index.md
   - Getting Started: user/GETTING_STARTED.md
-  - Supported PLC Registers: user/SUPPORTED_REGISTERS.md
-  - Latest Communication Verification: user/LATEST_COMMUNICATION_VERIFICATION.md
-  - User Guide: user/USER_GUIDE.md
+  - Usage Guide: user/USAGE_GUIDE.md
+  - Supported Registers: user/SUPPORTED_REGISTERS.md
+  - PLC Profiles: user/PROFILES.md
+  - Gotchas: user/GOTCHAS.md
   - API Reference: user/API_REFERENCE.md
   - Troubleshooting: user/TROUBLESHOOTING.md
   - Performance Guide: user/PERFORMANCE_GUIDE.md
+  - Latest Communication Verification: user/LATEST_COMMUNICATION_VERIFICATION.md
   - Change Log: CHANGELOG.md

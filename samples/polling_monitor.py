@@ -27,8 +27,11 @@ def parse_args() -> argparse.Namespace:
 
 async def run(args: argparse.Namespace) -> None:
     options = HostLinkConnectionOptions(host=args.host, port=args.port)
+    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
         seen = 0
+        # Poll a repeated named snapshot until this sample has printed enough rows.
+        # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
         async for snapshot in poll(client, ["DM0", "DM1:S", "DM4:F", "DM10.0"], interval=args.interval):
             seen += 1
             print(f"[{seen}] {snapshot}")

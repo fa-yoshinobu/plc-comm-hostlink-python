@@ -25,7 +25,10 @@ def parse_args() -> argparse.Namespace:
 
 async def run(args: argparse.Namespace) -> None:
     options = HostLinkConnectionOptions(host=args.host, port=args.port)
+    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
+        # Read a mixed snapshot containing word values and bit-in-word values.
+        # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
         snapshot = await read_named(
             client,
             ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0", "DM10.A"],

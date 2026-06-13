@@ -59,6 +59,7 @@ async def run(args: argparse.Namespace) -> None:
     print(f"[normalize_address] dm20 -> {normalize_address('dm20')}")
     print(f"[normalize_address] dm20.a -> {normalize_address('dm20.a')}")
 
+    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(
         HostLinkConnectionOptions(
             host=args.host,
@@ -69,32 +70,38 @@ async def run(args: argparse.Namespace) -> None:
     ) as client:
         print(f"Connected to {args.host}:{args.port} via {args.transport}")
 
+        # Read typed values from individual devices.
         dm0 = await read_typed(client, "DM0", "U")
         dm1 = await read_typed(client, "DM1", "S")
         dm2 = await read_typed(client, "DM2", "D")
         dm4 = await read_typed(client, "DM4", "F")
         print(f"[read_typed] DM0(U)={dm0} DM1(S)={dm1} DM2(D)={dm2} DM4(F)={dm4}")
 
+        # Write only to DM test addresses that are safe in your PLC program.
         await write_typed(client, "DM10", "U", dm0)
         await write_typed(client, "DM11", "S", dm1)
         await write_typed(client, "DM12", "D", dm2)
         await write_typed(client, "DM14", "F", dm4)
         print("[write_typed] Mirrored DM0/DM1/DM2/DM4 into DM10/DM11/DM12/DM14")
 
+        # Read contiguous blocks when values occupy adjacent DM words.
         words = await read_words_single_request(client, "DM20", 6)
         dwords = await read_dwords_single_request(client, "DM30", 3)
         print(f"[read_words_single_request] DM20-DM25 = {words}")
         print(f"[read_dwords_single_request] DM30-DM35 = {dwords}")
 
+        # Read larger areas only when explicit multi-request chunking is acceptable.
         large_words = await read_words_chunked(client, "DM1000", 1000)
         large_dwords = await read_dwords_chunked(client, "DM2000", 120)
         print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
         print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
+        # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
         await write_bit_in_word(client, "DM50", bit_index=0, value=True)
         await write_bit_in_word(client, "DM50", bit_index=3, value=False)
         print("[write_bit_in_word] Updated DM50 bit0=True bit3=False")
 
+        # Read a named mixed-type snapshot.
         snapshot = await read_named(
             client,
             ["DM10", "DM11:S", "DM12:D", "DM14:F", "DM50.0", "DM50.3"],
@@ -103,6 +110,7 @@ async def run(args: argparse.Namespace) -> None:
 
         print(f"[poll] Capturing {args.poll_count} snapshots")
         seen = 0
+        # Poll a repeated named snapshot until this sample has printed enough rows.
         async for snap in poll(client, ["DM10", "DM11:S", "DM14:F", "DM50.0"], interval=1.0):
             seen += 1
             print(f"  [{seen}] {snap}")
