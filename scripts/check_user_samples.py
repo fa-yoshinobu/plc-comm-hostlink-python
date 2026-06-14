@@ -20,7 +20,7 @@ USER_SAMPLES = [
 DOC_FILES = [
     "README.md",
     "samples/README.md",
-    "docsrc/user/USER_GUIDE.md",
+    "docsrc/user/USAGE_GUIDE.md",
 ]
 
 
