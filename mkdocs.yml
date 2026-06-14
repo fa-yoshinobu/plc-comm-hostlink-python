@@ -1,6 +1,6 @@
 site_dir: _site
 docs_dir: docsrc
-site_name: Host Link Communication Python API
+site_name: KV Host Link Python
 site_url: https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/
 theme:
   name: material
@@ -9,11 +9,8 @@ theme:
     primary: red
 plugins:
   - search
-  - mkdocstrings:
-      default_handler: python
 exclude_docs: |
   internal_docs/**
-  api/**
   maintainer/**
   validation/**
 
