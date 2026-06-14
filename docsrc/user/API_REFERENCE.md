@@ -295,7 +295,7 @@ Update a single bit inside a word device by read-modify-write.
 Parameters:
 
 - `device`: word device such as `"DM500"`
-- `bit_index`: `0` to `15`
+- `bit_index`: integer bit position `0` to `15` (`.0` through `.F` in address notation)
 - `value`: `True` or `False`
 
 Example:
