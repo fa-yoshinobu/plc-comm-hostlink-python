@@ -107,6 +107,44 @@ if __name__ == "__main__":
     main()
 ```
 
+## Abnormal device number returns E0
+
+| Field | Detail |
+|---|---|
+| Symptom | A read or write returns Host Link error `E0`. |
+| Root cause | The selected device address does not exist on the target PLC or is outside the range for the selected profile. |
+| Fix | Check [Supported registers](SUPPORTED_REGISTERS.md) and [PLC profiles](PROFILES.md), then choose an address that exists on that PLC model. |
+
+```python
+from hostlink import device_range_catalog_for_plc_profile
+
+
+def main() -> None:
+    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
+    dm = catalog.entry("DM")
+    print(dm)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+## Write disabled returns E4
+
+| Field | Detail |
+|---|---|
+| Symptom | A write returns Host Link error `E4`. |
+| Root cause | The CPU is write-protected, locked, or blocked by the target project settings. |
+| Fix | Check the CPU protection and KV Studio settings before retrying the write. |
+
+## 32-bit and float values look wrong
+
+| Field | Detail |
+|---|---|
+| Symptom | `:D`, `:L`, or `:F` reads return values that do not match the expected PLC-side value. |
+| Root cause | The target words do not contain the data type you selected, or the ladder uses a non-standard layout. |
+| Fix | Use `:D` for unsigned 32-bit, `:L` for signed 32-bit, and `:F` only when the PLC stores IEEE 754 float32 data. |
+
 ## KV-3000 and KV-5000 use separate profiles
 
 | Field | Detail |

@@ -6,7 +6,7 @@ This is the minimum release checklist for this repository.
 
 Check these before tagging:
 
-- [User Guide](../../docsrc/user/USER_GUIDE.md)
+- [Usage Guide](../../docsrc/user/USAGE_GUIDE.md)
 - [CHANGELOG](../../CHANGELOG.md)
 - [Protocol Spec](PROTOCOL_SPEC.md)
 

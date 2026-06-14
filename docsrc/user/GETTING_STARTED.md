@@ -47,7 +47,7 @@ async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
-        print(f"{catalog.plc_profile} DM0 = {dm0}")
+        print(f"DM0 = {dm0}")
 
 
 if __name__ == "__main__":

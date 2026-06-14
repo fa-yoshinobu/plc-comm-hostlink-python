@@ -53,6 +53,18 @@ if __name__ == "__main__":
 
 `HostLinkConnectionOptions` defaults to TCP, port `8501`, a 3-second timeout, and no LF appended after CR.
 
+## Performance notes
+
+For stable local networks, UDP usually has the lowest latency. TCP is the safer
+default for remote or less predictable networks because the OS handles
+retransmission. The TCP transport enables `TCP_NODELAY`, which keeps small Host
+Link command frames from waiting behind Nagle buffering.
+
+Reuse one connected client for repeated reads and writes. Prefer
+`read_words_single_request`, `read_dwords_single_request`, or `read_named` over
+many individual `read_typed` calls when one application snapshot can be read as
+one request.
+
 ## Read a single value
 
 ```python
