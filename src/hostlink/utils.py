@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING, cast
 from .device import (
     BIT_BANK_DEVICE_TYPES,
     DEFAULT_FORMAT_BY_DEVICE_TYPE,
-    DeviceAddress,
     NATIVE_32BIT_DEVICE_TYPES,
+    DeviceAddress,
     bit_bank_logical_number,
     bit_bank_number_from_logical,
     normalize_suffix,

@@ -10,6 +10,7 @@ from functools import lru_cache
 from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE
 from .errors import HostLinkProtocolError
 
+
 class KvDeviceRangeNotation(Enum):
     DECIMAL = "decimal"
     HEXADECIMAL = "hexadecimal"
@@ -84,7 +85,7 @@ class _RangeRow:
 
 @dataclass(frozen=True)
 class _RangeTable:
-    profiles: tuple["_RangeProfile", ...]
+    profiles: tuple[_RangeProfile, ...]
     rows: tuple[_RangeRow, ...]
 
 
