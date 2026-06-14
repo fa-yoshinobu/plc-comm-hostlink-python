@@ -222,10 +222,23 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
                     parse_device(text)
 
     def test_device_range_catalog_resolves_plc_profiles(self) -> None:
-        self.assertIn("keyence:kv-3000", available_plc_profiles())
-        self.assertIn("keyence:kv-5000", available_plc_profiles())
-        self.assertIn("keyence:kv-7000-xym", available_plc_profiles())
-        self.assertNotIn("keyence:kv-3000-5000", available_plc_profiles())
+        self.assertEqual(
+            available_plc_profiles(),
+            [
+                "keyence:kv-nano",
+                "keyence:kv-nano-xym",
+                "keyence:kv-3000",
+                "keyence:kv-3000-xym",
+                "keyence:kv-5000",
+                "keyence:kv-5000-xym",
+                "keyence:kv-7000",
+                "keyence:kv-7000-xym",
+                "keyence:kv-8000",
+                "keyence:kv-8000-xym",
+                "keyence:kv-x500",
+                "keyence:kv-x500-xym",
+            ],
+        )
 
         catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
         self.assertEqual(catalog.plc_profile, "keyence:kv-8000")
@@ -289,8 +302,6 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
             device_range_catalog_for_plc_profile("KEYENCE:KV-X500")
         with self.assertRaises(HostLinkProtocolError):
             device_range_catalog_for_plc_profile("keyence:kv-1000")
-        with self.assertRaises(HostLinkProtocolError):
-            device_range_catalog_for_plc_profile("keyence:kv-3000-5000")
 
 
 if __name__ == "__main__":
