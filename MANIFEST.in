@@ -1,1 +1,2 @@
 prune internal_docs
+prune tests
