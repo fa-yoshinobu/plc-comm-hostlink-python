@@ -1,8 +1,6 @@
 # Samples
 
-## What is here
-
-This directory contains runnable scripts for the recommended high-level KEYENCE KV Host Link API plus validation scripts for lab use. Each user-facing sample accepts a PLC host and uses Host Link port `8501` by default.
+This directory contains runnable scripts that demonstrate the recommended high-level KEYENCE KV Host Link API. Each user-facing sample accepts a PLC host and uses Host Link port `8501` by default.
 
 ## How to run
 
@@ -35,12 +33,3 @@ python samples/polling_monitor.py --host 192.168.250.100 --port 8501 --poll-coun
 | `basic_high_level_rw.py` | A compact typed read/write example for unsigned, signed, double-word, and float values. |
 | `named_snapshot.py` | A focused mixed snapshot using `read_named`. |
 | `polling_monitor.py` | A repeated snapshot loop using `poll`. |
-| `basic_test.py` | Low-level model, mode, and basic DM read/write validation. |
-| `full_pattern_validation.py` | Low-level async coverage for system, monitor, timer/counter, and mode commands. |
-| `exhaustive_address_test.py` | DM address sweep validation. |
-| `extreme_validation.py` | Bit, bulk, and concurrency validation. |
-| `grand_unified_test.py` | Reconnection, monitor, boundary, expansion, and mode stress validation. |
-| `stress_test.py` | Synchronous, asynchronous, and bulk transfer stress validation. |
-| `ultimate_dm_stress.py` | Large DM consistency sweep validation. |
-
-Validation and stress scripts write many devices. Run them only against a PLC and address range that are safe for your machine and program.

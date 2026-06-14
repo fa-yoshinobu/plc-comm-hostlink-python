@@ -2,7 +2,7 @@
 
 ## Start here
 
-This page gets you from an empty Python project to your first KEYENCE KV Host Link read. You will choose the canonical profile `keyence:kv-7000`, connect to your PLC at `192.168.250.100:8501`, read `DM0`, then write and restore a test register.
+This page gets you from an empty Python project to your first KEYENCE KV Host Link read. You will connect to your PLC at `192.168.250.100:8501`, read `DM0`, then write and restore a test register.
 
 ## Prerequisites
 
@@ -18,36 +18,36 @@ This page gets you from an empty Python project to your first KEYENCE KV Host Li
 pip install kv-hostlink
 ```
 
-## Choose profile
+## Connect
 
 ```python
-from hostlink import device_range_catalog_for_plc_profile
+import asyncio
+from hostlink import HostLinkConnectionOptions, open_and_connect
 
 
-def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
-    print(catalog.plc_profile)
+async def main() -> None:
+    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    async with await open_and_connect(options):
+        print("Connected")
 
 
-if __name__ == "__main__":
-    main()
+asyncio.run(main())
 ```
 
-Use the exact canonical profile string that matches your PLC model. The library does not infer the device range catalog from the PLC model response.
+Use `HostLinkConnectionOptions` so your host, port, transport, timeout, and line-ending options stay explicit.
 
 ## First read
 
 ```python
 import asyncio
-from hostlink import HostLinkConnectionOptions, device_range_catalog_for_plc_profile, open_and_connect, read_typed
+from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed
 
 
 async def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
     options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
-        print(f"{catalog.plc_profile} DM0 = {dm0}")
+        print(f"DM0 = {dm0}")
 
 
 if __name__ == "__main__":
@@ -90,21 +90,19 @@ Only write to a test address that is safe for your machine and program.
 
 ## Confirm success
 
-1. The profile snippet prints `keyence:kv-7000`.
-2. The connection opens without a timeout.
-3. The first read prints a value for `DM0`.
-4. The write example prints the value written to `DM100`.
-5. The `finally` block restores the original test-register value.
+1. The connection opens without a timeout.
+2. The first read prints a value for `DM0`.
+3. The write example prints the value written to `DM100`.
+4. The `finally` block restores the original test-register value.
 
 ## If it does not work
 
 | Symptom | Check |
 |---|---|
 | The connection fails immediately. | Default port is `8501`, not `1025`; double-check the connection node port. |
-| Profile selection fails. | Use one of the exact strings in [PLC profiles](PROFILES.md); aliases and combined old names are rejected. |
 | Reads fail while you are trying the first example. | Start with `DM` word reads; do not start with timer/counter or expansion buffer access. |
 | Timer/counter preset writes return `E1`. | Timer/Counter preset writes (`WS`/`WSS`) are only supported on KV-8000/7000-series. |
 
 ## Next pages
 
-Continue with [Usage guide](USAGE_GUIDE.md), then check [PLC profiles](PROFILES.md), [Supported registers](SUPPORTED_REGISTERS.md), and [Gotchas](GOTCHAS.md).
+Continue with [Usage guide](USAGE_GUIDE.md), then check [Supported registers](SUPPORTED_REGISTERS.md) for device families and address forms.

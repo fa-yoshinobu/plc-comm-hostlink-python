@@ -1,15 +1,14 @@
-# Host Link Communication Python
+# Host Link communication Python
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Static Analysis: Ruff](https://img.shields.io/badge/Lint-Ruff-black.svg)](https://github.com/astral-sh/ruff)
 
 High-level Python client library for KEYENCE KV Host Link communication.
 
-## Start Here
+## Start here
 
-- [Getting Started](user/GETTING_STARTED.md)
-- [Supported PLC Registers](user/SUPPORTED_REGISTERS.md)
-- [Latest Communication Verification](user/LATEST_COMMUNICATION_VERIFICATION.md)
-- [User Guide](user/USER_GUIDE.md)
-- [API Reference](user/API_REFERENCE.md)
+- [Getting started](user/GETTING_STARTED.md)
+- [Usage guide](user/USAGE_GUIDE.md)
+- [Supported registers](user/SUPPORTED_REGISTERS.md)
+- [PLC profiles](user/PROFILES.md)
+- [Gotchas](user/GOTCHAS.md)

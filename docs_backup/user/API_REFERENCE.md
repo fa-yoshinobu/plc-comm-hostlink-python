@@ -1,4 +1,4 @@
-# HostLink Python API reference
+# HostLink Python API Reference
 
 This reference covers the recommended high-level helper API.
 
@@ -10,8 +10,6 @@ It intentionally excludes raw protocol methods and low-level client operations.
 from hostlink import (
     HostLinkConnectionOptions,
     TimerCounterValue,
-    available_plc_profiles,
-    device_range_catalog_for_plc_profile,
     open_and_connect,
     parse_address,
     try_parse_address,
@@ -47,31 +45,7 @@ from hostlink.errors import (
 - `HostLinkProtocolError`: invalid address, invalid dtype, malformed response, or local validation failure
 - `HostLinkConnectionError`: connect, disconnect, socket, or timeout failure
 
-## Profile catalog
-
-### `available_plc_profiles()`
-
-Return the exact canonical profile strings accepted by the embedded range catalog.
-
-Example:
-
-```python
-for profile in available_plc_profiles():
-    print(profile)
-```
-
-### `device_range_catalog_for_plc_profile(plc_profile)`
-
-Resolve one canonical profile string to the profile-specific range catalog.
-
-Example:
-
-```python
-catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
-print(catalog.plc_profile)
-```
-
-## Connection helper
+## Connection Helper
 
 ### `await open_and_connect(options)` or `await open_and_connect(host, ...)`
 
@@ -128,7 +102,7 @@ try_parse_address("DM1A") is None
 format_address(parsed)  # DM100.A
 ```
 
-## Typed helpers
+## Typed Helpers
 
 Supported dtype codes:
 
@@ -209,7 +183,7 @@ Example:
 await write_typed(client, "DM100", "D", 123456)
 ```
 
-## Contiguous block helpers
+## Contiguous Block Helpers
 
 ### `await read_words_single_request(client, device, count)`
 
@@ -246,18 +220,18 @@ words = await read_words_single_request(client, "DM200", 8)
 dwords = await read_dwords_single_request(client, "DM300", 4)
 ```
 
-### `await read_words_chunked(client, device, count, max_per_request=...)`
+### `await read_words_chunked(client, device, count, chunk_words=...)`
 
 Read a large contiguous word range using explicit multi-request chunking.
 
-### `await read_dwords_chunked(client, device, count, max_dwords_per_request=...)`
+### `await read_dwords_chunked(client, device, count, chunk_dwords=...)`
 
 Read a large contiguous dword range using explicit multi-request chunking.
 
 `*_chunked` is the opt-in surface for protocol-defined chunk boundaries.
 It must not be confused with `*_single_request`.
 
-## Expansion unit buffer helpers
+## Expansion Unit Buffer Helpers
 
 ### `await read_expansion_unit_buffer(client, unit_no, address, count, data_format="")`
 
@@ -286,7 +260,7 @@ values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
 await write_expansion_unit_buffer(client, 1, 200, values, data_format="U")
 ```
 
-## Bit in word
+## Bit in Word
 
 ### `await write_bit_in_word(client, device, bit_index, value)`
 
@@ -304,7 +278,7 @@ Example:
 await write_bit_in_word(client, "DM500", 3, True)
 ```
 
-## Mixed snapshots
+## Mixed Snapshots
 
 ### `await read_named(client, addresses)`
 
@@ -362,5 +336,5 @@ async for snapshot in poll(client, ["DM100", "DM101:L", "DM200.3"], interval=1.0
 ## Notes
 
 - User-facing docs intentionally stop at the helper layer.
-- Hex/token-oriented reads and raw protocol commands are outside the recommended helper workflow.
+- Hex/token-oriented reads and raw protocol commands are maintainer topics.
 - See `samples/README.md` for runnable example scripts.

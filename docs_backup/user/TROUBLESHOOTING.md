@@ -1,27 +1,27 @@
-# Troubleshooting guide
+# Troubleshooting Guide
 
 This guide provides solutions for common connectivity and protocol issues encountered when using the `hostlink` Python library.
 
 ---
 
-## Connection issues
+## Connection Issues
 
 ### `HostLinkConnectionError: Failed to connect`
-**Possible causes:**
+**Possible Causes:**
 - **PLC IP/Port mismatch**: Verify the PLC's IP address and Port (default `8501`).
 - **Network Firewall**: Check if your OS or hardware firewall blocks TCP/UDP 8501.
 - **PLC Config**: Ensure "Host Link (Upper Link)" is enabled in the Ethernet unit settings in KV Studio.
 - **TCP/UDP Mismatch**: The library and PLC must use the same transport protocol.
 
 ### `HostLinkConnectionError: Timeout`
-**Possible causes:**
+**Possible Causes:**
 - **Cable Issue**: Check the Ethernet cable and hub.
 - **Wrong IP**: The target IP might not be reachable. Try `ping <IP>`.
 - **Busy PLC**: High-frequency communication might saturate old Ethernet units. Consider lowering the request frequency or using UDP.
 
 ---
 
-## Protocol errors (`HostLinkError`)
+## Protocol Errors (`HostLinkError`)
 
 ### `E1: Abnormal command`
 **Occurs when:** The PLC received a command it doesn't support or understand.
@@ -44,13 +44,13 @@ This guide provides solutions for common connectivity and protocol issues encoun
 
 ---
 
-## Unexpected data
+## Unexpected Data
 
-### Value mismatch
+### Value Mismatch (Endian Issues)
 **Symptoms:** Reading `32-bit (:D/:L)` values gives strange results.
-**Analysis:** KEYENCE stores 32-bit values with the low word first, such as DM100 low and DM101 high.
+**Analysis:** Keyence stores 32-bit values with the **Low-word first** (e.g., DM100=Low, DM101=High).
 **Solutions:** The library handles this automatically when using `:D` or `:L` in the public helper layer. Do not try to manually swap words unless you have a non-standard ladder configuration.
 
-### Float handling
+### Float Handling
 **Note:** The library supports `:F` for float32 helper reads and writes.
 **Solutions:** Use `:F` when the PLC side stores the value as IEEE 754 float32. If the device actually contains raw integer bits, read it as `:D` or `:L` instead.

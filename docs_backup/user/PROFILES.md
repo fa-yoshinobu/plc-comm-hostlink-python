@@ -2,9 +2,9 @@
 
 This library supports all KV series models. Device ranges differ by model. Your application selects the catalog with a canonical PLC profile name such as `keyence:kv-7000`; the library does not query the PLC to choose a profile for you.
 
-## Supported profiles
+## Supported models
 
-| Canonical profile | Key available devices | Notes |
+| Model | Key available devices | Notes |
 |---|---|---|
 | `keyence:kv-nano` | `R`, `B`, `MR`, `LR`, `CR`, `CM`, `T`, `C`, `DM`, `W`, `TM`, `VM`, `VB`, `Z`, `CTH`, `CTC` | Standard KV-NANO profile. `EM`, `FM`, `ZF`, and `AT` are not in this profile. |
 | `keyence:kv-nano-xym` | `X`, `Y`, `M`, `L`, `D`, plus standard KV-NANO devices | KV-NANO profile with XYM aliases. `E`, `F`, `ZF`, and `AT` are not in this profile. |
@@ -19,7 +19,7 @@ This library supports all KV series models. Device ranges differ by model. Your 
 | `keyence:kv-x500` | `R`, `B`, `MR`, `LR`, `CR`, `CM`, `T`, `C`, `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z` | Standard profile for KV-X500, KV-X520, KV-X530, KV-X550, and KV-X310 family models. `AT`, `VM`, `VB`, `CTH`, and `CTC` are not in this profile. |
 | `keyence:kv-x500-xym` | `X`, `Y`, `M`, `L`, `D`, `E`, `F`, plus standard KV-X500 devices | KV-X500 profile with XYM aliases. `AT`, `VM`, `VB`, `CTH`, and `CTC` are not in this profile. |
 
-## How to select
+## How to connect
 
 ```python
 import asyncio
@@ -40,18 +40,11 @@ Catalog selection is separate from connection setup:
 ```python
 from hostlink import device_range_catalog_for_plc_profile
 
-def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
-    print(catalog.plc_profile)
-
-
-if __name__ == "__main__":
-    main()
+catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
+print(catalog.plc_profile)
 ```
 
 Choose the canonical profile in your application settings, project file, or UI. Do not depend on runtime model probing for catalog selection.
-
-Unsupported strings fail immediately. Use the exact strings in the table above.
 
 ## Model-specific cautions
 

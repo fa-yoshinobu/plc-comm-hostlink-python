@@ -6,8 +6,6 @@
 |---|---|
 | `HostLinkConnectionOptions` | Keep connection settings in one explicit object. |
 | `open_and_connect` | Create and open the recommended async client. |
-| `available_plc_profiles` | List the exact canonical profile strings accepted by the range catalog. |
-| `device_range_catalog_for_plc_profile` | Select the profile-specific device range catalog. |
 | `parse_address` | Parse helper-layer address text into metadata. |
 | `try_parse_address` | Parse address text without raising on invalid input. |
 | `format_address` | Return canonical text from a parsed address or raw string. |
@@ -207,18 +205,6 @@ if __name__ == "__main__":
 
 `poll` yields a dictionary snapshot on each interval until cancellation or until your loop exits.
 
-## Address reference table
-
-| Form | Example | Meaning |
-|---|---|---|
-| Plain | `DM100` | Default type for the device family, usually unsigned word for word devices. |
-| `:U` | `DM100:U` | Unsigned 16-bit view. |
-| `:S` | `DM100:S` | Signed 16-bit view. |
-| `:D` | `DM100:D` | Unsigned 32-bit view. |
-| `:L` | `DM100:L` | Signed 32-bit view. |
-| `:F` | `DM100:F` | IEEE 754 32-bit float view. |
-| `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
-
 ## Timer/counter helpers
 
 ```python
@@ -286,3 +272,15 @@ if __name__ == "__main__":
 ```
 
 Expansion unit buffer methods access module buffer memory by unit number, buffer address, count, and data format.
+
+## Address reference table
+
+| Form | Example | Meaning |
+|---|---|---|
+| Plain | `DM100` | Default type for the device family, usually unsigned word for word devices. |
+| `:U` | `DM100:U` | Unsigned 16-bit view. |
+| `:S` | `DM100:S` | Signed 16-bit view. |
+| `:D` | `DM100:D` | Unsigned 32-bit view. |
+| `:L` | `DM100:L` | Signed 32-bit view. |
+| `:F` | `DM100:F` | IEEE 754 32-bit float view. |
+| `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
