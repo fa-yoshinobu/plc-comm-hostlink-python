@@ -46,7 +46,7 @@ if __name__ == "__main__":
     main()
 ```
 
-## X/Y address rejected
+## X or Y address rejected
 
 | Field | Detail |
 |---|---|
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     main()
 ```
 
-## R/MR/LR/CR address rejected
+## R, MR, LR, or CR address rejected
 
 | Field | Detail |
 |---|---|
