@@ -3,38 +3,12 @@
 
 from __future__ import annotations
 
-import csv
-import io
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 
 from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE
 from .errors import HostLinkProtocolError
-
-RANGE_CSV_DATA = """DeviceType,Base,KV-NANO,KV-NANO(XYM),KV-3000/5000,KV-3000/5000(XYM),KV-7000,KV-7000(XYM),KV-8000,KV-8000(XYM),KV-X500,KV-X500(XYM)
-R,10,R00000-R59915,"X0-599F,Y0-599F",R00000-R99915,"X0-999F,Y0-999F",R00000-R199915,"X0-1999F,Y0-1999F",R00000-R199915,"X0-1999F,Y0-1999F",R00000-R199915,"X0-1999F,Y0-1999F"
-B,16,B0000-B1FFF,B0000-B1FFF,B0000-B3FFF,B0000-B3FFF,B0000-B7FFF,B0000-B7FFF,B0000-B7FFF,B0000-B7FFF,B0000-B7FFF,B0000-B7FFF
-MR,10,MR00000-MR59915,M0-9599,MR00000-MR99915,M0-15999,MR000000-MR399915,M000000-M63999,MR000000-MR399915,M000000-M63999,MR000000-MR399915,M000000-M63999
-LR,10,LR00000-LR19915,L0-3199,LR00000-LR99915,L0-15999,LR00000-LR99915,L00000-L15999,LR00000-LR99915,L00000-L15999,LR00000-LR99915,L00000-L15999
-CR,10,CR0000-CR8915,CR0000-CR8915,CR0000-CR3915,CR0000-CR3915,CR0000-CR7915,CR0000-CR7915,CR0000-CR7915,CR0000-CR7915,CR0000-CR7915,CR0000-CR7915
-CM,10,CM0000-CM8999,CM0000-CM8999,CM0000-CM5999,CM0000-CM5999,CM0000-CM5999,CM0000-CM5999,CM0000-CM7599,CM0000-CM7599,CM0000-CM7599,CM0000-CM7599
-T,10,T0000-T0511,T0000-T0511,T0000-T3999,T0000-T3999,T0000-T3999,T0000-T3999,T0000-T3999,T0000-T3999,T0000-T3999,T0000-T3999
-C,10,C0000-C0255,C0000-C0255,C0000-C3999,C0000-C3999,C0000-C3999,C0000-C3999,C0000-C3999,C0000-C3999,C0000-C3999,C0000-C3999
-DM,10,DM00000-DM32767,D0-32767,DM00000-DM65534,D0-65534,DM00000-DM65534,D00000-D65534,DM00000-DM65534,D00000-D65534,DM00000-DM65534,D00000-D65534
-EM,10,-,-,EM00000-EM65534,E0-65534,EM00000-EM65534,E00000-E65534,EM00000-EM65534,E00000-E65534,EM00000-EM65534,E00000-E65534
-FM,10,-,-,FM00000-FM32767,F0-32767,FM00000-FM32767,F00000-F32767,FM00000-FM32767,F00000-F32767,FM00000-FM32767,F00000-F32767
-ZF,10,-,-,ZF000000-ZF131071,ZF000000-ZF131071,ZF000000-ZF524287,ZF000000-ZF524287,ZF000000-ZF524287,ZF000000-ZF524287,ZF000000-ZF524287,ZF000000-ZF524287
-W,16,W0000-W3FFF,W0000-W3FFF,W0000-W3FFF,W0000-W3FFF,W0000-W7FFF,W0000-W7FFF,W0000-W7FFF,W0000-W7FFF,W0000-W7FFF,W0000-W7FFF
-TM,10,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511,TM000-TM511
-VM,10,VM0-9499,VM0-9499,VM0-49999,VM0-49999,VM0-63999,VM0-63999,VM0-589823,VM0-589823,-,-
-VB,16,VB0-1FFF,VB0-1FFF,VB0-3FFF,VB0-3FFF,VB0-F9FF,VB0-F9FF,VB0-F9FF,VB0-F9FF,-,-
-Z,10,Z1-12,Z1-12,Z1-12,Z1-12,Z1-12,Z1-12,Z1-12,Z1-12,Z1-10,Z1-10
-CTH,10,CTH0-3,CTH0-3,CTH0-1,CTH0-3,-,-,-,-,-,-
-CTC,10,CTC0-7,CTC0-7,CTC0-3,CTC0-3,-,-,-,-,-,-
-AT,10,-,-,AT0-7,AT0-7,AT0-7,AT0-7,AT0-7,AT0-7,-,-
-"""
-
 
 class KvDeviceRangeNotation(Enum):
     DECIMAL = "decimal"
@@ -110,12 +84,18 @@ class _RangeRow:
 
 @dataclass(frozen=True)
 class _RangeTable:
-    model_headers: tuple[str, ...]
+    profiles: tuple["_RangeProfile", ...]
     rows: tuple[_RangeRow, ...]
 
 
+@dataclass(frozen=True)
+class _RangeProfile:
+    display_name: str
+    plc_profile: str
+
+
 def available_plc_profiles() -> list[str]:
-    return [_profile_for_model_header(header) for header in _range_table().model_headers]
+    return [profile.plc_profile for profile in _range_table().profiles]
 
 
 def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatalog:
@@ -128,22 +108,16 @@ def _build_catalog(plc_profile: str, model_code: str | None) -> KvDeviceRangeCat
         raise HostLinkProtocolError("PLC profile must not be empty.")
 
     table = _range_table()
-    resolved_model = _model_header_for_profile(table, requested_plc_profile)
-    resolved_plc_profile = _profile_for_model_header(resolved_model)
-    try:
-        model_index = table.model_headers.index(resolved_model)
-    except ValueError as exc:
-        raise HostLinkProtocolError(
-            f"Resolved model column {resolved_model!r} was not found in the embedded device range table."
-        ) from exc
+    resolved_profile = _range_profile_for_plc_profile(table, requested_plc_profile)
+    model_index = table.profiles.index(resolved_profile)
 
-    entries = tuple(_build_entry(row, model_index, resolved_model) for row in table.rows)
+    entries = tuple(_build_entry(row, model_index, resolved_profile.display_name) for row in table.rows)
     return KvDeviceRangeCatalog(
-        plc_profile=resolved_plc_profile,
+        plc_profile=resolved_profile.plc_profile,
         model_code=model_code or "",
         has_model_code=model_code is not None,
         requested_plc_profile=requested_plc_profile,
-        resolved_plc_profile=resolved_plc_profile,
+        resolved_plc_profile=resolved_profile.plc_profile,
         entries=entries,
     )
 
@@ -320,73 +294,60 @@ def _notation_for_device(
     return KvDeviceRangeNotation.HEXADECIMAL if device_type in {"B", "W", "VB", "X", "Y"} else fallback
 
 
-def _model_header_for_profile(table: _RangeTable, plc_profile: str) -> str:
+def _range_profile_for_plc_profile(table: _RangeTable, plc_profile: str) -> _RangeProfile:
     normalized = _normalize_plc_profile(plc_profile)
-    for header in table.model_headers:
-        if _profile_for_model_header(header) == normalized:
-            return header
+    for profile in table.profiles:
+        if profile.plc_profile == normalized:
+            return profile
     supported = ", ".join(available_plc_profiles())
     raise HostLinkProtocolError(f"Unsupported PLC profile {plc_profile!r}. Supported PLC profiles: {supported}.")
-
-
-def _profile_for_model_header(model_header: str) -> str:
-    normalized = _normalize_model_key(model_header)
-    wants_xym = normalized.endswith("(XYM)")
-    base_model = normalized[: -len("(XYM)")] if wants_xym else normalized
-    profile_key = {
-        "KV-NANO": "kv-nano",
-        "KV-3000/5000": "kv-3000-5000",
-        "KV-7000": "kv-7000",
-        "KV-8000": "kv-8000",
-        "KV-X500": "kv-x500",
-    }.get(base_model)
-    if profile_key is None:
-        raise HostLinkProtocolError(f"Cannot map model header {model_header!r} to a PLC profile.")
-    suffix = "-xym" if wants_xym else ""
-    return f"keyence:{profile_key}{suffix}"
 
 
 def _normalize_plc_profile(text: str) -> str:
     return text.strip().rstrip("\0")
 
 
-def _normalize_model_key(text: str) -> str:
-    return "".join(char.upper() for char in text.strip().rstrip("\0") if not char.isspace())
-
-
 @lru_cache(maxsize=1)
 def _range_table() -> _RangeTable:
-    rows = list(csv.reader(io.StringIO(RANGE_CSV_DATA.strip())))
-    if not rows:
-        raise HostLinkProtocolError("Embedded device range table is empty.")
+    return _RangeTable(
+        profiles=(
+            _RangeProfile("KV-NANO", "keyence:kv-nano"),
+            _RangeProfile("KV-NANO(XYM)", "keyence:kv-nano-xym"),
+            _RangeProfile("KV-3000", "keyence:kv-3000"),
+            _RangeProfile("KV-3000(XYM)", "keyence:kv-3000-xym"),
+            _RangeProfile("KV-5000", "keyence:kv-5000"),
+            _RangeProfile("KV-5000(XYM)", "keyence:kv-5000-xym"),
+            _RangeProfile("KV-7000", "keyence:kv-7000"),
+            _RangeProfile("KV-7000(XYM)", "keyence:kv-7000-xym"),
+            _RangeProfile("KV-8000", "keyence:kv-8000"),
+            _RangeProfile("KV-8000(XYM)", "keyence:kv-8000-xym"),
+            _RangeProfile("KV-X500", "keyence:kv-x500"),
+            _RangeProfile("KV-X500(XYM)", "keyence:kv-x500-xym"),
+        ),
+        rows=(
+            _row("R", KvDeviceRangeNotation.DECIMAL, "R00000-R59915", "X0-599F,Y0-599F", "R00000-R99915", "X0-999F,Y0-999F", "R00000-R99915", "X0-999F,Y0-999F", "R00000-R199915", "X0-1999F,Y0-1999F", "R00000-R199915", "X0-1999F,Y0-1999F", "R00000-R199915", "X0-1999F,Y0-1999F"),
+            _row("B", KvDeviceRangeNotation.HEXADECIMAL, "B0000-B1FFF", "B0000-B1FFF", "B0000-B3FFF", "B0000-B3FFF", "B0000-B3FFF", "B0000-B3FFF", "B0000-B7FFF", "B0000-B7FFF", "B0000-B7FFF", "B0000-B7FFF", "B0000-B7FFF", "B0000-B7FFF"),
+            _row("MR", KvDeviceRangeNotation.DECIMAL, "MR00000-MR59915", "M0-9599", "MR00000-MR99915", "M0-15999", "MR00000-MR99915", "M0-15999", "MR000000-MR399915", "M000000-M63999", "MR000000-MR399915", "M000000-M63999", "MR000000-MR399915", "M000000-M63999"),
+            _row("LR", KvDeviceRangeNotation.DECIMAL, "LR00000-LR19915", "L0-3199", "LR00000-LR99915", "L0-15999", "LR00000-LR99915", "L0-15999", "LR00000-LR99915", "L00000-L15999", "LR00000-LR99915", "L00000-L15999", "LR00000-LR99915", "L00000-L15999"),
+            _row("CR", KvDeviceRangeNotation.DECIMAL, "CR0000-CR8915", "CR0000-CR8915", "CR0000-CR3915", "CR0000-CR3915", "CR0000-CR3915", "CR0000-CR3915", "CR0000-CR7915", "CR0000-CR7915", "CR0000-CR7915", "CR0000-CR7915", "CR0000-CR7915", "CR0000-CR7915"),
+            _row("CM", KvDeviceRangeNotation.DECIMAL, "CM0000-CM8999", "CM0000-CM8999", "CM0000-CM5999", "CM0000-CM5999", "CM0000-CM5999", "CM0000-CM5999", "CM0000-CM5999", "CM0000-CM5999", "CM0000-CM7599", "CM0000-CM7599", "CM0000-CM7599", "CM0000-CM7599"),
+            _row("T", KvDeviceRangeNotation.DECIMAL, "T0000-T0511", "T0000-T0511", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999", "T0000-T3999"),
+            _row("C", KvDeviceRangeNotation.DECIMAL, "C0000-C0255", "C0000-C0255", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999", "C0000-C3999"),
+            _row("DM", KvDeviceRangeNotation.DECIMAL, "DM00000-DM32767", "D0-32767", "DM00000-DM65534", "D0-65534", "DM00000-DM65534", "D0-65534", "DM00000-DM65534", "D00000-D65534", "DM00000-DM65534", "D00000-D65534", "DM00000-DM65534", "D00000-D65534"),
+            _row("EM", KvDeviceRangeNotation.DECIMAL, "-", "-", "EM00000-EM65534", "E0-65534", "EM00000-EM65534", "E0-65534", "EM00000-EM65534", "E00000-E65534", "EM00000-EM65534", "E00000-E65534", "EM00000-EM65534", "E00000-E65534"),
+            _row("FM", KvDeviceRangeNotation.DECIMAL, "-", "-", "FM00000-FM32767", "F0-32767", "FM00000-FM32767", "F0-32767", "FM00000-FM32767", "F00000-F32767", "FM00000-FM32767", "F00000-F32767", "FM00000-FM32767", "F00000-F32767"),
+            _row("ZF", KvDeviceRangeNotation.DECIMAL, "-", "-", "ZF000000-ZF131071", "ZF000000-ZF131071", "ZF000000-ZF131071", "ZF000000-ZF131071", "ZF000000-ZF524287", "ZF000000-ZF524287", "ZF000000-ZF524287", "ZF000000-ZF524287", "ZF000000-ZF524287", "ZF000000-ZF524287"),
+            _row("W", KvDeviceRangeNotation.HEXADECIMAL, "W0000-W3FFF", "W0000-W3FFF", "W0000-W3FFF", "W0000-W3FFF", "W0000-W3FFF", "W0000-W3FFF", "W0000-W7FFF", "W0000-W7FFF", "W0000-W7FFF", "W0000-W7FFF", "W0000-W7FFF", "W0000-W7FFF"),
+            _row("TM", KvDeviceRangeNotation.DECIMAL, "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511", "TM000-TM511"),
+            _row("VM", KvDeviceRangeNotation.DECIMAL, "VM0-9499", "VM0-9499", "VM0-49999", "VM0-49999", "VM0-49999", "VM0-49999", "VM0-63999", "VM0-63999", "VM0-589823", "VM0-589823", "-", "-"),
+            _row("VB", KvDeviceRangeNotation.HEXADECIMAL, "VB0-1FFF", "VB0-1FFF", "VB0-3FFF", "VB0-3FFF", "VB0-3FFF", "VB0-3FFF", "VB0-F9FF", "VB0-F9FF", "VB0-F9FF", "VB0-F9FF", "-", "-"),
+            _row("Z", KvDeviceRangeNotation.DECIMAL, "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-12", "Z1-10", "Z1-10"),
+            _row("CTH", KvDeviceRangeNotation.DECIMAL, "CTH0-3", "CTH0-3", "CTH0-1", "CTH0-3", "CTH0-1", "CTH0-3", "-", "-", "-", "-", "-", "-"),
+            _row("CTC", KvDeviceRangeNotation.DECIMAL, "CTC0-7", "CTC0-7", "CTC0-3", "CTC0-3", "CTC0-3", "CTC0-3", "-", "-", "-", "-", "-", "-"),
+            _row("AT", KvDeviceRangeNotation.DECIMAL, "-", "-", "AT0-7", "AT0-7", "AT0-7", "AT0-7", "AT0-7", "AT0-7", "AT0-7", "AT0-7", "-", "-"),
+        ),
+    )
 
-    headers = [field.strip() for field in rows[0]]
-    if len(headers) < 3:
-        raise HostLinkProtocolError(
-            "Embedded device range table must contain at least DeviceType, Base, and one model column."
-        )
 
-    model_headers = tuple(headers[2:])
-    range_rows = []
-    for row in rows[1:]:
-        if len(row) != len(headers):
-            raise HostLinkProtocolError(
-                f"Embedded device range row has {len(row)} columns but {len(headers)} were expected: {row}"
-            )
-        range_rows.append(
-            _RangeRow(
-                device_type=row[0].strip(),
-                notation=_notation_from_base(row[1]),
-                ranges=tuple(field.strip() for field in row[2:]),
-            )
-        )
-    return _RangeTable(model_headers=model_headers, rows=tuple(range_rows))
-
-
-def _notation_from_base(base_text: str) -> KvDeviceRangeNotation:
-    normalized = base_text.strip()
-    if normalized.startswith("10"):
-        return KvDeviceRangeNotation.DECIMAL
-    if normalized.startswith("16"):
-        return KvDeviceRangeNotation.HEXADECIMAL
-    raise HostLinkProtocolError(f"Unsupported base cell {base_text!r} in the embedded device range table.")
+def _row(device_type: str, notation: KvDeviceRangeNotation, *ranges: str) -> _RangeRow:
+    return _RangeRow(device_type=device_type, notation=notation, ranges=ranges)

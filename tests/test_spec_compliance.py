@@ -222,7 +222,10 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
                     parse_device(text)
 
     def test_device_range_catalog_resolves_plc_profiles(self) -> None:
+        self.assertIn("keyence:kv-3000", available_plc_profiles())
+        self.assertIn("keyence:kv-5000", available_plc_profiles())
         self.assertIn("keyence:kv-7000-xym", available_plc_profiles())
+        self.assertNotIn("keyence:kv-3000-5000", available_plc_profiles())
 
         catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
         self.assertEqual(catalog.plc_profile, "keyence:kv-8000")
@@ -236,7 +239,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertFalse(tm.is_bit_device)
 
     def test_device_range_catalog_splits_xym_alias_ranges(self) -> None:
-        catalog = device_range_catalog_for_plc_profile("keyence:kv-3000-5000-xym")
+        catalog = device_range_catalog_for_plc_profile("keyence:kv-3000-xym")
         entry = catalog.entry("R")
 
         self.assertEqual(entry.device, "R")
@@ -273,7 +276,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertFalse(nano.entry("EM").supported)
         self.assertIsNone(nano.entry("EM").address_range)
 
-        xym = device_range_catalog_for_plc_profile("keyence:kv-3000-5000-xym")
+        xym = device_range_catalog_for_plc_profile("keyence:kv-5000-xym")
         self.assertEqual(xym.entry("CR").address_range, "CR0000-CR3915")
 
         kvx = device_range_catalog_for_plc_profile("keyence:kv-x500")
@@ -286,6 +289,8 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
             device_range_catalog_for_plc_profile("KEYENCE:KV-X500")
         with self.assertRaises(HostLinkProtocolError):
             device_range_catalog_for_plc_profile("keyence:kv-1000")
+        with self.assertRaises(HostLinkProtocolError):
+            device_range_catalog_for_plc_profile("keyence:kv-3000-5000")
 
 
 if __name__ == "__main__":
