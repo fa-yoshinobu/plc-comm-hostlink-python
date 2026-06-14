@@ -145,27 +145,6 @@ if __name__ == "__main__":
 | Root cause | The target words do not contain the data type you selected, or the ladder uses a non-standard layout. |
 | Fix | Use `:D` for unsigned 32-bit, `:L` for signed 32-bit, and `:F` only when the PLC stores IEEE 754 float32 data. |
 
-## KV-3000 and KV-5000 use separate profiles
-
-| Field | Detail |
-|---|---|
-| Symptom | A KV-3000 or KV-5000 range lookup uses the wrong catalog. |
-| Root cause | KV-3000 and KV-5000 are separate canonical profiles. |
-| Fix | Use `keyence:kv-3000`, `keyence:kv-3000-xym`, `keyence:kv-5000`, or `keyence:kv-5000-xym`. |
-
-```python
-from hostlink import device_range_catalog_for_plc_profile
-
-
-def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-5000")
-    print(catalog.plc_profile)
-
-
-if __name__ == "__main__":
-    main()
-```
-
 ## Non-canonical profile string rejected
 
 | Field | Detail |
