@@ -298,3 +298,16 @@ if __name__ == "__main__":
 ```
 
 Expansion unit buffer methods access module buffer memory by unit number, buffer address, count, and data format.
+
+## Runnable samples
+
+The `samples/` directory contains ready-to-run scripts for the most common high-level workflows.
+Each script accepts `--host` and `--port` arguments.
+
+| Script | What it demonstrates |
+|---|---|
+| `samples/high_level_async.py` | Async typed reads/writes, block reads, bit-in-word, named snapshots, and polling. |
+| `samples/high_level_sync.py` | Synchronous CLI wrapper that runs the async workflow with `asyncio.run`. |
+| `samples/basic_high_level_rw.py` | Compact typed read/write for unsigned, signed, double-word, and float values. |
+| `samples/named_snapshot.py` | Mixed snapshot with `read_named`. |
+| `samples/polling_monitor.py` | Repeated snapshot loop with `poll`. |

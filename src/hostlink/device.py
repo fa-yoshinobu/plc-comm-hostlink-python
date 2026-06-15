@@ -48,7 +48,6 @@ DEVICE_RANGES = {
 
 FORCE_SINGLE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
 FORCE_CONSECUTIVE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
-FORCE_DEVICE_TYPES = FORCE_SINGLE_DEVICE_TYPES
 MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
 MWS_DEVICE_TYPES = {
     "R",

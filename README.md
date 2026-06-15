@@ -47,7 +47,7 @@ asyncio.run(main())
 | [Supported registers](docsrc/user/SUPPORTED_REGISTERS.md) | Check supported device families and address forms. |
 | [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile that matches your PLC model and device ranges. |
 | [Gotchas](docsrc/user/GOTCHAS.md) | Check the common Host Link failure modes before troubleshooting wiring or ladder code. |
-| [Examples](samples/README.md) | Run maintained Python samples. |
+| [Examples](samples/README.md) | Run maintained Python samples: `samples/high_level_async.py`, `samples/high_level_sync.py`, `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, `samples/polling_monitor.py`. |
 
 ## Hardware verified
 

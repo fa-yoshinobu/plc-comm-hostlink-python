@@ -119,62 +119,6 @@ class HostLinkBase:
     def _process_response(self, response: bytes, *, decoder: Callable[[bytes], str] = decode_response) -> str:
         return ensure_success(decoder(response))
 
-    def _get_change_mode_cmd(self, mode: int | str) -> str:
-        if isinstance(mode, str):
-            upper = mode.strip().upper()
-            if upper == "PROGRAM":
-                mode_no = 0
-            elif upper == "RUN":
-                mode_no = 1
-            else:
-                raise HostLinkProtocolError(f"Unsupported mode: {mode!r}")
-        else:
-            mode_no = mode
-        if mode_no not in {0, 1}:
-            raise HostLinkProtocolError("mode must be 0/1 or PROGRAM/RUN")
-        return f"M{mode_no}"
-
-    def _get_set_time_cmd(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> str:
-        if value is None:
-            now = datetime.now()
-            year = now.year % 100
-            month = now.month
-            day = now.day
-            hour = now.hour
-            minute = now.minute
-            second = now.second
-            week = (now.weekday() + 1) % 7
-        elif isinstance(value, datetime):
-            year = value.year % 100
-            month = value.month
-            day = value.day
-            hour = value.hour
-            minute = value.minute
-            second = value.second
-            week = (value.weekday() + 1) % 7
-        else:
-            year, month, day, hour, minute, second, week = value
-
-        validate_range("year(YY)", year, 0, 99)
-        validate_range("month", month, 1, 12)
-        validate_range("day", day, 1, 31)
-        validate_range("hour", hour, 0, 23)
-        validate_range("minute", minute, 0, 59)
-        validate_range("second", second, 0, 59)
-        validate_range("week", week, 0, 6)
-
-        return "WRT " + " ".join(
-            [
-                f"{year:02d}",
-                f"{month:02d}",
-                f"{day:02d}",
-                f"{hour:02d}",
-                f"{minute:02d}",
-                f"{second:02d}",
-                str(week),
-            ]
-        )
-
     def _device_token(self, device: str, *, drop_suffix: bool = False) -> str:
         addr = parse_device(device)
         if drop_suffix and addr.suffix:
@@ -341,7 +285,19 @@ class HostLinkBase:
         return split_data_tokens(response)
 
     def _build_change_mode_command(self, mode: int | str) -> str:
-        return self._get_change_mode_cmd(mode)
+        if isinstance(mode, str):
+            upper = mode.strip().upper()
+            if upper == "PROGRAM":
+                mode_no = 0
+            elif upper == "RUN":
+                mode_no = 1
+            else:
+                raise HostLinkProtocolError(f"Unsupported mode: {mode!r}")
+        else:
+            mode_no = mode
+        if mode_no not in {0, 1}:
+            raise HostLinkProtocolError("mode must be 0/1 or PROGRAM/RUN")
+        return f"M{mode_no}"
 
     @staticmethod
     def _build_clear_error_command() -> str:
@@ -371,7 +327,45 @@ class HostLinkBase:
         self,
         value: datetime | tuple[int, int, int, int, int, int, int] | None = None,
     ) -> str:
-        return self._get_set_time_cmd(value)
+        if value is None:
+            now = datetime.now()
+            year = now.year % 100
+            month = now.month
+            day = now.day
+            hour = now.hour
+            minute = now.minute
+            second = now.second
+            week = (now.weekday() + 1) % 7
+        elif isinstance(value, datetime):
+            year = value.year % 100
+            month = value.month
+            day = value.day
+            hour = value.hour
+            minute = value.minute
+            second = value.second
+            week = (value.weekday() + 1) % 7
+        else:
+            year, month, day, hour, minute, second, week = value
+
+        validate_range("year(YY)", year, 0, 99)
+        validate_range("month", month, 1, 12)
+        validate_range("day", day, 1, 31)
+        validate_range("hour", hour, 0, 23)
+        validate_range("minute", minute, 0, 59)
+        validate_range("second", second, 0, 59)
+        validate_range("week", week, 0, 6)
+
+        return "WRT " + " ".join(
+            [
+                f"{year:02d}",
+                f"{month:02d}",
+                f"{day:02d}",
+                f"{hour:02d}",
+                f"{minute:02d}",
+                f"{second:02d}",
+                str(week),
+            ]
+        )
 
     def _build_forced_command(self, command: str, device: str) -> str:
         addr = parse_device(device)
@@ -504,9 +498,17 @@ class HostLinkClient(HostLinkBase):
         # Note: This is called within self._lock in send_raw
         if self._sock is None:
             sock_type = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
-            self._sock = socket.socket(socket.AF_INET, sock_type)
-            self._sock.settimeout(self.timeout)
-            self._sock.connect((self.host, self.port))
+            sock = socket.socket(socket.AF_INET, sock_type)
+            sock.settimeout(self.timeout)
+            if self.transport == "tcp":
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            try:
+                sock.connect((self.host, self.port))
+            except OSError as exc:
+                sock.close()
+                raise HostLinkConnectionError(f"Failed to connect to {self.host}:{self.port}") from exc
+            self._sock = sock
+            self._rx_buffer = b""
 
         try:
             self._fire_trace(HostLinkTraceDirection.SEND, payload)
@@ -523,7 +525,8 @@ class HostLinkClient(HostLinkBase):
             raise HostLinkConnectionError("Socket communication failed") from exc
 
     def _recv_tcp_line(self) -> bytes:
-        assert self._sock is not None
+        if self._sock is None:
+            raise HostLinkConnectionError("Not connected")
         while True:
             idx_cr = self._rx_buffer.find(b"\r")
             idx_lf = self._rx_buffer.find(b"\n")
@@ -762,8 +765,10 @@ class AsyncHostLinkClient(HostLinkBase):
 
         try:
             if self.transport == "tcp":
-                assert self._writer is not None
-                assert self._reader is not None
+                if self._writer is None:
+                    raise HostLinkConnectionError("Not connected")
+                if self._reader is None:
+                    raise HostLinkConnectionError("Not connected")
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._writer.write(payload)
                 await self._writer.drain()
@@ -771,8 +776,10 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
             else:
-                assert self._udp_transport is not None
-                assert self._udp_protocol is not None
+                if self._udp_transport is None:
+                    raise HostLinkConnectionError("Not connected")
+                if self._udp_protocol is None:
+                    raise HostLinkConnectionError("Not connected")
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
@@ -785,7 +792,8 @@ class AsyncHostLinkClient(HostLinkBase):
             raise HostLinkConnectionError("Socket communication failed") from exc
 
     async def _recv_tcp_line(self) -> bytes:
-        assert self._reader is not None
+        if self._reader is None:
+            raise HostLinkConnectionError("Not connected")
         # Responses typically end in \r\n. readuntil(\r) gets everything including \r.
         # Leading \n from previous frames are trimmed without affecting padding spaces.
         line = await self._reader.readuntil(b"\r")
@@ -934,5 +942,6 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
         self._future = asyncio.get_running_loop().create_future()
 
     async def wait_response(self) -> bytes:
-        assert self._future is not None
+        if self._future is None:
+            raise HostLinkConnectionError("Not connected")
         return await self._future

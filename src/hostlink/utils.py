@@ -161,9 +161,17 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
             assert parsed.bit_index == 10
     """
 
-    canonical = normalize_address(address, default_suffix=default_suffix)
-    base, dtype, bit_index = _parse_address(canonical)
-    base_device = parse_device_text(base)
+    base_raw, dtype, bit_index = _parse_address(address)
+    base_device = parse_device_text(base_raw)
+    if dtype == "BIT_IN_WORD":
+        canonical = f"{base_device}.{format(cast(int, bit_index), 'X')}"
+    elif ":" in address:
+        canonical = f"{base_device}:{dtype}"
+    elif default_suffix:
+        dtype = normalize_suffix(default_suffix).lstrip(".")
+        canonical = f"{base_device}:{dtype}"
+    else:
+        canonical = base_device
     return HostLinkAddress(canonical, base_device, dtype, bit_index)
 
 
