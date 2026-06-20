@@ -5,12 +5,12 @@ import time
 from hostlink import AsyncHostLinkClient, HostLinkClient
 
 
-def run_sync_stress(host, port, transport, count=500):
+def run_sync_stress(host, plc_profile, port, transport, count=500):
     print(f"\n--- [1] Synchronous Stress Test: {count} iterations ---")
     latencies = []
     errors = 0
 
-    with HostLinkClient(host, port=port, transport=transport) as plc:
+    with HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
         for i in range(count):
             start = time.perf_counter()
             try:
@@ -29,10 +29,10 @@ def run_sync_stress(host, port, transport, count=500):
         print(f"Results: Avg={avg:.2f}ms, Min={min(latencies):.2f}ms, Max={max(latencies):.2f}ms, Errors={errors}")
 
 
-async def run_async_concurrency(host, port, transport, tasks_count=20):
+async def run_async_concurrency(host, plc_profile, port, transport, tasks_count=20):
     print(f"\n--- [2] Asynchronous Concurrency Test: {tasks_count} parallel tasks ---")
 
-    async with AsyncHostLinkClient(host, port=port, transport=transport) as plc:
+    async with AsyncHostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
 
         async def task(tid):
             start = time.perf_counter()
@@ -57,9 +57,9 @@ async def run_async_concurrency(host, port, transport, tasks_count=20):
             print(f"Avg latency per task: {sum(success) / len(success):.2f}ms")
 
 
-def run_bulk_test(host, port, transport, words=1000):
+def run_bulk_test(host, plc_profile, port, transport, words=1000):
     print(f"\n--- [3] Bulk Data Test: {words} words ---")
-    with HostLinkClient(host, port=port, transport=transport) as plc:
+    with HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
         try:
             # Test Bulk Read
             start = time.perf_counter()
@@ -80,24 +80,25 @@ def run_bulk_test(host, port, transport, words=1000):
 
 
 async def main():
-    if len(sys.argv) < 2:
-        print("Usage: python stress_test.py <host> [port] [transport]")
+    if len(sys.argv) < 3:
+        print("Usage: python stress_test.py <host> <plc-profile> [port] [transport]")
         return
 
     host = sys.argv[1]
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8501
-    transport = sys.argv[3] if len(sys.argv) > 3 else "tcp"
+    plc_profile = sys.argv[2]
+    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
+    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
 
-    print(f"STARTING STRESS TEST ON {host}:{port} ({transport})")
+    print(f"STARTING STRESS TEST ON {host}:{port} ({transport}, {plc_profile})")
 
     # 1. Sync Stress (Latency & Stability)
-    run_sync_stress(host, port, transport, count=500)
+    run_sync_stress(host, plc_profile, port, transport, count=500)
 
     # 2. Async Concurrency (Locking & Async Performance)
-    await run_async_concurrency(host, port, transport, tasks_count=50)
+    await run_async_concurrency(host, plc_profile, port, transport, tasks_count=50)
 
     # 3. Bulk Transfer (Packet size limits)
-    run_bulk_test(host, port, transport, words=1000)
+    run_bulk_test(host, plc_profile, port, transport, words=1000)
 
 
 if __name__ == "__main__":

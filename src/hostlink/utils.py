@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import struct
 from collections.abc import AsyncIterator, Sequence
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import TYPE_CHECKING, cast
 
 from .device import (
@@ -83,6 +83,7 @@ class HostLinkConnectionOptions:
 
     Attributes:
         host: PLC hostname or IP address.
+        plc_profile: Canonical KEYENCE KV PLC profile for the session.
         port: Host Link port number.
         transport: Transport name such as ``"tcp"`` or ``"udp"``.
         timeout: Socket timeout in seconds.
@@ -91,10 +92,20 @@ class HostLinkConnectionOptions:
     """
 
     host: str
+    _: KW_ONLY
+    plc_profile: str | None = None
     port: int = 8501
     transport: str = "tcp"
     timeout: float = 3.0
     append_lf_on_send: bool = False
+
+    def __post_init__(self) -> None:
+        from .device_ranges import device_range_catalog_for_plc_profile
+
+        if self.plc_profile is None:
+            raise ValueError("plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'.")
+
+        object.__setattr__(self, "plc_profile", device_range_catalog_for_plc_profile(self.plc_profile).plc_profile)
 
 
 @dataclass(frozen=True)
@@ -1061,6 +1072,8 @@ async def open_and_connect(
     transport: str = "tcp",
     timeout: float = 3.0,
     append_lf_on_send: bool = False,
+    *,
+    plc_profile: str | None = None,
 ) -> AsyncHostLinkClient:
     """
     Create and connect an :class:`AsyncHostLinkClient`.
@@ -1072,6 +1085,8 @@ async def open_and_connect(
     Args:
         host: PLC IP address, hostname, or a :class:`HostLinkConnectionOptions`
             instance.
+        plc_profile: Canonical KEYENCE KV PLC profile for the standard
+            high-level route.
         port: Host Link port. Defaults to ``8501``.
         transport: Transport string such as ``"tcp"`` or ``"udp"``.
         timeout: Socket timeout in seconds.
@@ -1083,7 +1098,7 @@ async def open_and_connect(
 
     Usage::
 
-        client = await open_and_connect("192.168.250.100")
+        client = await open_and_connect("192.168.250.100", plc_profile="keyence:kv-8000")
         async with client:
             values = await read_words(client, "DM100", 10)
     """
@@ -1098,6 +1113,7 @@ async def open_and_connect(
             transport=transport,
             timeout=timeout,
             append_lf_on_send=append_lf_on_send,
+            plc_profile=plc_profile,
         )
 
     client = AsyncHostLinkClient(
@@ -1105,6 +1121,7 @@ async def open_and_connect(
         port=options.port,
         transport=options.transport,
         timeout=options.timeout,
+        plc_profile=options.plc_profile,
         append_lf_on_send=options.append_lf_on_send,
         auto_connect=False,
     )

@@ -10,7 +10,7 @@ write_bit_in_word, poll).
 
 Usage
 -----
-    python samples/high_level_async.py --host 192.168.250.100 [--port 8501]
+    python samples/high_level_async.py --host 192.168.250.100 --plc-profile keyence:kv-8000 [--port 8501]
 """
 
 from __future__ import annotations
@@ -53,6 +53,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     p.add_argument("--host", required=True, help="PLC IP address or hostname")
+    p.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     p.add_argument(
         "--port",
         type=int,
@@ -73,7 +74,7 @@ def parse_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-async def demo_open_and_connect(host: str, port: int) -> None:
+async def demo_open_and_connect(host: str, port: int, plc_profile: str) -> None:
     """
     open_and_connect - create and open the connected client used by the helper API.
 
@@ -84,7 +85,7 @@ async def demo_open_and_connect(host: str, port: int) -> None:
     Returns a connected client object for the helper functions below.
     """
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
-    client = await open_and_connect(HostLinkConnectionOptions(host=host, port=port))
+    client = await open_and_connect(HostLinkConnectionOptions(host=host, plc_profile=plc_profile, port=port))
     print(f"[open_and_connect] Connected to {host}:{port}")
     await client.close()
 
@@ -223,11 +224,13 @@ async def run(args: argparse.Namespace) -> None:
     demo_normalize_address()
 
     # 1. open_and_connect shortcut
-    await demo_open_and_connect(args.host, args.port)
+    await demo_open_and_connect(args.host, args.port, args.plc_profile)
 
     # 2-6. connect once, run all demos
     # Reuse one connection for the remaining helper demos.
-    client = await open_and_connect(HostLinkConnectionOptions(host=args.host, port=args.port))
+    client = await open_and_connect(
+        HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port)
+    )
     try:
         await demo_typed_rw(client)
         await demo_array_reads(client)

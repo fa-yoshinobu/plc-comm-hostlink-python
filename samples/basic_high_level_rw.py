@@ -19,12 +19,13 @@ from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProt
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Basic Host Link high-level read/write example")
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
+    parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     parser.add_argument("--port", type=int, default=8501, help="Host Link port (default 8501)")
     return parser.parse_args()
 
 
 async def run(args: argparse.Namespace) -> None:
-    options = HostLinkConnectionOptions(host=args.host, port=args.port)
+    options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port)
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         dm1 = await read_typed(client, "DM1", "S")

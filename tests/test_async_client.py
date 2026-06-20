@@ -45,7 +45,7 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = MockHostLinkServer()
         await self.server.start()
-        self.client = AsyncHostLinkClient("127.0.0.1", port=self.server.port, auto_connect=False)
+        self.client = AsyncHostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, auto_connect=False)
 
     async def asyncTearDown(self):
         await self.client.close()

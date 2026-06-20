@@ -88,6 +88,15 @@ class ModelInfo:
 T = TypeVar("T")
 
 
+def _normalize_connection_plc_profile(plc_profile: str | None) -> str:
+    if plc_profile is None:
+        raise ValueError("plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'.")
+
+    from .device_ranges import device_range_catalog_for_plc_profile
+
+    return device_range_catalog_for_plc_profile(plc_profile).plc_profile
+
+
 class HostLinkBase:
     """Base logic for KEYENCE KV Host Link protocol common to sync and async clients."""
 
@@ -98,6 +107,9 @@ class HostLinkBase:
         transport: str = "tcp",
         append_lf_on_send: bool = False,
         trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
+        *,
+        plc_profile: str | None = None,
+        _allow_manual_profile: bool = False,
     ) -> None:
         self.host = host
         self.port = port
@@ -106,6 +118,12 @@ class HostLinkBase:
         if self.transport not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
         self.trace_hook = trace_hook
+        if plc_profile is None and not _allow_manual_profile:
+            raise ValueError(
+                "plc_profile is required for the standard HostLinkClient route "
+                "unless you explicitly opt into a low-level raw Host Link path."
+            )
+        self.plc_profile = _normalize_connection_plc_profile(plc_profile) if plc_profile is not None else None
 
     def _fire_trace(self, direction: HostLinkTraceDirection, data: bytes) -> None:
         if self.trace_hook:
@@ -435,12 +453,22 @@ class HostLinkClient(HostLinkBase):
         port: int = 8501,
         transport: str = "tcp",
         timeout: float = 3.0,
+        plc_profile: str | None = None,
         buffer_size: int = 8192,
         append_lf_on_send: bool = False,
         auto_connect: bool = True,
         trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
+        _allow_manual_profile: bool = False,
     ) -> None:
-        super().__init__(host, port, transport, append_lf_on_send, trace_hook)
+        super().__init__(
+            host,
+            port,
+            transport,
+            append_lf_on_send,
+            trace_hook,
+            plc_profile=plc_profile,
+            _allow_manual_profile=_allow_manual_profile,
+        )
         self.timeout = timeout
         self.buffer_size = buffer_size
         self._sock: socket.socket | None = None
@@ -680,12 +708,22 @@ class AsyncHostLinkClient(HostLinkBase):
         port: int = 8501,
         transport: str = "tcp",
         timeout: float = 3.0,
+        plc_profile: str | None = None,
         buffer_size: int = 8192,
         append_lf_on_send: bool = False,
         auto_connect: bool = True,
         trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
+        _allow_manual_profile: bool = False,
     ) -> None:
-        super().__init__(host, port, transport, append_lf_on_send, trace_hook)
+        super().__init__(
+            host,
+            port,
+            transport,
+            append_lf_on_send,
+            trace_hook,
+            plc_profile=plc_profile,
+            _allow_manual_profile=_allow_manual_profile,
+        )
         self.timeout = timeout
         self.buffer_size = buffer_size
         self._reader: asyncio.StreamReader | None = None

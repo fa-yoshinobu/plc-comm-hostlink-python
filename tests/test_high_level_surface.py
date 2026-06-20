@@ -21,6 +21,7 @@ from hostlink import (
     write_words_chunked,
     write_words_single_request,
 )
+from hostlink.errors import HostLinkProtocolError
 
 
 class TestAddressSurface(unittest.TestCase):
@@ -56,8 +57,19 @@ class TestAddressSurface(unittest.TestCase):
 
 
 class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
+    def test_connection_options_require_canonical_plc_profile(self) -> None:
+        with self.assertRaisesRegex(ValueError, "plc_profile is required"):
+            HostLinkConnectionOptions("127.0.0.1")
+        with self.assertRaises(HostLinkProtocolError):
+            HostLinkConnectionOptions("127.0.0.1", plc_profile="KV-8000")
+
     async def test_open_and_connect_accepts_options(self) -> None:
-        options = HostLinkConnectionOptions("127.0.0.1", port=8501, append_lf_on_send=True)
+        options = HostLinkConnectionOptions(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=8501,
+            append_lf_on_send=True,
+        )
         with patch("hostlink.client.AsyncHostLinkClient") as client_cls:
             inner = AsyncMock()
             client_cls.return_value = inner
@@ -70,6 +82,7 @@ class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
             port=8501,
             transport="tcp",
             timeout=3.0,
+            plc_profile="keyence:kv-8000",
             append_lf_on_send=True,
             auto_connect=False,
         )
