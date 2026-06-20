@@ -6,7 +6,7 @@ from hostlink import AsyncHostLinkClient, HostLinkClient
 from hostlink.errors import HostLinkError
 
 
-async def grand_unified_test(host, port, transport):
+async def grand_unified_test(host, plc_profile, port, transport):
     print(f"=== GRAND UNIFIED STRESS TEST ON {host}:{port} ===")
     start_time_all = time.perf_counter()
 
@@ -15,7 +15,7 @@ async def grand_unified_test(host, port, transport):
     reconn_start = time.perf_counter()
     for i in range(50):
         try:
-            client = HostLinkClient(host, port=port, transport=transport, auto_connect=True)
+            client = HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport, auto_connect=True)
             client.query_model()
             client.close()
             if i % 10 == 0:
@@ -26,7 +26,7 @@ async def grand_unified_test(host, port, transport):
 
     # --- Phase 2: System Control & Mode Stress ---
     print("\n[Phase 2] System Control & Mode Toggle")
-    async with AsyncHostLinkClient(host, port=port, transport=transport) as plc:
+    async with AsyncHostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
         for i in range(5):
             await plc.set_time()  # Clock Sync
             await plc.change_mode("PROGRAM")
@@ -85,7 +85,11 @@ async def grand_unified_test(host, port, transport):
 
 
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else "192.168.250.100"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8501
-    transport = sys.argv[3] if len(sys.argv) > 3 else "tcp"
-    asyncio.run(grand_unified_test(host, port, transport))
+    if len(sys.argv) < 3:
+        print("Usage: python grand_unified_test.py <host> <plc-profile> [port] [transport]")
+        sys.exit(1)
+    host = sys.argv[1]
+    plc_profile = sys.argv[2]
+    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
+    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    asyncio.run(grand_unified_test(host, plc_profile, port, transport))

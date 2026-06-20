@@ -5,12 +5,12 @@ import time
 from hostlink import HostLinkClient
 
 
-def run_ultimate_test(host, port, transport):
+def run_ultimate_test(host, plc_profile, port, transport):
     start_addr = 0
     end_addr = 5000
     print(f"=== ULTIMATE DM CONSISTENCY SWEEP: DM{start_addr} to DM{end_addr} ===")
 
-    with HostLinkClient(host, port=port, transport=transport) as plc:
+    with HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
         success = 0
         fail = 0
         start_time = time.perf_counter()
@@ -81,7 +81,11 @@ def run_ultimate_test(host, port, transport):
 
 
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else "192.168.250.100"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8501
-    transport = sys.argv[3] if len(sys.argv) > 3 else "tcp"
-    run_ultimate_test(host, port, transport)
+    if len(sys.argv) < 3:
+        print("Usage: python ultimate_dm_stress.py <host> <plc-profile> [port] [transport]")
+        sys.exit(1)
+    host = sys.argv[1]
+    plc_profile = sys.argv[2]
+    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
+    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    run_ultimate_test(host, plc_profile, port, transport)

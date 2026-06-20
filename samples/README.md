@@ -2,28 +2,28 @@
 
 ## What is here
 
-This directory contains runnable scripts for the recommended high-level KEYENCE KV Host Link API plus validation scripts for lab use. Each user-facing sample accepts a PLC host and uses Host Link port `8501` by default.
+This directory contains runnable scripts for the recommended high-level KEYENCE KV Host Link API plus validation scripts for lab use. Each user-facing sample requires a PLC host and canonical PLC profile; the examples below use Host Link port `8501`.
 
 ## How to run
 
 ```bash
-python samples/high_level_async.py --host 192.168.250.100 --port 8501
+python samples/high_level_async.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
 ```bash
-python samples/high_level_sync.py --host 192.168.250.100 --port 8501
+python samples/high_level_sync.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
 ```bash
-python samples/basic_high_level_rw.py --host 192.168.250.100 --port 8501
+python samples/basic_high_level_rw.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
 ```bash
-python samples/named_snapshot.py --host 192.168.250.100 --port 8501
+python samples/named_snapshot.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
 ```bash
-python samples/polling_monitor.py --host 192.168.250.100 --port 8501 --poll-count 5
+python samples/polling_monitor.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501 --poll-count 5
 ```
 
 ## Sample index
@@ -43,4 +43,4 @@ python samples/polling_monitor.py --host 192.168.250.100 --port 8501 --poll-coun
 | `stress_test.py` | Synchronous, asynchronous, and bulk transfer stress validation. |
 | `ultimate_dm_stress.py` | Large DM consistency sweep validation. |
 
-Validation and stress scripts write many devices. Run them only against a PLC and address range that are safe for your machine and program.
+Validation and stress scripts write many devices. They use positional arguments in the form `<host> <plc-profile> [port] [transport]`. Run them only against a PLC and address range that are safe for your machine and program.

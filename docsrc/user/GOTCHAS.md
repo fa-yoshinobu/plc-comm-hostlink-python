@@ -14,7 +14,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_timer
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         timer = await read_timer(client, "T0")
         print(timer.preset)
@@ -99,7 +99,7 @@ from hostlink import HostLinkConnectionOptions
 
 
 def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     print(options)
 
 

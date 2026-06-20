@@ -1,6 +1,6 @@
 """
 Basic Communication Test for KEYENCE KV Host Link.
-Usage: python basic_test.py <host> [port] [transport: tcp/udp]
+Usage: python basic_test.py <host> <plc-profile> [port] [transport: tcp/udp]
 """
 
 import sys
@@ -10,18 +10,19 @@ from hostlink.errors import HostLinkConnectionError, HostLinkError
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python basic_test.py <host> [port] [transport: tcp/udp]")
+    if len(sys.argv) < 3:
+        print("Usage: python basic_test.py <host> <plc-profile> [port] [transport: tcp/udp]")
         sys.exit(1)
 
     host = sys.argv[1]
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 8501
-    transport = sys.argv[3] if len(sys.argv) > 3 else "tcp"
+    plc_profile = sys.argv[2]
+    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
+    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
 
-    print(f"Connecting to {host}:{port} via {transport}...")
+    print(f"Connecting to {host}:{port} via {transport} ({plc_profile})...")
 
     try:
-        with HostLinkClient(host, port=port, transport=transport) as plc:
+        with HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
             # 1. Query Model (?K)
             model_info = plc.query_model()
             print(f"PLC Model Code: {model_info.code}")

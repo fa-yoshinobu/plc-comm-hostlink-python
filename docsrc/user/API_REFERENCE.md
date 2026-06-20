@@ -79,7 +79,7 @@ Create and connect a client for use with the helper functions.
 
 Parameters:
 
-- `options`: `HostLinkConnectionOptions(host, port=8501, transport="tcp", timeout=3.0, append_lf_on_send=False)`
+- `options`: `HostLinkConnectionOptions(host, plc_profile="keyence:kv-8000", port=8501, transport="tcp", timeout=3.0, append_lf_on_send=False)`
 - `host`: PLC IP address or hostname
 - `port`: Host Link port, default `8501`
 - `transport`: `"tcp"` or `"udp"`
@@ -93,7 +93,7 @@ Returns:
 Example:
 
 ```python
-options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
 async with await open_and_connect(options) as client:
     ...
 ```

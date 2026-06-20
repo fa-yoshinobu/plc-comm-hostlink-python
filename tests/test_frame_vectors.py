@@ -20,7 +20,7 @@ _VECTORS = json.loads(_VECTORS_PATH.read_text())["vectors"]
 
 class _FakeHostLinkClient(HostLinkClient):
     def __init__(self) -> None:
-        super().__init__("127.0.0.1", auto_connect=False)
+        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", auto_connect=False)
         self.sent_frames: list[bytes] = []
 
     def _exchange(self, payload: bytes) -> bytes:

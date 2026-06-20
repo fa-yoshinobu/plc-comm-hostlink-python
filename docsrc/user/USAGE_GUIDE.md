@@ -38,6 +38,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect
 async def main() -> None:
     options = HostLinkConnectionOptions(
         host="192.168.250.100",
+        plc_profile="keyence:kv-8000",
         port=8501,
         transport="tcp",
         timeout=3.0,
@@ -73,7 +74,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         unsigned_word = await read_typed(client, "DM0", "U")
         signed_word = await read_typed(client, "DM1", "S")
@@ -103,7 +104,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, wr
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         address = "DM100"
         original = await read_typed(client, address, "U")
@@ -129,7 +130,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_named
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         addresses = ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.A"]
         snapshot = await read_named(client, addresses)
@@ -158,7 +159,7 @@ from hostlink import (
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         words = await read_words_single_request(client, "DM200", 8)
         dwords = await read_dwords_single_request(client, "DM300", 4)
@@ -182,7 +183,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, wr
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         await write_bit_in_word(client, "DM50", bit_index=10, value=True)
         snapshot = await read_named(client, ["DM50.A"])
@@ -203,7 +204,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, poll
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         count = 0
         async for snapshot in poll(client, ["DM0", "DM1:S", "DM4:F"], interval=1.0):
@@ -239,7 +240,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_counter, 
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         timer = await read_timer(client, "T0")
         counter = await read_counter(client, "C0")
@@ -274,7 +275,7 @@ from hostlink import (
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         buffer_words = await read_expansion_unit_buffer(
             client,
