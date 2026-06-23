@@ -103,7 +103,9 @@ class HostLinkConnectionOptions:
         from .device_ranges import device_range_catalog_for_plc_profile
 
         if self.plc_profile is None:
-            raise ValueError("plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'.")
+            raise ValueError(
+                "plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'."
+            )
 
         object.__setattr__(self, "plc_profile", device_range_catalog_for_plc_profile(self.plc_profile).plc_profile)
 

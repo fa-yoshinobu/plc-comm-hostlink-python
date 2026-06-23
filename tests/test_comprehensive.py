@@ -100,7 +100,9 @@ class TestComprehensiveSync(unittest.TestCase):
     def setUp(self):
         self.server = MockSyncServer(transport="tcp")
         self.server.start()
-        self.client = HostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, auto_connect=True)
+        self.client = HostLinkClient(
+            "127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, auto_connect=True
+        )
 
     def tearDown(self):
         self.client.close()
@@ -128,7 +130,13 @@ class TestComprehensiveSync(unittest.TestCase):
     def test_udp_send_raw_accepts_large_datagram_response(self):
         server = MockSyncServer(transport="udp")
         server.start()
-        client = HostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=server.port, transport="udp", auto_connect=True)
+        client = HostLinkClient(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=server.port,
+            transport="udp",
+            auto_connect=True,
+        )
         try:
             large_response = "7" * 9000
             server.responses["LARGE"] = large_response
@@ -219,7 +227,9 @@ class TestComprehensiveSync(unittest.TestCase):
         udp_server = MockSyncServer(transport="udp")
         udp_server.start()
         try:
-            with HostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp") as client:
+            with HostLinkClient(
+                "127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp"
+            ) as client:
                 client.write("DM0.U", 123)
                 self.assertEqual(udp_server.last_received[-1], "WR DM0.U 123")
         finally:
@@ -265,7 +275,9 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         udp_server = MockSyncServer(transport="udp")
         udp_server.start()
         try:
-            async with AsyncHostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp") as client:
+            async with AsyncHostLinkClient(
+                "127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp"
+            ) as client:
                 await client.write("DM10.U", 999)
                 self.assertEqual(udp_server.last_received[-1], "WR DM10.U 999")
                 udp_server.responses["RD DM10.U"] = "999"
