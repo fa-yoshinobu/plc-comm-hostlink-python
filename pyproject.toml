@@ -15,7 +15,7 @@ readme = "README.md"
 license-files = ["LICENSE"]
 keywords = ["keyence", "kv", "hostlink", "upper-link", "plc", "tcp", "udp"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
