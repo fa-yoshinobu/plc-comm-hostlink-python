@@ -2,7 +2,7 @@
 
 ## Start here
 
-This page gets you from an empty Python project to your first KEYENCE KV Host Link read. You will choose the canonical profile `keyence:kv-7000`, connect to your PLC at `192.168.250.100:8501`, read `DM0`, then write and restore a test register.
+This page gets you from an empty Python project to your first KEYENCE KV Host Link read. You will choose the canonical profile `keyence:kv-8000`, connect to your PLC at `192.168.250.100:8501`, read `DM0`, then write and restore a test register.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ from hostlink import device_range_catalog_for_plc_profile
 
 
 def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
+    catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
     print(catalog.plc_profile)
 
 
@@ -43,7 +43,7 @@ from hostlink import HostLinkConnectionOptions, device_range_catalog_for_plc_pro
 
 
 async def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
+    catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
@@ -90,7 +90,7 @@ Only write to a test address that is safe for your machine and program.
 
 ## Confirm success
 
-1. The profile snippet prints `keyence:kv-7000`.
+1. The profile snippet prints `keyence:kv-8000`.
 2. The connection opens without a timeout.
 3. The first read prints a value for `DM0`.
 4. The write example prints the value written to `DM100`.

@@ -37,11 +37,22 @@ async def run(args: argparse.Namespace) -> None:
         print(f"DM2(D) = {dm2}")
         print(f"DM4(F) = {dm4}")
 
-        await write_typed(client, "DM100", "U", dm0)
-        await write_typed(client, "DM101", "S", dm1)
-        await write_typed(client, "DM102", "D", dm2)
-        await write_typed(client, "DM104", "F", dm4)
-        print("Mirrored source values into DM100/DM101/DM102/DM104")
+        original_dm100 = await read_typed(client, "DM100", "U")
+        original_dm101 = await read_typed(client, "DM101", "S")
+        original_dm102 = await read_typed(client, "DM102", "D")
+        original_dm104 = await read_typed(client, "DM104", "F")
+        try:
+            await write_typed(client, "DM100", "U", dm0)
+            await write_typed(client, "DM101", "S", dm1)
+            await write_typed(client, "DM102", "D", dm2)
+            await write_typed(client, "DM104", "F", dm4)
+            print("Mirrored source values into DM100/DM101/DM102/DM104")
+        finally:
+            await write_typed(client, "DM100", "U", original_dm100)
+            await write_typed(client, "DM101", "S", original_dm101)
+            await write_typed(client, "DM102", "D", original_dm102)
+            await write_typed(client, "DM104", "F", original_dm104)
+            print("Restored DM100/DM101/DM102/DM104")
 
 
 def main() -> None:

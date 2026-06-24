@@ -22,6 +22,7 @@ from hostlink import (
     read_timer,
     read_counter,
     write_typed,
+    read_comments,
     write_bit_in_word,
     read_named,
     poll,
@@ -154,6 +155,7 @@ Returns:
 
 - `int` for `U`, `S`, `D`, `L`
 - `float` for `F`
+- `bool` for direct bit/default bit reads
 
 Example:
 
@@ -207,6 +209,28 @@ Example:
 
 ```python
 await write_typed(client, "DM100", "D", 123456)
+```
+
+## Device comments
+
+### `await read_comments(client, device, strip_padding=True)`
+
+Read one PLC device comment string.
+
+Parameters:
+
+- `client`: connected client from `open_and_connect`
+- `device`: base device such as `"DM100"`
+- `strip_padding`: trim trailing spaces from the fixed-width Host Link response
+
+Returns:
+
+- `str`
+
+Example:
+
+```python
+label = await read_comments(client, "DM100")
 ```
 
 ## Contiguous block helpers
@@ -319,6 +343,7 @@ Supported address notation:
 | `"DM100:D"` | unsigned 32-bit |
 | `"DM100:L"` | signed 32-bit |
 | `"DM100:F"` | float32 |
+| `"DM100:COMMENT"` | PLC device comment text |
 | `"DM100.3"` | bit 3 inside the word |
 | `"DM100.A"` | bit 10 inside the word |
 
@@ -328,12 +353,12 @@ Parameters:
 
 Returns:
 
-- `dict[str, int | float | bool]`
+- `dict[str, int | float | bool | str]`
 
 Example:
 
 ```python
-snapshot = await read_named(client, ["DM100", "DM101:S", "DM102:F", "DM200.3"])
+snapshot = await read_named(client, ["DM100", "DM101:S", "DM102:F", "DM200.3", "DM100:COMMENT"])
 ```
 
 ## Polling
@@ -350,7 +375,7 @@ Parameters:
 
 Yields:
 
-- `dict[str, int | float | bool]`
+- `dict[str, int | float | bool | str]`
 
 Example:
 

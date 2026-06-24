@@ -119,11 +119,20 @@ async def demo_typed_rw(client) -> None:
     val_f = await read_typed(client, "DM300", "F")
     print(f"[read_typed] DM100(S)={val_s}  DM200(L)={val_l}  DM300(F)={val_f}")
 
+    original_dm100 = await read_typed(client, "DM100", "S")
+    original_dm200 = await read_typed(client, "DM200", "L")
+    original_dm300 = await read_typed(client, "DM300", "F")
     # Write only to DM test addresses that are safe in your PLC program.
-    await write_typed(client, "DM100", "S", -500)
-    await write_typed(client, "DM200", "L", 123456)
-    await write_typed(client, "DM300", "F", 12.5)
-    print("[write_typed] Wrote -500->DM100, 123456->DM200, 12.5->DM300")
+    try:
+        await write_typed(client, "DM100", "S", -500)
+        await write_typed(client, "DM200", "L", 123456)
+        await write_typed(client, "DM300", "F", 12.5)
+        print("[write_typed] Wrote -500->DM100, 123456->DM200, 12.5->DM300")
+    finally:
+        await write_typed(client, "DM100", "S", original_dm100)
+        await write_typed(client, "DM200", "L", original_dm200)
+        await write_typed(client, "DM300", "F", original_dm300)
+        print("[write_typed] Restored DM100/DM200/DM300")
 
 
 async def demo_array_reads(client) -> None:
@@ -163,10 +172,16 @@ async def demo_bit_in_word(client) -> None:
               uses each bit for a different axis or function.
     """
     # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
-    await write_bit_in_word(client, "DM50", bit_index=4, value=True)
-    print("[write_bit_in_word] Set   bit 4 of DM50")
-    await write_bit_in_word(client, "DM50", bit_index=4, value=False)
-    print("[write_bit_in_word] Clear bit 4 of DM50")
+    original = await read_named(client, ["DM50.4"])
+    original_bit4 = bool(original["DM50.4"])
+    try:
+        await write_bit_in_word(client, "DM50", bit_index=4, value=True)
+        print("[write_bit_in_word] Set   bit 4 of DM50")
+        await write_bit_in_word(client, "DM50", bit_index=4, value=False)
+        print("[write_bit_in_word] Clear bit 4 of DM50")
+    finally:
+        await write_bit_in_word(client, "DM50", bit_index=4, value=original_bit4)
+        print("[write_bit_in_word] Restored bit 4 of DM50")
 
 
 async def demo_read_named(client) -> None:
