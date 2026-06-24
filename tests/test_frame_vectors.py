@@ -42,18 +42,58 @@ def _run_command(client: _FakeHostLinkClient, vec: dict[str, Any]) -> None:
         client.change_mode(vec["mode"])
     elif cmd == "clear_error":
         client.clear_error()
+    elif cmd == "check_error_no":
+        client.check_error_no()
+    elif cmd == "query_model":
+        client.query_model()
+    elif cmd == "confirm_operating_mode":
+        client.confirm_operating_mode()
     elif cmd == "set_time":
         client.set_time(tuple(vec["args"]))  # type: ignore[arg-type]
+    elif cmd == "forced_set":
+        client.forced_set(vec["device"])
+    elif cmd == "forced_reset":
+        client.forced_reset(vec["device"])
+    elif cmd == "forced_set_consecutive":
+        client.forced_set_consecutive(vec["device"], vec["count"])
+    elif cmd == "forced_reset_consecutive":
+        client.forced_reset_consecutive(vec["device"], vec["count"])
     elif cmd == "read_format":
         client.read(vec["device"], data_format=vec["data_format"])
+    elif cmd == "read_monitor_bits":
+        client.read_monitor_bits()
+    elif cmd == "read_monitor_words":
+        client.read_monitor_words()
     elif cmd == "read_consecutive_legacy":
         client.read_consecutive_legacy(vec["device"], vec["count"])
+    elif cmd == "write_consecutive_legacy":
+        client.write_consecutive_legacy(vec["device"], vec["values"])
     elif cmd == "register_monitor_bits":
         client.register_monitor_bits(*vec["devices"])
     elif cmd == "register_monitor_words":
         client.register_monitor_words(*vec["devices"])
     elif cmd == "write_set_value":
         client.write_set_value(vec["device"], vec["value"])
+    elif cmd == "write_set_value_consecutive":
+        client.write_set_value_consecutive(vec["device"], vec["values"])
+    elif cmd == "switch_bank":
+        client.switch_bank(vec.get("bank", vec.get("bank_no")))
+    elif cmd == "read_expansion_unit_buffer":
+        client.read_expansion_unit_buffer(
+            vec.get("unit", vec.get("unit_no")),
+            vec.get("address", vec.get("buffer_address")),
+            vec["count"],
+            data_format=vec.get("data_format", ""),
+        )
+    elif cmd == "write_expansion_unit_buffer":
+        client.write_expansion_unit_buffer(
+            vec.get("unit", vec.get("unit_no")),
+            vec.get("address", vec.get("buffer_address")),
+            vec["values"],
+            data_format=vec.get("data_format", ""),
+        )
+    elif cmd == "read_comments":
+        client.read_comments(vec["device"])
     else:
         raise ValueError(f"Unknown command: {cmd}")
 

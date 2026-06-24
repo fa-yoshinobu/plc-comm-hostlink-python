@@ -5,28 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.9.0 - 2026-06-21
+## [1.0.0] - 2026-06-24
+
+### Changed
+- Bumped package metadata to `1.0.0` for the first stable release line.
+- Expanded the Host Link frame-vector test runner so the Python suite covers the same command families as the shared vector file.
+
+### Fixed
+- Aligned the Python Host Link frame vectors with the .NET canonical vector set so matching IDs describe the same request shape across libraries.
+
+## [0.9.0] - 2026-06-21
 
 ### Changed
 - Require an explicit canonical PLC profile when creating Host Link connection options, aligning standard connection behavior with the cross-language libraries.
 - Updated samples and validation examples to pass the PLC profile argument explicitly.
 
-## 0.8.0 - 2026-06-14
+## [0.8.0] - 2026-06-14
 
 ### Changed
 - Bumped release metadata to 0.8.0 for the unified PLC communication library release.
 
-## 0.1.13 - 2026-06-12
+## [0.1.13] - 2026-06-12
 
 ### Changed
 - Bumped the Python package revision for the final 2026-06-12 manual release pass.
 
-## 0.1.12 - 2026-06-12
+## [0.1.12] - 2026-06-12
 
 ### Changed
 - Bumped the library revision for release alignment after the resolved live-validation pass.
 
-## 0.1.11 - 2026-05-14
+## [0.1.11] - 2026-05-14
 
 ### Added
 - Added `TimerCounterValue` plus `read_timer_counter()`, `read_timer()`, and
@@ -43,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parse comma-separated timer/counter composite responses and make
   `read_typed()` return the preset value for `T` / `C` `.D` / `.L` reads.
 
-## 0.1.10 - 2026-05-14
+## [0.1.10] - 2026-05-14
 
 ### Changed
 - Added `KV-X500` to the README verified hardware list.
@@ -52,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected XYM `X` / `Y` alias catalog bounds so published ranges such as `X0-999F` are exposed as decimal-bank plus hexadecimal-bit logical counts.
 - Batched `read_named()` direct-bit reads across `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`.
 
-## 0.1.9 - 2026-05-02
+## [0.1.9] - 2026-05-02
 
 ### Added
 - Added public address helper APIs: `parse_address`, `try_parse_address`, and `format_address`.
@@ -61,14 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Documented the helper naming, explicit connection option, address helper, and semantic atomicity policy.
 
-## 0.1.8 - 2026-04-27
+## [0.1.8] - 2026-04-27
 
 ### Changed
 - Added X/Y monitor registration support verified on KV-7500.
 - Normalized X/Y bit addresses as decimal bank plus hexadecimal bit notation, rejecting invalid forms such as `X3F0` before sending.
 - Added M/L monitor bit registration support while keeping M/L out of monitor word registration.
 
-## 0.1.7 - 2026-04-27
+## [0.1.7] - 2026-04-27
 
 ### Added
 - Added the embedded KEYENCE KV device range catalog and `read_device_range_catalog()` helpers.
@@ -77,16 +86,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range.
 - Normalized `R`, `MR`, `LR`, and `CR` bit-bank addresses and rejected invalid lower-two-digit bit numbers.
 
-## 0.1.6 - 2026-04-14
+## [0.1.6] - 2026-04-14
 
 ### Changed
 - Reorganized the public MkDocs content around end-user getting-started, supported-register, and latest-verification pages while keeping maintainer docs internal.
 - Separated local and publish docs builds so publication settings no longer affect local documentation checks.
 - Tightened source-distribution packaging so maintainer-only docs stay out of shipped release artifacts.
 
-## 0.1.5 - 2026-04-01
+## [0.1.5] - 2026-04-01
 
-## 0.1.4 - 2026-03-29
+## [0.1.4] - 2026-03-29
 
 ### Added
 - Added `scripts/check_high_level_docs.py` to verify that all public helper functions keep user-facing docstring coverage.
