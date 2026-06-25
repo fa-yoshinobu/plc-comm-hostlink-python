@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.1] - 2026-06-25
 
 ### Changed
-- Removed the `None` default from `HostLinkConnectionOptions.plc_profile` so connection options require an explicit canonical PLC profile.
-- Make `open_and_connect()` reject omitted `plc_profile` values instead of relying on a fallback placeholder.
+- [Library] Removed the `None` default from `HostLinkConnectionOptions.plc_profile` so connection options require an explicit canonical PLC profile.
+- [Library] Make `open_and_connect()` reject omitted `plc_profile` values instead of relying on a fallback placeholder.
+- [Docs/Samples] Updated Host Link documentation and samples to use safer write/restore patterns.
 
 ## [1.0.0] - 2026-06-24
 
