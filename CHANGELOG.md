@@ -5,137 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+**Entry labels**
+
+- `Release`: Package/version metadata and publishing preparation.
+- `Library`: Runtime behavior, public API, protocol handling, or validation in the distributed library.
+- `Docs`: README, user guides, generated API docs, or other documentation-only changes.
+- `Samples`: Examples, sample flows, sample scripts, or sample applications.
+- `Tests`: Test suites, test fixtures, golden vectors, or verification data.
+- `Tooling`: Developer/operator command-line tools and helper utilities.
+- `CI`: Release checks, workflow scripts, or automation-only changes.
+
 ## [1.0.1] - 2026-06-25
 
 ### Changed
-- [Library] Removed the `None` default from `HostLinkConnectionOptions.plc_profile` so connection options require an explicit canonical PLC profile.
-- [Library] Make `open_and_connect()` reject omitted `plc_profile` values instead of relying on a fallback placeholder.
-- [Docs/Samples] Updated Host Link documentation and samples to use safer write/restore patterns.
+- Release: Bumped Python package metadata to `1.0.1`.
+- Library: Removed the `None` default from `HostLinkConnectionOptions.plc_profile` so connection options require an explicit canonical PLC profile.
+- Library: Made `open_and_connect()` reject omitted `plc_profile` values instead of relying on a fallback placeholder.
+- Docs: Updated Host Link documentation for safer write/restore patterns.
+- Samples: Updated Host Link samples to use safer write/restore patterns.
 
 ## [1.0.0] - 2026-06-24
 
 ### Changed
-- Bumped package metadata to `1.0.0` for the first stable release line.
-- Expanded the Host Link frame-vector test runner so the Python suite covers the same command families as the shared vector file.
+- Release: Bumped package metadata to `1.0.0` for the first stable release line.
+- Tests: Expanded the Host Link frame-vector test runner so the Python suite covers the same command families as the shared vector file.
 
 ### Fixed
-- Aligned the Python Host Link frame vectors with the .NET canonical vector set so matching IDs describe the same request shape across libraries.
-
-## [0.9.0] - 2026-06-21
-
-### Changed
-- Require an explicit canonical PLC profile when creating Host Link connection options, aligning standard connection behavior with the cross-language libraries.
-- Updated samples and validation examples to pass the PLC profile argument explicitly.
-
-## [0.8.0] - 2026-06-14
-
-### Changed
-- Bumped release metadata to 0.8.0 for the unified PLC communication library release.
-
-## [0.1.13] - 2026-06-12
-
-### Changed
-- Bumped the Python package revision for the final 2026-06-12 manual release pass.
-
-## [0.1.12] - 2026-06-12
-
-### Changed
-- Bumped the library revision for release alignment after the resolved live-validation pass.
-
-## [0.1.11] - 2026-05-14
-
-### Added
-- Added `TimerCounterValue` plus `read_timer_counter()`, `read_timer()`, and
-  `read_counter()` helpers for full `T` / `C` composite values.
-
-### Changed
-- Documented that `WS` / `WSS` timer/counter preset writes are supported only
-  by KV-8000/7000-series CPU units; other CPU units return abnormal response
-  `E1` when those commands are executed.
-
-### Fixed
-- Corrected `URD` / `UWR` expansion unit buffer command framing so the data
-  suffix is attached directly to the buffer address, for example `100.U`.
-- Parse comma-separated timer/counter composite responses and make
-  `read_typed()` return the preset value for `T` / `C` `.D` / `.L` reads.
-
-## [0.1.10] - 2026-05-14
-
-### Changed
-- Added `KV-X500` to the README verified hardware list.
-
-### Fixed
-- Corrected XYM `X` / `Y` alias catalog bounds so published ranges such as `X0-999F` are exposed as decimal-bank plus hexadecimal-bit logical counts.
-- Batched `read_named()` direct-bit reads across `R` / `MR` / `LR` / `CR` bit-bank display boundaries such as `CR3615` to `CR3700`.
-
-## [0.1.9] - 2026-05-02
-
-### Added
-- Added public address helper APIs: `parse_address`, `try_parse_address`, and `format_address`.
-- Added high-level async expansion unit buffer helpers for `URD` / `UWR`.
-
-### Changed
-- Documented the helper naming, explicit connection option, address helper, and semantic atomicity policy.
-
-## [0.1.8] - 2026-04-27
-
-### Changed
-- Added X/Y monitor registration support verified on KV-7500.
-- Normalized X/Y bit addresses as decimal bank plus hexadecimal bit notation, rejecting invalid forms such as `X3F0` before sending.
-- Added M/L monitor bit registration support while keeping M/L out of monitor word registration.
-
-## [0.1.7] - 2026-04-27
-
-### Added
-- Added the embedded KEYENCE KV device range catalog and `read_device_range_catalog()` helpers.
-
-### Changed
-- Aligned Host Link device parsing with the .NET/Rust libraries, including the extended `M0..M63999` XYM range.
-- Normalized `R`, `MR`, `LR`, and `CR` bit-bank addresses and rejected invalid lower-two-digit bit numbers.
-
-## [0.1.6] - 2026-04-14
-
-### Changed
-- Reorganized the public MkDocs content around end-user getting-started, supported-register, and latest-verification pages while keeping maintainer docs internal.
-- Separated local and publish docs builds so publication settings no longer affect local documentation checks.
-- Tightened source-distribution packaging so maintainer-only docs stay out of shipped release artifacts.
-
-## [0.1.5] - 2026-04-01
-
-## [0.1.4] - 2026-03-29
-
-### Added
-- Added `scripts/check_high_level_docs.py` to verify that all public helper functions keep user-facing docstring coverage.
-- Added `scripts/check_user_samples.py` to validate user-facing sample scripts by compiling them and running `--help`.
-- Added `release_check.bat` as a one-step release gate that runs CI (lint/format/mypy/docs coverage/samples/tests) and then rebuilds the published MkDocs site.
-- Added three high-level user samples: `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, and `samples/polling_monitor.py`.
-- Added `MANIFEST.in` pruning for `internal_docs/` so source distributions omit maintainer-only docs.
-
-### Changed
-- Updated README, user docs, and samples to describe the current helper API coverage, including API-to-sample mapping tables.
-- Clarified that low-level `.H` reads return uppercase hex strings and added helper-level `.F` float32 conversion for typed/named reads.
-- Updated `run_ci.bat` to include high-level docs coverage checks and user-facing sample validation runs.
-- Expanded `.gitignore` to exclude coverage artifacts such as `.coverage*` and `htmlcov/`.
-
-## [0.1.2] - 2026-03-19
-
-### Added
-- Comprehensive `docsrc/user/USER_GUIDE.md` for end-users.
-- Documentation for `AsyncHostLinkClient` in `docsrc/user/API_REFERENCE.md`.
-- Internal connectivity verification evidence: maintainer archive.
-- Stability and stress test samples in `samples/` directory.
-
-### Changed
-- **Optimized Performance**: Enabled `TCP_NODELAY` and removed `asyncio.wait_for` overhead in `AsyncHostLinkClient` receive logic.
-- Improved type safety in `hostlink/client.py` (fixed Mypy errors regarding `Iterable` vs `Sequence`).
-
-### Fixed
-- Fixed Ruff linting errors (E722, F401) in core library and tests.
-- Fixed an `async/await` missing bug in `AsyncHostLinkClient.register_monitor_bits`.
-
-## [0.1.0] - 2025-05-18
-
-### Added
-- Initial implementation of KEYENCE KV Host Link protocol for Python.
-- Support for TCP/UDP transport.
-- Comprehensive unit tests and SPEC coverage documentation.
+- Tests: Aligned the Python Host Link frame vectors with the .NET canonical vector set so matching IDs describe the same request shape across libraries.
