@@ -58,7 +58,7 @@ class TestAddressSurface(unittest.TestCase):
 
 class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
     def test_connection_options_require_canonical_plc_profile(self) -> None:
-        with self.assertRaisesRegex(ValueError, "plc_profile is required"):
+        with self.assertRaises(TypeError):
             HostLinkConnectionOptions("127.0.0.1")
         with self.assertRaises(HostLinkProtocolError):
             HostLinkConnectionOptions("127.0.0.1", plc_profile="KV-8000")

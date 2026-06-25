@@ -93,7 +93,7 @@ class HostLinkConnectionOptions:
 
     host: str
     _: KW_ONLY
-    plc_profile: str | None = None
+    plc_profile: str
     port: int = 8501
     transport: str = "tcp"
     timeout: float = 3.0
@@ -1068,6 +1068,9 @@ async def read_dwords(
     return await read_dwords_single_request(client, device, count)
 
 
+_MISSING_PLC_PROFILE = object()
+
+
 async def open_and_connect(
     host: str | HostLinkConnectionOptions,
     port: int = 8501,
@@ -1075,7 +1078,7 @@ async def open_and_connect(
     timeout: float = 3.0,
     append_lf_on_send: bool = False,
     *,
-    plc_profile: str | None = None,
+    plc_profile: str | object = _MISSING_PLC_PROFILE,
 ) -> AsyncHostLinkClient:
     """
     Create and connect an :class:`AsyncHostLinkClient`.
@@ -1109,13 +1112,17 @@ async def open_and_connect(
     if isinstance(host, HostLinkConnectionOptions):
         options = host
     else:
+        if plc_profile is _MISSING_PLC_PROFILE:
+            raise ValueError(
+                "plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'."
+            )
         options = HostLinkConnectionOptions(
             host,
             port=port,
             transport=transport,
             timeout=timeout,
             append_lf_on_send=append_lf_on_send,
-            plc_profile=plc_profile,
+            plc_profile=cast(str, plc_profile),
         )
 
     client = AsyncHostLinkClient(
