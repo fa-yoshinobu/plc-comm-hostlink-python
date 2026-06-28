@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2026-06-28
 
 ### Fixed
+- Library: Reject malformed embedded device-range segments while building the KV range catalog instead of silently defaulting invalid lower bounds to `0`.
 - Library: Made `BIT_IN_WORD` helper addresses require an explicit bit index such as `DM100.0` through `DM100.F`; `DM100:BIT_IN_WORD` now fails instead of silently reading bit 0.
+- Tests: Added coverage for invalid embedded device-range segment parsing.
 - Tests: Added coverage for rejecting `BIT_IN_WORD` addresses without an explicit bit index.
 
 ## [1.0.1] - 2026-06-25

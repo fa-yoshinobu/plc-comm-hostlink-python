@@ -224,12 +224,17 @@ def _parse_segment_bounds(
 ) -> tuple[int, int | None, int | None]:
     parts = [part.strip() for part in segment.split("-", 1)]
     if len(parts) != 2:
-        return 0, None, None
+        raise ValueError(f"Invalid device range segment {segment!r}: missing '-' separator.")
 
     lower = _parse_segment_number(parts[0], notation, default_device)
     upper = _parse_segment_number(parts[1], notation, default_device)
-    point_count = upper - lower + 1 if lower is not None and upper is not None and upper >= lower else None
-    return lower or 0, upper, point_count
+    if lower is None:
+        raise ValueError(f"Invalid device range start {parts[0]!r} in segment {segment!r}.")
+    if upper is None:
+        raise ValueError(f"Invalid device range end {parts[1]!r} in segment {segment!r}.")
+    if upper < lower:
+        raise ValueError(f"Invalid device range bounds in segment {segment!r}.")
+    return lower, upper, upper - lower + 1
 
 
 def _parse_segment_number(
@@ -246,7 +251,10 @@ def _parse_segment_number(
     if default_device in {"X", "Y"}:
         return _parse_xym_segment_number(normalized)
     base = 16 if notation == KvDeviceRangeNotation.HEXADECIMAL else 10
-    return int(normalized, base)
+    try:
+        return int(normalized, base)
+    except ValueError:
+        return None
 
 
 def _parse_xym_segment_number(text: str) -> int | None:

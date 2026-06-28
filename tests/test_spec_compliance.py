@@ -8,6 +8,7 @@ from hostlink import (
     device_range_catalog_for_plc_profile,
 )
 from hostlink.device import parse_device, validate_device_span, validate_expansion_buffer_span
+from hostlink.device_ranges import _parse_segment_bounds
 from hostlink.errors import HostLinkProtocolError
 
 
@@ -294,6 +295,10 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
         kvx = device_range_catalog_for_plc_profile("keyence:kv-x500")
         self.assertEqual(kvx.entry("Z").address_range, "Z1-10")
+
+    def test_device_range_catalog_rejects_invalid_segment_numbers(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid device range start"):
+            _parse_segment_bounds("DMX-DM10", KvDeviceRangeNotation.DECIMAL, "DM")
 
     def test_device_range_catalog_rejects_unsupported_profile(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
