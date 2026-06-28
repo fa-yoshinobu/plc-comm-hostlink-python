@@ -177,7 +177,8 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
     base_raw, dtype, bit_index = _parse_address(address)
     base_device = parse_device_text(base_raw)
     if dtype == "BIT_IN_WORD":
-        canonical = f"{base_device}.{format(cast(int, bit_index), 'X')}"
+        bit_index = _require_bit_in_word_index(address, bit_index)
+        canonical = f"{base_device}.{format(bit_index, 'X')}"
     elif ":" in address:
         canonical = f"{base_device}:{dtype}"
     elif default_suffix:
@@ -562,6 +563,14 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
     return address.strip(), dtype, None
 
 
+def _require_bit_in_word_index(address: str, bit_index: int | None) -> int:
+    if bit_index is None:
+        raise ValueError(f"bit-in-word address requires explicit bit index 0-F: {address!r}")
+    if not 0 <= bit_index <= 15:
+        raise ValueError(f"bit-in-word index must be 0-F: {address!r}")
+    return bit_index
+
+
 async def _read_named_sequential(
     client: AsyncHostLinkClient,
     addresses: list[str],
@@ -570,10 +579,11 @@ async def _read_named_sequential(
     for address in addresses:
         base, dtype, bit_idx = _parse_address(address)
         if dtype == "BIT_IN_WORD":
+            bit_index = _require_bit_in_word_index(address, bit_idx)
             raw = await client.read(base, data_format=".U")
             values = raw if isinstance(raw, list) else [raw]
             word = int(values[0]) if isinstance(values[0], str) else int(values[0])
-            result[address] = bool((word >> (bit_idx or 0)) & 1)
+            result[address] = bool((word >> bit_index) & 1)
         elif dtype == "COMMENT":
             result[address] = await read_comments(client, base)
         else:
@@ -667,12 +677,13 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
         return None
 
     if dtype == "BIT_IN_WORD":
+        bit_index = _require_bit_in_word_index(address, bit_idx)
         return _ReadPlanRequest(
             index=index,
             address=address,
             base_address=parsed,
             kind="BIT_IN_WORD",
-            bit_index=bit_idx or 0,
+            bit_index=bit_index,
         )
 
     if dtype not in {"U", "S", "D", "L", "F"}:
@@ -791,7 +802,7 @@ def normalize_address(address: str, *, default_suffix: str = "") -> str:
     base, dtype, bit_index = _parse_address(address)
     base_text = parse_device_text(base)
     if dtype == "BIT_IN_WORD":
-        assert bit_index is not None
+        bit_index = _require_bit_in_word_index(address, bit_index)
         return f"{base_text}.{format(bit_index, 'X')}"
     if ":" in address:
         return f"{base_text}:{dtype}"

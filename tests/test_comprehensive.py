@@ -379,6 +379,10 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(self.server.last_received, ["RDS DM100.U 8"])
 
+    async def test_async_read_named_rejects_bit_in_word_without_bit_index(self):
+        with self.assertRaisesRegex(ValueError, "explicit bit index"):
+            await read_named(self.client, ["DM100:BIT_IN_WORD"])
+
     async def test_async_read_named_batches_bit_bank_direct_bits_across_display_bank_boundary(self):
         self.server.responses["RDS CR3614 4"] = "0 1 0 1"
 

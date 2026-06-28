@@ -53,7 +53,14 @@ class TestAddressSurface(unittest.TestCase):
         self.assertIsNone(try_parse_address("DM1A"))
         self.assertIsNone(try_parse_address("DM100.S"))
         self.assertIsNone(try_parse_address("DM100.10"))
+        self.assertIsNone(try_parse_address("DM100:BIT_IN_WORD"))
         self.assertEqual(format_address("dm100:f"), "DM100:F")
+
+    def test_bit_in_word_dtype_requires_explicit_bit_index(self) -> None:
+        with self.assertRaisesRegex(ValueError, "explicit bit index"):
+            parse_address("DM100:BIT_IN_WORD")
+        with self.assertRaisesRegex(ValueError, "explicit bit index"):
+            normalize_address("DM100:BIT_IN_WORD")
 
 
 class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
