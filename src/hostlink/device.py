@@ -209,12 +209,15 @@ def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress
     raw = text.strip().upper()
     match = DEVICE_RE.match(raw)
     if not match:
-        if allow_omitted_type and raw.isdigit():
-            return parse_device(f"R{raw}", allow_omitted_type=False)
         valid_types = ", ".join(sorted(DEVICE_RANGES.keys()))
         raise HostLinkProtocolError(f"Invalid device string {text!r}. Valid device types: {valid_types}")
 
-    device_type = match.group("type") or "R"
+    device_type = match.group("type")
+    if not device_type:
+        valid_types = ", ".join(sorted(DEVICE_RANGES.keys()))
+        raise HostLinkProtocolError(
+            f"Device string {text!r} requires an explicit device type. Valid device types: {valid_types}"
+        )
     number_text = match.group("number")
     suffix = normalize_suffix(match.group("suffix"))
 
@@ -295,6 +298,17 @@ def _parse_xym_bit_number(device_type: str, number_text: str) -> int:
 
 def resolve_effective_format(device_type: str, suffix: str) -> str:
     return suffix if suffix else DEFAULT_FORMAT_BY_DEVICE_TYPE.get(device_type, "")
+
+
+def require_explicit_format(addr: DeviceAddress, data_format: str | None = None) -> str:
+    suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
+    if suffix:
+        return suffix
+    if resolve_effective_format(addr.device_type, "") == "":
+        return ""
+    raise HostLinkProtocolError(
+        f"Device {addr.to_text()!r} requires an explicit data format suffix such as '.U', '.S', '.D', '.L', or '.H'."
+    )
 
 
 def validate_device_type(command: str, device_type: str, allowed_types: set[str]) -> None:

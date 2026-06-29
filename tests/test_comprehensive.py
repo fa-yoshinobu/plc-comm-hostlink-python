@@ -170,15 +170,15 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(self.server.last_received[-1], "RSS R100 3")
 
     def test_write_set_value(self):
-        self.client.write_set_value("T0", 100)
+        self.client.write_set_value("T0.D", 100)
         self.assertEqual(self.server.last_received[-1], "WS T0.D 100")
-        self.client.write_set_value_consecutive("C0", [10, 20])
+        self.client.write_set_value_consecutive("C0.D", [10, 20])
         self.assertEqual(self.server.last_received[-1], "WSS C0.D 2 10 20")
 
     def test_monitor(self):
         self.client.register_monitor_bits("R0", "R1", "R2")
         self.assertEqual(self.server.last_received[-1], "MBS R000 R001 R002")
-        self.client.register_monitor_words("DM0", "DM1")
+        self.client.register_monitor_words("DM0.U", "DM1.U")
         self.assertEqual(self.server.last_received[-1], "MWS DM0.U DM1.U")
         self.server.responses["MBR"] = "1 0 1"
         self.assertEqual(self.client.read_monitor_bits(), [1, 0, 1])
@@ -334,9 +334,9 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.server.responses["RD T10.D"] = "0,0000000010,0000000020"
         self.server.responses["RD C10.D"] = "0,0000000000,0000000030"
 
-        result = await read_named(self.client, ["T10", "C10"])
+        result = await read_named(self.client, ["T10:D", "C10:D"])
 
-        self.assertEqual(result, {"T10": 20, "C10": 30})
+        self.assertEqual(result, {"T10:D": 20, "C10:D": 30})
         self.assertEqual(self.server.last_received, ["RD T10.D", "RD C10.D"])
 
     async def test_async_read_named_native_32bit_z_uses_native_dword_read(self):
@@ -362,13 +362,13 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
         result = await read_named(
             self.client,
-            ["DM100", "DM100.0", "DM100.A", "DM101:S", "DM102:D", "DM104:L", "DM106:F"],
+            ["DM100:U", "DM100.0", "DM100.A", "DM101:S", "DM102:D", "DM104:L", "DM106:F"],
         )
 
         self.assertEqual(
             result,
             {
-                "DM100": 1025,
+                "DM100:U": 1025,
                 "DM100.0": True,
                 "DM100.A": True,
                 "DM101:S": -1,
@@ -386,15 +386,15 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
     async def test_async_read_named_batches_bit_bank_direct_bits_across_display_bank_boundary(self):
         self.server.responses["RDS CR3614 4"] = "0 1 0 1"
 
-        result = await read_named(self.client, ["CR3614", "CR3615", "CR3700", "CR3701"])
+        result = await read_named(self.client, ["CR3614:BIT", "CR3615:BIT", "CR3700:BIT", "CR3701:BIT"])
 
         self.assertEqual(
             result,
             {
-                "CR3614": False,
-                "CR3615": True,
-                "CR3700": False,
-                "CR3701": True,
+                "CR3614:BIT": False,
+                "CR3615:BIT": True,
+                "CR3700:BIT": False,
+                "CR3701:BIT": True,
             },
         )
         self.assertEqual(self.server.last_received, ["RDS CR3614 4"])
@@ -407,15 +407,15 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.server.last_received.clear()
         self.server.responses["RD DM100.U"] = "321"
         self.server.responses["RDC DM101"] = "ALARM COMMENT                   "
-        result = await read_named(self.client, ["DM100", "DM101:COMMENT"])
-        self.assertEqual(result, {"DM100": 321, "DM101:COMMENT": "ALARM COMMENT"})
+        result = await read_named(self.client, ["DM100:U", "DM101:COMMENT"])
+        self.assertEqual(result, {"DM100:U": 321, "DM101:COMMENT": "ALARM COMMENT"})
         self.assertEqual(self.server.last_received, ["RD DM100.U", "RDC DM101"])
 
     async def test_async_poll_reuses_compiled_read_plan(self):
         self.server.responses["RDS DM100.U 3"] = "1 0 16320"
         snapshots: list[dict[str, int | float | bool | str]] = []
 
-        async for snapshot in poll(self.client, ["DM100", "DM100.0", "DM101:F"], interval=0.001):
+        async for snapshot in poll(self.client, ["DM100:U", "DM100.0", "DM101:F"], interval=0.001):
             snapshots.append(snapshot)
             if len(snapshots) == 1:
                 self.server.responses["RDS DM100.U 3"] = "3 0 16416"
@@ -425,8 +425,8 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             snapshots,
             [
-                {"DM100": 1, "DM100.0": True, "DM101:F": 1.5},
-                {"DM100": 3, "DM100.0": True, "DM101:F": 2.5},
+                {"DM100:U": 1, "DM100.0": True, "DM101:F": 1.5},
+                {"DM100:U": 3, "DM100.0": True, "DM101:F": 2.5},
             ],
         )
         self.assertEqual(self.server.last_received, ["RDS DM100.U 3", "RDS DM100.U 3"])

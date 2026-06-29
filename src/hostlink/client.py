@@ -22,7 +22,7 @@ from .device import (
     DeviceAddress,
     normalize_suffix,
     parse_device,
-    parse_device_text,
+    require_explicit_format,
     resolve_effective_format,
     validate_device_count,
     validate_device_span,
@@ -145,22 +145,16 @@ class HostLinkBase:
 
     def _device_with_format(self, device: str, data_format: str | None, count: int = 1) -> tuple[str, str]:
         addr = parse_device(device)
-        suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
-        # If still no suffix, resolve effective default for the device type
-        if not suffix:
-            suffix = resolve_effective_format(addr.device_type, "")
+        suffix = require_explicit_format(addr, data_format)
         validate_device_span(addr.device_type, addr.number, suffix, count)
         addr = DeviceAddress(addr.device_type, addr.number, suffix)
         return addr.to_text(), suffix
 
     def _ensure_timer_or_counter(self, device: str, data_format: str | None, count: int = 1) -> str:
-        token = parse_device_text(device, default_suffix=data_format or "")
-        addr = parse_device(token)
+        addr = parse_device(device)
         validate_device_type("WS/WSS", addr.device_type, WS_DEVICE_TYPES)
-        # Ensure suffix if missing (WS/WSS often needs .D)
-        if not addr.suffix:
-            suffix = resolve_effective_format(addr.device_type, "")
-            addr = DeviceAddress(addr.device_type, addr.number, suffix)
+        suffix = require_explicit_format(addr, data_format)
+        addr = DeviceAddress(addr.device_type, addr.number, suffix)
         validate_device_span(addr.device_type, addr.number, addr.suffix, count)
         validate_device_count(addr.device_type, addr.suffix, count)
         return addr.to_text()

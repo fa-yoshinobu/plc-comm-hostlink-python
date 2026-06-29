@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2026-06-28
 
+### Changed
+- Library: Made Host Link device parsing require explicit device areas and value-format suffixes; numeric-only devices no longer default to `R`, and suffixless named addresses no longer infer a default format.
+- Docs: Updated Host Link API, supported-register, and usage guidance for explicit device/value-format requirements.
+- Tests: Updated parser, high-level helper, sync/async parity, spec-compliance, and shared frame-vector coverage for explicit device/value-format requirements.
+
 ### Fixed
 - Library: Reject malformed embedded device-range segments while building the KV range catalog instead of silently defaulting invalid lower bounds to `0`.
 - Library: Made `BIT_IN_WORD` helper addresses require an explicit bit index such as `DM100.0` through `DM100.F`; `DM100:BIT_IN_WORD` now fails instead of silently reading bit 0.

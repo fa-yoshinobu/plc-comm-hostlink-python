@@ -102,13 +102,14 @@ async with await open_and_connect(options) as client:
 ### `normalize_address(address, default_suffix="")`
 
 Normalize a user-supplied device string into canonical Host Link form.
+Helper-layer addresses must include the intended data type; `default_suffix`
+is kept only for signature compatibility and raises if supplied.
 
 Examples:
 
 ```python
-normalize_address("dm100")      # DM100
+normalize_address("dm100:u")    # DM100:U
 normalize_address("dm100.a")    # DM100.A
-normalize_address("dm100", default_suffix="U")  # DM100:U
 ```
 
 ### `parse_address`, `try_parse_address`, and `format_address`
@@ -338,11 +339,12 @@ Supported address notation:
 
 | Format | Meaning |
 |---|---|
-| `"DM100"` | unsigned 16-bit |
+| `"DM100:U"` | unsigned 16-bit |
 | `"DM100:S"` | signed 16-bit |
 | `"DM100:D"` | unsigned 32-bit |
 | `"DM100:L"` | signed 32-bit |
 | `"DM100:F"` | float32 |
+| `"CR000:BIT"` | direct bit device |
 | `"DM100:COMMENT"` | PLC device comment text |
 | `"DM100.3"` | bit 3 inside the word |
 | `"DM100.A"` | bit 10 inside the word |
@@ -358,7 +360,7 @@ Returns:
 Example:
 
 ```python
-snapshot = await read_named(client, ["DM100", "DM101:S", "DM102:F", "DM200.3", "DM100:COMMENT"])
+snapshot = await read_named(client, ["DM100:U", "DM101:S", "DM102:F", "DM200.3", "DM100:COMMENT"])
 ```
 
 ## Polling
@@ -380,7 +382,7 @@ Yields:
 Example:
 
 ```python
-async for snapshot in poll(client, ["DM100", "DM101:L", "DM200.3"], interval=1.0):
+async for snapshot in poll(client, ["DM100:U", "DM101:L", "DM200.3"], interval=1.0):
     print(snapshot)
 ```
 

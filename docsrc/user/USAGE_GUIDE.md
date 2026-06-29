@@ -132,7 +132,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_named
 async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
-        addresses = ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.A", "DM0:COMMENT"]
+        addresses = ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.A", "DM0:COMMENT"]
         snapshot = await read_named(client, addresses)
         for address, value in snapshot.items():
             print(f"{address} = {value}")
@@ -207,8 +207,8 @@ async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         count = 0
-        async for snapshot in poll(client, ["DM0", "DM1:S", "DM4:F"], interval=1.0):
-            print(f"DM0={snapshot['DM0']}, DM1:S={snapshot['DM1:S']}, DM4:F={snapshot['DM4:F']}")
+        async for snapshot in poll(client, ["DM0:U", "DM1:S", "DM4:F"], interval=1.0):
+            print(f"DM0:U={snapshot['DM0:U']}, DM1:S={snapshot['DM1:S']}, DM4:F={snapshot['DM4:F']}")
             count += 1
             if count >= 3:
                 break
@@ -224,14 +224,16 @@ if __name__ == "__main__":
 
 | Form | Example | Meaning |
 |---|---|---|
-| Plain | `DM100` | Default type for the device family, usually unsigned word for word devices. |
 | `:U` | `DM100:U` | Unsigned 16-bit view. |
 | `:S` | `DM100:S` | Signed 16-bit view. |
 | `:D` | `DM100:D` | Unsigned 32-bit view. |
 | `:L` | `DM100:L` | Signed 32-bit view. |
 | `:F` | `DM100:F` | IEEE 754 32-bit float view. |
+| `:BIT` | `CR000:BIT` | Direct bit device view. |
 | `:COMMENT` | `DM100:COMMENT` | PLC device comment text. |
 | `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
+
+For `read_named` and `poll`, do not omit the type suffix. Use `DM100:U` instead of relying on `DM100` to mean an unsigned word.
 
 ## Timer/counter helpers
 

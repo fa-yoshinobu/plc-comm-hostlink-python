@@ -101,8 +101,8 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read",
-        lambda client: client.read("DM100"),
-        lambda client: client.read("DM100"),
+        lambda client: client.read("DM100.U"),
+        lambda client: client.read("DM100.U"),
         response=b"123\r\n",
     ),
     _ParityCase(
@@ -113,20 +113,20 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read_consecutive",
-        lambda client: client.read_consecutive("DM100", 2),
-        lambda client: client.read_consecutive("DM100", 2),
+        lambda client: client.read_consecutive("DM100.U", 2),
+        lambda client: client.read_consecutive("DM100.U", 2),
         response=b"10 20\r\n",
     ),
     _ParityCase(
         "read_consecutive_legacy",
-        lambda client: client.read_consecutive_legacy("DM100", 2),
-        lambda client: client.read_consecutive_legacy("DM100", 2),
+        lambda client: client.read_consecutive_legacy("DM100.U", 2),
+        lambda client: client.read_consecutive_legacy("DM100.U", 2),
         response=b"10 20\r\n",
     ),
     _ParityCase(
         "write",
-        lambda client: client.write("DM100", 1234),
-        lambda client: client.write("DM100", 1234),
+        lambda client: client.write("DM100.U", 1234),
+        lambda client: client.write("DM100.U", 1234),
     ),
     _ParityCase(
         "write_hex_format",
@@ -135,23 +135,23 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "write_consecutive",
-        lambda client: client.write_consecutive("DM100", [100, 200, 300]),
-        lambda client: client.write_consecutive("DM100", [100, 200, 300]),
+        lambda client: client.write_consecutive("DM100.U", [100, 200, 300]),
+        lambda client: client.write_consecutive("DM100.U", [100, 200, 300]),
     ),
     _ParityCase(
         "write_consecutive_legacy",
-        lambda client: client.write_consecutive_legacy("DM100", [100, 200, 300]),
-        lambda client: client.write_consecutive_legacy("DM100", [100, 200, 300]),
+        lambda client: client.write_consecutive_legacy("DM100.U", [100, 200, 300]),
+        lambda client: client.write_consecutive_legacy("DM100.U", [100, 200, 300]),
     ),
     _ParityCase(
         "write_set_value",
-        lambda client: client.write_set_value("T0", 1000),
-        lambda client: client.write_set_value("T0", 1000),
+        lambda client: client.write_set_value("T0.D", 1000),
+        lambda client: client.write_set_value("T0.D", 1000),
     ),
     _ParityCase(
         "write_set_value_consecutive",
-        lambda client: client.write_set_value_consecutive("C0", [10, 20]),
-        lambda client: client.write_set_value_consecutive("C0", [10, 20]),
+        lambda client: client.write_set_value_consecutive("C0.D", [10, 20]),
+        lambda client: client.write_set_value_consecutive("C0.D", [10, 20]),
     ),
     _ParityCase(
         "register_monitor_bits",
@@ -160,8 +160,8 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "register_monitor_words",
-        lambda client: client.register_monitor_words("DM0", "DM1"),
-        lambda client: client.register_monitor_words("DM0", "DM1"),
+        lambda client: client.register_monitor_words("DM0.U", "DM1.U"),
+        lambda client: client.register_monitor_words("DM0.U", "DM1.U"),
     ),
     _ParityCase(
         "read_monitor_bits",

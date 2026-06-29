@@ -77,7 +77,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
     def test_mws_accepts_xym_word_alias_device_types_supported_by_kv_x500(self) -> None:
         plc = FakeHostLinkClient()
-        plc.register_monitor_words("D100", "E100", "F100", "MR100", "LR100")
+        plc.register_monitor_words("D100.U", "E100.U", "F100.U", "MR100", "LR100")
         self.assertEqual(plc.sent_frames[-1], b"MWS D100.U E100.U F100.U MR100 LR100\r")
 
     def test_mws_rejects_m_l_aliases_rejected_by_kv_x500(self) -> None:
@@ -117,6 +117,10 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_parse_device_rejects_float_suffix(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
             parse_device("DM10.F")
+
+    def test_parse_device_rejects_omitted_device_type(self) -> None:
+        with self.assertRaises(HostLinkProtocolError):
+            parse_device("100")
 
     def test_validate_device_span_rejects_32bit_end_crossing(self) -> None:
         with self.assertRaises(HostLinkProtocolError):
@@ -159,14 +163,14 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             validate_device_span("Z", 2, ".D", 12)
 
-    def test_at_uses_32bit_default_format(self) -> None:
+    def test_at_uses_explicit_32bit_format(self) -> None:
         plc = FakeHostLinkClient()
         plc.queue("0000000000")
-        plc.read("AT7")
+        plc.read("AT7.D")
         self.assertEqual(plc.sent_frames[-1], b"RD AT7.D\r")
 
         plc.queue("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000")
-        plc.read_consecutive("AT0", 8)
+        plc.read_consecutive("AT0.D", 8)
         self.assertEqual(plc.sent_frames[-1], b"RDS AT0.D 8\r")
 
     def test_at_write_is_rejected_before_send(self) -> None:
@@ -189,7 +193,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
     def test_write_set_value_accepts_native_32bit_device_end(self) -> None:
         plc = FakeHostLinkClient()
-        plc.write_set_value("T3999", 100)
+        plc.write_set_value("T3999.D", 100)
         self.assertEqual(plc.sent_frames[-1], b"WS T3999.D 100\r")
 
     def test_forced_commands_use_manual_device_sets_and_xym_aliases(self) -> None:

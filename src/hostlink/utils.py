@@ -158,10 +158,11 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
     logical helper forms accepted by :func:`read_named`.
 
     Args:
-        address: User-facing address such as ``"dm100"``, ``"dm100:f"``, or
-            ``"dm100.a"``.
-        default_suffix: Optional default data type for bare base-device
-            addresses. Public helper text uses ``:`` for this data type.
+        address: User-facing address such as ``"dm100:u"``, ``"dm100:f"``, or
+            ``"dm100.a"``. Bare base-device addresses are rejected because the
+            data type must be explicit.
+        default_suffix: Deprecated compatibility parameter. Supplying it now
+            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         A :class:`HostLinkAddress` with canonical text and parsed metadata.
@@ -174,18 +175,16 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
             assert parsed.bit_index == 10
     """
 
+    _reject_default_suffix(default_suffix)
     base_raw, dtype, bit_index = _parse_address(address)
     base_device = parse_device_text(base_raw)
     if dtype == "BIT_IN_WORD":
         bit_index = _require_bit_in_word_index(address, bit_index)
         canonical = f"{base_device}.{format(bit_index, 'X')}"
-    elif ":" in address:
-        canonical = f"{base_device}:{dtype}"
-    elif default_suffix:
-        dtype = normalize_suffix(default_suffix).lstrip(".")
+    elif dtype:
         canonical = f"{base_device}:{dtype}"
     else:
-        canonical = base_device
+        raise ValueError(f"Address {address!r} requires an explicit data type such as ':U', ':D', or ':BIT'.")
     return HostLinkAddress(canonical, base_device, dtype, bit_index)
 
 
@@ -194,8 +193,8 @@ def try_parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddr
 
     Args:
         address: User-facing address text.
-        default_suffix: Optional default data type for bare base-device
-            addresses.
+        default_suffix: Deprecated compatibility parameter. Supplying it now
+            makes the parse fail; put the data type in ``address`` instead.
 
     Returns:
         A parsed :class:`HostLinkAddress`, or ``None`` if validation fails.
@@ -212,8 +211,8 @@ def format_address(address: HostLinkAddress | str, *, default_suffix: str = "") 
 
     Args:
         address: A parsed :class:`HostLinkAddress` or raw address string.
-        default_suffix: Optional default data type used when ``address`` is a
-            bare raw string.
+        default_suffix: Deprecated compatibility parameter. Supplying it now
+            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         Canonical address text.
@@ -270,9 +269,7 @@ async def read_typed(
     """
     key = dtype.upper().lstrip(".").strip()
     if key == "":
-        addr = parse_device(device)
-        suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(addr.device_type, "")
-        key = suffix.lstrip(".") if suffix else "BIT"
+        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', or 'BIT'.")
 
     if key == "BIT":
         raw = await client.read(device, data_format=None)
@@ -388,9 +385,7 @@ async def write_typed(
     """
     key = dtype.upper().lstrip(".").strip()
     if key == "":
-        addr = parse_device(device)
-        suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(addr.device_type, "")
-        key = suffix.lstrip(".") if suffix else "BIT"
+        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', or 'BIT'.")
 
     if key == "F":
         lo_word, hi_word = _float32_to_words(float(value))
@@ -465,11 +460,12 @@ async def read_named(
 
     Address format examples:
 
-    - ``"DM100"`` -- unsigned 16-bit int
+    - ``"DM100:U"`` -- unsigned 16-bit int
     - ``"DM100:F"`` -- float
     - ``"DM100:S"`` -- signed 16-bit int
     - ``"DM100:D"`` -- unsigned 32-bit int
     - ``"DM100:L"`` -- signed 32-bit int
+    - ``"CR000:BIT"`` -- direct bit device (bool)
     - ``"DM100.3"`` -- bit 3 within word (bool)
     - ``"DM100.A"`` -- bit 10 within word (bool); bits 10-15 use hex digits A-F
     - ``"DM100:COMMENT"`` -- PLC comment text (str)
@@ -493,7 +489,7 @@ async def read_named(
     Examples:
         Read mixed integer, float, and bit-in-word values::
 
-            snapshot = await read_named(client, ["DM10", "DM20:F", "DM30.A"])
+            snapshot = await read_named(client, ["DM10:U", "DM20:F", "DM30.A"])
     """
     if not addresses:
         return {}
@@ -527,7 +523,7 @@ async def poll(
 
     Usage::
 
-        async for snapshot in poll(client, ["DM100", "DM200:F"], interval=0.5):
+        async for snapshot in poll(client, ["DM100:U", "DM200:F"], interval=0.5):
             print(snapshot)
     """
     plan = _try_compile_read_named_plan(addresses) if addresses else None
@@ -548,7 +544,7 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
     """
     if ":" in address:
         base, dtype = address.split(":", 1)
-        return base.strip(), dtype.strip().upper(), None
+        return base.strip(), _normalize_helper_dtype(dtype), None
     if "." in address:
         base, bit_str = address.split(".", 1)
         bit_text = bit_str.strip()
@@ -558,9 +554,21 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
     parsed = parse_device(address)
     if parsed.suffix:
         return address.strip(), parsed.suffix.lstrip(".").upper(), None
-    suffix = DEFAULT_FORMAT_BY_DEVICE_TYPE.get(parsed.device_type, "")
-    dtype = suffix.lstrip(".") if suffix else ""
-    return address.strip(), dtype, None
+    raise ValueError(f"Address {address!r} requires an explicit data type such as ':U', ':D', or ':BIT'.")
+
+
+def _reject_default_suffix(default_suffix: str) -> None:
+    if default_suffix:
+        raise ValueError("default_suffix is no longer supported; specify the data type in the address, e.g. 'DM100:U'.")
+
+
+def _normalize_helper_dtype(dtype: str) -> str:
+    key = dtype.strip().upper().lstrip(".")
+    if key == "":
+        raise ValueError("address data type is required; use ':U', ':D', ':F', ':BIT', or ':COMMENT'.")
+    if key in {"BIT", "BIT_IN_WORD", "COMMENT", "F"}:
+        return key
+    return normalize_suffix(key).lstrip(".")
 
 
 def _require_bit_in_word_index(address: str, bit_index: int | None) -> int:
@@ -666,7 +674,7 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
 
     if parsed.suffix:
         return None
-    if dtype == "" and parsed.device_type in _DIRECT_BIT_DEVICE_TYPES:
+    if dtype == "BIT" and parsed.device_type in _DIRECT_BIT_DEVICE_TYPES:
         return _ReadPlanRequest(
             index=index,
             address=address,
@@ -792,23 +800,24 @@ def normalize_address(address: str, *, default_suffix: str = "") -> str:
     explicit dtype or bit-in-word intent when present.
 
     Args:
-        address: User-facing address such as ``"dm100:f"`` or ``"DM100.a"``.
-        default_suffix: Optional default data type for bare addresses.
+        address: User-facing address such as ``"dm100:u"``, ``"dm100:f"``, or
+            ``"DM100.a"``.
+        default_suffix: Deprecated compatibility parameter. Supplying it now
+            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         Canonical uppercase address text.
     """
 
+    _reject_default_suffix(default_suffix)
     base, dtype, bit_index = _parse_address(address)
     base_text = parse_device_text(base)
     if dtype == "BIT_IN_WORD":
         bit_index = _require_bit_in_word_index(address, bit_index)
         return f"{base_text}.{format(bit_index, 'X')}"
-    if ":" in address:
+    if dtype:
         return f"{base_text}:{dtype}"
-    if default_suffix:
-        return f"{base_text}:{normalize_suffix(default_suffix).lstrip('.')}"
-    return base_text
+    raise ValueError(f"Address {address!r} requires an explicit data type such as ':U', ':D', or ':BIT'.")
 
 
 async def read_words_single_request(
