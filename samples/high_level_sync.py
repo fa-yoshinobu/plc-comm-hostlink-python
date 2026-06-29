@@ -115,14 +115,14 @@ async def run(args: argparse.Namespace) -> None:
             # Read a named mixed-type snapshot.
             snapshot = await read_named(
                 client,
-                ["DM10", "DM11:S", "DM12:D", "DM14:F", "DM50.0", "DM50.3"],
+                ["DM10:U", "DM11:S", "DM12:D", "DM14:F", "DM50.0", "DM50.3"],
             )
             print(f"[read_named] {snapshot}")
 
             print(f"[poll] Capturing {args.poll_count} snapshots")
             seen = 0
             # Poll a repeated named snapshot until this sample has printed enough rows.
-            async for snap in poll(client, ["DM10", "DM11:S", "DM14:F", "DM50.0"], interval=1.0):
+            async for snap in poll(client, ["DM10:U", "DM11:S", "DM14:F", "DM50.0"], interval=1.0):
                 seen += 1
                 print(f"  [{seen}] {snap}")
                 if seen >= args.poll_count:

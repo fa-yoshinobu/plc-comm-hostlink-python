@@ -189,7 +189,7 @@ async def demo_read_named(client) -> None:
     read_named - read multiple devices with mixed types in one call.
 
     Address notation:
-        "DM100"    unsigned 16-bit (default)
+        "DM100:U"  unsigned 16-bit
         "DM100:S"  signed 16-bit
         "DM100:D"  unsigned 32-bit (2 words)
         "DM100:L"  signed 32-bit
@@ -203,7 +203,7 @@ async def demo_read_named(client) -> None:
     snapshot = await read_named(
         client,
         [
-            "DM100",
+            "DM100:U",
             "DM200:L",
             "DM50.3",
             "DM50.A",
@@ -223,7 +223,7 @@ async def demo_poll(client, count: int) -> None:
     print(f"\nPolling {count} snapshots:")
     i = 0
     # Poll a repeated named snapshot until this sample has printed enough rows.
-    async for snap in poll(client, ["DM100", "DM200:L", "DM50.3"], interval=1.0):
+    async for snap in poll(client, ["DM100:U", "DM200:L", "DM50.3"], interval=1.0):
         print(f"  [{i + 1}] {snap}")
         i += 1
         if i >= count:

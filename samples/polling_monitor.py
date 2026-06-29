@@ -33,7 +33,7 @@ async def run(args: argparse.Namespace) -> None:
         seen = 0
         # Poll a repeated named snapshot until this sample has printed enough rows.
         # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
-        async for snapshot in poll(client, ["DM0", "DM1:S", "DM4:F", "DM10.0"], interval=args.interval):
+        async for snapshot in poll(client, ["DM0:U", "DM1:S", "DM4:F", "DM10.0"], interval=args.interval):
             seen += 1
             print(f"[{seen}] {snapshot}")
             if seen >= args.poll_count:

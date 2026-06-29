@@ -32,7 +32,7 @@ async def run(args: argparse.Namespace) -> None:
         # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
         snapshot = await read_named(
             client,
-            ["DM0", "DM1:S", "DM2:D", "DM4:F", "DM10.0", "DM10.A"],
+            ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.0", "DM10.A"],
         )
         for address, value in snapshot.items():
             print(f"{address} = {value}")
