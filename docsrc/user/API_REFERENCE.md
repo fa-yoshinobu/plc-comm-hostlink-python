@@ -94,9 +94,10 @@ Returns:
 Example:
 
 ```python
-options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
-async with await open_and_connect(options) as client:
-    ...
+async def example() -> None:
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    async with await open_and_connect(options) as client:
+        ...
 ```
 
 ### `normalize_address(address, default_suffix="")`
@@ -161,7 +162,9 @@ Returns:
 Example:
 
 ```python
-value = await read_typed(client, "DM100", "F")
+async def example(client):
+    value = await read_typed(client, "DM100", "F")
+    print(value)
 ```
 
 For `T` and `C` devices, `read_typed(client, "T10", "D")` returns the preset
@@ -188,8 +191,9 @@ Returns:
 Example:
 
 ```python
-tc = await read_timer_counter(client, "T10")
-print(tc.status, tc.current, tc.preset)
+async def example(client):
+    tc = await read_timer_counter(client, "T10")
+    print(tc.status, tc.current, tc.preset)
 ```
 
 `read_timer(client, "T10")` and `read_counter(client, "C10")` are stricter
@@ -209,7 +213,8 @@ Parameters:
 Example:
 
 ```python
-await write_typed(client, "DM100", "D", 123456)
+async def example(client) -> None:
+    await write_typed(client, "DM100", "D", 123456)
 ```
 
 ## Device comments
@@ -231,7 +236,9 @@ Returns:
 Example:
 
 ```python
-label = await read_comments(client, "DM100")
+async def example(client):
+    label = await read_comments(client, "DM100")
+    print(label)
 ```
 
 ## Contiguous block helpers
@@ -267,8 +274,10 @@ Returns:
 Example:
 
 ```python
-words = await read_words_single_request(client, "DM200", 8)
-dwords = await read_dwords_single_request(client, "DM300", 4)
+async def example(client):
+    words = await read_words_single_request(client, "DM200", 8)
+    dwords = await read_dwords_single_request(client, "DM300", 4)
+    print(words, dwords)
 ```
 
 ### `await read_words_chunked(client, device, count, max_per_request=...)`
@@ -307,8 +316,9 @@ Write buffer memory in an expansion unit through one `UWR` request.
 Example:
 
 ```python
-values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
-await write_expansion_unit_buffer(client, 1, 200, values, data_format="U")
+async def example(client) -> None:
+    values = await read_expansion_unit_buffer(client, 1, 100, 2, data_format="U")
+    await write_expansion_unit_buffer(client, 1, 200, values, data_format="U")
 ```
 
 ## Bit in word
@@ -326,7 +336,8 @@ Parameters:
 Example:
 
 ```python
-await write_bit_in_word(client, "DM500", 3, True)
+async def example(client) -> None:
+    await write_bit_in_word(client, "DM500", 3, True)
 ```
 
 ## Mixed snapshots
@@ -360,7 +371,9 @@ Returns:
 Example:
 
 ```python
-snapshot = await read_named(client, ["DM100:U", "DM101:S", "DM102:F", "DM200.3", "DM100:COMMENT"])
+async def example(client):
+    snapshot = await read_named(client, ["DM100:U", "DM101:S", "DM102:F", "DM200.3", "DM100:COMMENT"])
+    print(snapshot)
 ```
 
 ## Polling
@@ -382,8 +395,9 @@ Yields:
 Example:
 
 ```python
-async for snapshot in poll(client, ["DM100:U", "DM101:L", "DM200.3"], interval=1.0):
-    print(snapshot)
+async def example(client) -> None:
+    async for snapshot in poll(client, ["DM100:U", "DM101:L", "DM200.3"], interval=1.0):
+        print(snapshot)
 ```
 
 ## Notes
