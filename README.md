@@ -46,7 +46,7 @@ asyncio.run(main())
 | [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use the high-level API and common Host Link workflows. |
 | [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile that matches your PLC model and device ranges. |
 | [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
-| [KV Host Link Error Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/error-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
+| [KV Host Link Troubleshooting & Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
 | [Gotchas](docsrc/user/GOTCHAS.md) | Check whether this library has any current library-specific caveats. |
 | [Examples](samples/README.md) | Run maintained Python samples: `samples/high_level_async.py`, `samples/high_level_sync.py`, `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, `samples/polling_monitor.py`. |
 
