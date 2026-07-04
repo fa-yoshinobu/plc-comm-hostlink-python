@@ -12,11 +12,15 @@ from .errors import HostLinkProtocolError
 
 
 class KvDeviceRangeNotation(Enum):
+    """Address number notation used by one device range row."""
+
     DECIMAL = "decimal"
     HEXADECIMAL = "hexadecimal"
 
 
 class KvDeviceRangeCategory(Enum):
+    """Broad device category used by the maintained KV range catalog."""
+
     BIT = "bit"
     WORD = "word"
     TIMER_COUNTER = "timer_counter"
@@ -26,6 +30,8 @@ class KvDeviceRangeCategory(Enum):
 
 @dataclass(frozen=True)
 class KvDeviceRangeSegment:
+    """One concrete segment from a published KV device range row."""
+
     device: str
     category: KvDeviceRangeCategory
     is_bit_device: bool
@@ -38,6 +44,8 @@ class KvDeviceRangeSegment:
 
 @dataclass(frozen=True)
 class KvDeviceRangeEntry:
+    """Catalog entry for one logical Host Link device family."""
+
     device: str
     device_type: str
     category: KvDeviceRangeCategory
@@ -55,6 +63,8 @@ class KvDeviceRangeEntry:
 
 @dataclass(frozen=True)
 class KvDeviceRangeCatalog:
+    """Resolved KV device range catalog for one canonical PLC profile."""
+
     plc_profile: str
     model_code: str
     has_model_code: bool
@@ -63,6 +73,8 @@ class KvDeviceRangeCatalog:
     entries: tuple[KvDeviceRangeEntry, ...]
 
     def entry(self, device_type: str) -> KvDeviceRangeEntry | None:
+        """Return the catalog entry matching a device type or segment alias."""
+
         wanted = device_type.strip().upper()
         for entry in self.entries:
             if entry.device_type.upper() == wanted:
@@ -96,10 +108,14 @@ class _RangeProfile:
 
 
 def available_plc_profiles() -> list[str]:
+    """Return canonical PLC profile strings supported by the embedded range table."""
+
     return [profile.plc_profile for profile in _range_table().profiles]
 
 
 def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatalog:
+    """Resolve and return the device range catalog for a canonical PLC profile."""
+
     return _build_catalog(plc_profile, None)
 
 

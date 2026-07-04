@@ -13,6 +13,8 @@ LF = b"\n"
 
 
 def build_frame(body: str, *, append_lf: bool = False) -> bytes:
+    """Encode a Host Link command body and append the required line ending."""
+
     payload = body.strip().encode("ascii")
     if append_lf:
         return payload + CR + LF
@@ -20,11 +22,15 @@ def build_frame(body: str, *, append_lf: bool = False) -> bytes:
 
 
 def build_command(command: str, *params: str, append_lf: bool = False) -> bytes:
+    """Build one Host Link command frame from a command name and parameters."""
+
     parts = [command, *[p for p in params if p != ""]]
     return build_frame(" ".join(parts), append_lf=append_lf)
 
 
 def decode_response(raw: bytes) -> str:
+    """Decode a normal ASCII Host Link response frame."""
+
     if not raw:
         raise HostLinkProtocolError("Empty response")
     raw = raw.rstrip(b"\r\n")
@@ -66,16 +72,22 @@ def decode_comment_response(raw: bytes) -> str:
 
 
 def ensure_success(response_text: str) -> str:
+    """Return response text or raise ``HostLinkError`` for PLC error codes."""
+
     if ERROR_RE.match(response_text):
         raise HostLinkError(code=response_text, response=response_text)
     return response_text
 
 
 def split_data_tokens(response_text: str) -> list[str]:
+    """Split a Host Link data response into non-empty scalar tokens."""
+
     return [token for token in re.split(r"[ ,]+", response_text) if token != ""]
 
 
 def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
+    """Convert one response token according to the selected Host Link data format."""
+
     if data_format == ".H":
         return token.upper()
     try:
@@ -85,4 +97,6 @@ def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
 
 
 def parse_data_tokens(tokens: Iterable[str], *, data_format: str = "") -> list[int | str]:
+    """Convert multiple response tokens according to the selected data format."""
+
     return [parse_scalar_token(token, data_format=data_format) for token in tokens]

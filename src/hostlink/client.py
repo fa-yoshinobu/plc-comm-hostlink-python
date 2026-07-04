@@ -45,12 +45,16 @@ UDP_RECEIVE_BUFFER_SIZE = 65_535
 
 
 class HostLinkTraceDirection(Enum):
+    """Direction for a traced Host Link frame."""
+
     SEND = "send"
     RECEIVE = "receive"
 
 
 @dataclass(frozen=True)
 class HostLinkTraceFrame:
+    """One raw Host Link frame observed by a trace hook."""
+
     direction: HostLinkTraceDirection
     data: bytes
     timestamp: datetime
@@ -81,6 +85,8 @@ MODEL_CODES = {
 
 @dataclass
 class ModelInfo:
+    """PLC model response returned by ``query_model``."""
+
     code: str
     model: str | None
 
@@ -480,6 +486,8 @@ class HostLinkClient(HostLinkBase):
         self.close()
 
     def connect(self) -> None:
+        """Open the configured TCP or UDP socket if it is not already open."""
+
         with self._lock:
             if self._sock is not None:
                 return
@@ -497,6 +505,8 @@ class HostLinkClient(HostLinkBase):
             self._rx_buffer = b""
 
     def close(self) -> None:
+        """Close the current socket and clear buffered receive data."""
+
         with self._lock:
             if self._sock is None:
                 return
@@ -507,6 +517,8 @@ class HostLinkClient(HostLinkBase):
                 self._rx_buffer = b""
 
     def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
+        """Send one raw Host Link command body and return the decoded response text."""
+
         with self._lock:
             response = self._exchange(self._build_command(body))
             return self._process_response(response, decoder=decoder)
@@ -574,53 +586,81 @@ class HostLinkClient(HostLinkBase):
     # --- Commands ---
 
     def change_mode(self, mode: int | str) -> None:
+        """Change the PLC operating mode through the Host Link ``M`` command."""
+
         self._expect_ok(self._build_change_mode_command(mode))
 
     def clear_error(self) -> None:
+        """Clear the current PLC error through the Host Link ``ER`` command."""
+
         self._expect_ok(self._build_clear_error_command())
 
     def check_error_no(self) -> str:
+        """Read the current PLC error number as raw response text."""
+
         return self.send_raw(self._build_check_error_no_command())
 
     def query_model(self) -> ModelInfo:
+        """Query the PLC model code and mapped model name."""
+
         response = self.send_raw(self._build_query_model_command())
         return self._decode_query_model_response(response)
 
     def confirm_operating_mode(self) -> int:
+        """Return the current PLC operating mode code."""
+
         response = self.send_raw(self._build_confirm_operating_mode_command())
         return self._decode_confirm_operating_mode_response(response)
 
     def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
+        """Set the PLC clock from ``value`` or from the current system time."""
+
         self._expect_ok(self._build_set_time_command(value))
 
     def forced_set(self, device: str) -> None:
+        """Force one bit device ON."""
+
         self._expect_ok(self._build_forced_command("ST", device))
 
     def forced_reset(self, device: str) -> None:
+        """Force one bit device OFF."""
+
         self._expect_ok(self._build_forced_command("RS", device))
 
     def forced_set_consecutive(self, device: str, count: int) -> None:
+        """Force a consecutive bit-device range ON."""
+
         self._expect_ok(self._build_forced_consecutive_command("STS", device, count))
 
     def forced_reset_consecutive(self, device: str, count: int) -> None:
+        """Force a consecutive bit-device range OFF."""
+
         self._expect_ok(self._build_forced_consecutive_command("RSS", device, count))
 
     def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
+        """Read one device with the Host Link ``RD`` command."""
+
         body, suffix = self._build_read_command(device, data_format)
         response = self.send_raw(body)
         return self._decode_read_response(response, suffix)
 
     def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+        """Read consecutive devices with the Host Link ``RDS`` command."""
+
         body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
         response = self.send_raw(body)
         return self._decode_data_response(response, suffix)
 
     def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+        """Read consecutive devices with the legacy Host Link ``RDE`` command."""
+
         body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
         response = self.send_raw(body)
         return self._decode_data_response(response, suffix)
 
     def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Write one device with the Host Link ``WR`` command."""
+
         self._expect_ok(self._build_write_command(device, value, data_format))
 
     def write_consecutive(
@@ -630,6 +670,8 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive devices with the Host Link ``WRS`` command."""
+
         self._expect_ok(self._build_write_consecutive_command("WRS", device, values, data_format))
 
     def write_consecutive_legacy(
@@ -639,9 +681,13 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive devices with the legacy Host Link ``WRE`` command."""
+
         self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
     def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Write one timer or counter preset/current value with ``WS``."""
+
         self._expect_ok(self._build_write_set_value_command(device, value, data_format))
 
     def write_set_value_consecutive(
@@ -651,32 +697,48 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive timer or counter values with ``WSS``."""
+
         self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     def register_monitor_bits(self, *devices: str) -> None:
+        """Register bit devices for later monitor reads."""
+
         self._expect_ok(self._build_register_monitor_bits_command(devices))
 
     def register_monitor_words(self, *devices: str) -> None:
+        """Register word devices for later monitor reads."""
+
         self._expect_ok(self._build_register_monitor_words_command(devices))
 
     def read_monitor_bits(self) -> list[int | str]:
+        """Read the currently registered bit monitor values."""
+
         response = self.send_raw("MBR")
         return self._decode_monitor_bits_response(response)
 
     def read_monitor_words(self) -> list[str]:
+        """Read the currently registered word monitor values."""
+
         response = self.send_raw("MWR")
         return self._decode_monitor_words_response(response)
 
     def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
+        """Read the PLC comment text for one supported device."""
+
         response = self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
         return self._decode_read_comments_response(response, strip_padding=strip_padding)
 
     def switch_bank(self, bank_no: int) -> None:
+        """Switch the active Host Link bank number."""
+
         self._expect_ok(self._build_switch_bank_command(bank_no))
 
     def read_expansion_unit_buffer(
         self, unit_no: int, address: int, count: int, *, data_format: str = ""
     ) -> list[int | str]:
+        """Read an expansion unit buffer range with ``URD``."""
+
         body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
         response = self.send_raw(body)
         return self._decode_expansion_unit_buffer_response(response, suffix)
@@ -689,6 +751,8 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str = "",
     ) -> None:
+        """Write an expansion unit buffer range with ``UWR``."""
+
         self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
 
 
@@ -735,6 +799,8 @@ class AsyncHostLinkClient(HostLinkBase):
         await self.close()
 
     async def connect(self) -> None:
+        """Open the configured TCP or UDP transport if it is not already open."""
+
         async with self._lock:
             await self._connect_unlocked()
 
@@ -766,6 +832,8 @@ class AsyncHostLinkClient(HostLinkBase):
                 raise HostLinkConnectionError(f"Failed to setup UDP endpoint for {self.host}:{self.port}") from exc
 
     async def close(self) -> None:
+        """Close the current async transport and clear connection state."""
+
         async with self._lock:
             if self._writer is not None:
                 self._writer.close()
@@ -781,6 +849,8 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._udp_protocol = None
 
     async def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
+        """Send one raw Host Link command body and return the decoded response text."""
+
         async with self._lock:
             response = await self._exchange(self._build_command(body))
             return self._process_response(response, decoder=decoder)
@@ -834,43 +904,67 @@ class AsyncHostLinkClient(HostLinkBase):
     # --- Async Commands ---
 
     async def change_mode(self, mode: int | str) -> None:
+        """Change the PLC operating mode through the Host Link ``M`` command."""
+
         await self._expect_ok(self._build_change_mode_command(mode))
 
     async def clear_error(self) -> None:
+        """Clear the current PLC error through the Host Link ``ER`` command."""
+
         await self._expect_ok(self._build_clear_error_command())
 
     async def check_error_no(self) -> str:
+        """Read the current PLC error number as raw response text."""
+
         return await self.send_raw(self._build_check_error_no_command())
 
     async def query_model(self) -> ModelInfo:
+        """Query the PLC model code and mapped model name."""
+
         response = await self.send_raw(self._build_query_model_command())
         return self._decode_query_model_response(response)
 
     async def confirm_operating_mode(self) -> int:
+        """Return the current PLC operating mode code."""
+
         response = await self.send_raw(self._build_confirm_operating_mode_command())
         return self._decode_confirm_operating_mode_response(response)
 
     async def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
+        """Set the PLC clock from ``value`` or from the current system time."""
+
         await self._expect_ok(self._build_set_time_command(value))
 
     async def forced_set(self, device: str) -> None:
+        """Force one bit device ON."""
+
         await self._expect_ok(self._build_forced_command("ST", device))
 
     async def forced_reset(self, device: str) -> None:
+        """Force one bit device OFF."""
+
         await self._expect_ok(self._build_forced_command("RS", device))
 
     async def forced_set_consecutive(self, device: str, count: int) -> None:
+        """Force a consecutive bit-device range ON."""
+
         await self._expect_ok(self._build_forced_consecutive_command("STS", device, count))
 
     async def forced_reset_consecutive(self, device: str, count: int) -> None:
+        """Force a consecutive bit-device range OFF."""
+
         await self._expect_ok(self._build_forced_consecutive_command("RSS", device, count))
 
     async def read(self, device: str, *, data_format: str | None = None) -> int | str | list[int | str]:
+        """Read one device with the Host Link ``RD`` command."""
+
         body, suffix = self._build_read_command(device, data_format)
         response = await self.send_raw(body)
         return self._decode_read_response(response, suffix)
 
     async def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
+        """Read consecutive devices with the Host Link ``RDS`` command."""
+
         body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
         response = await self.send_raw(body)
         return self._decode_data_response(response, suffix)
@@ -878,11 +972,15 @@ class AsyncHostLinkClient(HostLinkBase):
     async def read_consecutive_legacy(
         self, device: str, count: int, *, data_format: str | None = None
     ) -> list[int | str]:
+        """Read consecutive devices with the legacy Host Link ``RDE`` command."""
+
         body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
         response = await self.send_raw(body)
         return self._decode_data_response(response, suffix)
 
     async def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Write one device with the Host Link ``WR`` command."""
+
         await self._expect_ok(self._build_write_command(device, value, data_format))
 
     async def write_consecutive(
@@ -892,6 +990,8 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive devices with the Host Link ``WRS`` command."""
+
         await self._expect_ok(self._build_write_consecutive_command("WRS", device, values, data_format))
 
     async def write_consecutive_legacy(
@@ -901,9 +1001,13 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive devices with the legacy Host Link ``WRE`` command."""
+
         await self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
     async def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Write one timer or counter preset/current value with ``WS``."""
+
         await self._expect_ok(self._build_write_set_value_command(device, value, data_format))
 
     async def write_set_value_consecutive(
@@ -913,32 +1017,48 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
+        """Write consecutive timer or counter values with ``WSS``."""
+
         await self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     async def register_monitor_bits(self, *devices: str) -> None:
+        """Register bit devices for later monitor reads."""
+
         await self._expect_ok(self._build_register_monitor_bits_command(devices))
 
     async def register_monitor_words(self, *devices: str) -> None:
+        """Register word devices for later monitor reads."""
+
         await self._expect_ok(self._build_register_monitor_words_command(devices))
 
     async def read_monitor_bits(self) -> list[int | str]:
+        """Read the currently registered bit monitor values."""
+
         response = await self.send_raw("MBR")
         return self._decode_monitor_bits_response(response)
 
     async def read_monitor_words(self) -> list[str]:
+        """Read the currently registered word monitor values."""
+
         response = await self.send_raw("MWR")
         return self._decode_monitor_words_response(response)
 
     async def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
+        """Read the PLC comment text for one supported device."""
+
         response = await self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
         return self._decode_read_comments_response(response, strip_padding=strip_padding)
 
     async def switch_bank(self, bank_no: int) -> None:
+        """Switch the active Host Link bank number."""
+
         await self._expect_ok(self._build_switch_bank_command(bank_no))
 
     async def read_expansion_unit_buffer(
         self, unit_no: int, address: int, count: int, *, data_format: str = ""
     ) -> list[int | str]:
+        """Read an expansion unit buffer range with ``URD``."""
+
         body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
         response = await self.send_raw(body)
         return self._decode_expansion_unit_buffer_response(response, suffix)
@@ -951,6 +1071,8 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str = "",
     ) -> None:
+        """Write an expansion unit buffer range with ``UWR``."""
+
         await self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
 
 
