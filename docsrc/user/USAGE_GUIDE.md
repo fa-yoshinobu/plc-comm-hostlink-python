@@ -28,6 +28,42 @@
 | `read_expansion_unit_buffer` | Read expansion unit buffer memory. |
 | `write_expansion_unit_buffer` | Write expansion unit buffer memory. |
 
+## API reference summary
+
+The user-facing API is the high-level helper surface imported from `hostlink`.
+It intentionally excludes raw protocol methods and low-level client operations.
+
+```python
+from hostlink import (
+    HostLinkConnectionOptions,
+    TimerCounterValue,
+    available_plc_profiles,
+    device_range_catalog_for_plc_profile,
+    open_and_connect,
+    parse_address,
+    try_parse_address,
+    format_address,
+    normalize_address,
+    read_typed,
+    write_typed,
+    read_named,
+    poll,
+)
+from hostlink.errors import (
+    HostLinkBaseError,
+    HostLinkConnectionError,
+    HostLinkError,
+    HostLinkProtocolError,
+)
+```
+
+| Exception | Meaning |
+| --- | --- |
+| `HostLinkBaseError` | Base type for library exceptions. |
+| `HostLinkError` | PLC returned an error response such as `E0`, `E1`, or `E6`. |
+| `HostLinkProtocolError` | Invalid address, invalid dtype, malformed response, or local validation failure. |
+| `HostLinkConnectionError` | Connect, disconnect, socket, or timeout failure. |
+
 ## Connection
 
 ```python

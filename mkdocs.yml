@@ -17,7 +17,5 @@ exclude_docs: |
 nav:
   - Getting Started: user/GETTING_STARTED.md
   - Usage Guide: user/USAGE_GUIDE.md
-  - Supported Registers: user/SUPPORTED_REGISTERS.md
   - PLC Profiles: user/PROFILES.md
   - Gotchas: user/GOTCHAS.md
-  - API Reference: user/API_REFERENCE.md

@@ -104,7 +104,3 @@ Only write to a test address that is safe for your machine and program.
 | Profile selection fails. | Use one of the exact strings in [PLC profiles](PROFILES.md); aliases and combined old names are rejected. |
 | Reads fail while you are trying the first example. | Start with `DM` word reads; do not start with timer/counter or expansion buffer access. |
 | Timer/counter preset writes return `E1`. | Timer/Counter preset writes (`WS`/`WSS`) are only supported on KV-8000/7000-series. |
-
-## Next pages
-
-Continue with [Usage guide](USAGE_GUIDE.md), then check [PLC profiles](PROFILES.md), [Supported registers](SUPPORTED_REGISTERS.md), and [Gotchas](GOTCHAS.md).
