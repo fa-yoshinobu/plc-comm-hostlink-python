@@ -177,11 +177,15 @@ DEVICE_RE = re.compile(rf"^(?P<type>{TYPE_PATTERN})?(?P<number>[0-9A-F]+)(?P<suf
 
 @dataclass(frozen=True)
 class DeviceAddress:
+    """Parsed Host Link device token and optional data-format suffix."""
+
     device_type: str
     number: int
     suffix: str = ""
 
     def to_text(self) -> str:
+        """Return the canonical Host Link device token text."""
+
         _, _, base = DEVICE_RANGES[self.device_type]
         if self.device_type in BIT_BANK_DEVICE_TYPES:
             number = _format_bit_bank_number(self.number)
@@ -195,6 +199,8 @@ class DeviceAddress:
 
 
 def normalize_suffix(suffix: str | None) -> str:
+    """Normalize an optional data-format suffix to ``.U``/``.S`` style text."""
+
     if not suffix:
         return ""
     s = suffix.upper()
@@ -206,6 +212,8 @@ def normalize_suffix(suffix: str | None) -> str:
 
 
 def parse_device(text: str, *, allow_omitted_type: bool = True) -> DeviceAddress:
+    """Parse and validate one Host Link device token."""
+
     raw = text.strip().upper()
     match = DEVICE_RE.match(raw)
     if not match:
@@ -260,10 +268,14 @@ def _format_bit_bank_number(number: int) -> str:
 
 
 def bit_bank_logical_number(number: int) -> int:
+    """Convert KEYENCE decimal-bank bit notation to a zero-based logical bit number."""
+
     return (number // 100) * 16 + (number % 100)
 
 
 def bit_bank_number_from_logical(number: int) -> int:
+    """Convert a zero-based logical bit number to KEYENCE decimal-bank notation."""
+
     return (number // 16) * 100 + (number % 16)
 
 
@@ -297,10 +309,14 @@ def _parse_xym_bit_number(device_type: str, number_text: str) -> int:
 
 
 def resolve_effective_format(device_type: str, suffix: str) -> str:
+    """Return the command data format after applying the device default."""
+
     return suffix if suffix else DEFAULT_FORMAT_BY_DEVICE_TYPE.get(device_type, "")
 
 
 def require_explicit_format(addr: DeviceAddress, data_format: str | None = None) -> str:
+    """Return a usable data-format suffix or reject ambiguous word access."""
+
     suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
     if suffix:
         return suffix
@@ -312,6 +328,8 @@ def require_explicit_format(addr: DeviceAddress, data_format: str | None = None)
 
 
 def validate_device_type(command: str, device_type: str, allowed_types: set[str]) -> None:
+    """Raise if ``device_type`` is not valid for a Host Link command."""
+
     if device_type not in allowed_types:
         supported = ", ".join(sorted(allowed_types))
         raise HostLinkProtocolError(
@@ -320,6 +338,8 @@ def validate_device_type(command: str, device_type: str, allowed_types: set[str]
 
 
 def validate_device_count(device_type: str, effective_format: str, count: int) -> None:
+    """Validate a consecutive device count against Host Link command limits."""
+
     category = _COUNT_CATEGORY_BY_DEVICE_TYPE.get(device_type)
     if category is None:
         raise HostLinkProtocolError(f"No count constraint metadata for device type: {device_type}")
@@ -342,6 +362,8 @@ def validate_device_count(device_type: str, effective_format: str, count: int) -
 
 
 def validate_device_span(device_type: str, start_number: int, effective_format: str, count: int = 1) -> None:
+    """Validate that a device span stays inside the maintained address range."""
+
     lo, hi, _ = DEVICE_RANGES[device_type]
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
@@ -376,11 +398,15 @@ def _device_span_width(device_type: str, effective_format: str) -> int:
 
 
 def validate_expansion_buffer_count(effective_format: str, count: int) -> None:
+    """Validate an expansion-buffer transfer count for the selected data width."""
+
     lo, hi = (1, 500) if effective_format in {".D", ".L"} else (1, 1000)
     validate_range("count", count, lo, hi)
 
 
 def validate_expansion_buffer_span(address: int, effective_format: str, count: int) -> None:
+    """Validate that an expansion-buffer span stays inside the supported address range."""
+
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
 
@@ -393,5 +419,7 @@ def validate_expansion_buffer_span(address: int, effective_format: str, count: i
 
 
 def validate_range(name: str, value: int, lo: int, hi: int) -> None:
+    """Raise ``HostLinkProtocolError`` when an integer falls outside a closed range."""
+
     if value < lo or value > hi:
         raise HostLinkProtocolError(f"{name} out of range: {value} (allowed: {lo}..{hi})")
