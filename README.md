@@ -49,11 +49,6 @@ asyncio.run(main())
 | [Gotchas](docsrc/user/GOTCHAS.md) | Check the common Host Link failure modes before troubleshooting wiring or ladder code. |
 | [Examples](samples/README.md) | Run maintained Python samples: `samples/high_level_async.py`, `samples/high_level_sync.py`, `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, `samples/polling_monitor.py`. |
 
-## Hardware verified
-
-Live-device verification is maintained in [Latest communication verification](docsrc/user/LATEST_COMMUNICATION_VERIFICATION.md).
-See that page for verified PLC models, transports, dates, limitations, and retained validation notes.
-
 ## License and registry
 
 | Item | Value |
