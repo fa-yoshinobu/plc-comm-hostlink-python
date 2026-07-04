@@ -37,8 +37,8 @@ This page lists the device families exposed by the Python high-level API. The ex
 | `T` | Timer/counter | `T0` | Timer status, current value, and preset helpers. |
 | `C` | Timer/counter | `C0` | Counter status, current value, and preset helpers. |
 | `AT` | Timer/counter catalog category | `AT0` | Digital trimmer; not available on KV-NANO or KV-X500 profiles. |
-| `CTH` | Timer/counter catalog category | `CTH0` | High-speed counter area on KV-NANO, KV-3000, and KV-5000 profiles only. |
-| `CTC` | Timer/counter catalog category | `CTC0` | High-speed counter area on KV-NANO, KV-3000, and KV-5000 profiles only. |
+| `CTH` | Timer/counter catalog category | `CTH0` | Catalog entry only. High-speed counter range row on KV-NANO, KV-3000, and KV-5000 profiles; not accepted by the address parser. |
+| `CTC` | Timer/counter catalog category | `CTC0` | Catalog entry only. High-speed counter range row on KV-NANO, KV-3000, and KV-5000 profiles; not accepted by the address parser. |
 | `Z` | Index | `Z1` | Index registers. KV-X500 profiles expose `Z1` through `Z10`; other profiles expose `Z1` through `Z12`. |
 
 ## Type suffixes
@@ -63,4 +63,5 @@ Helper-layer address text must include the intended type. Use `DM100:U`, not pla
 | `X` or `Y` is rejected. | Use decimal-bank plus hex-bit notation, such as `X10F`. |
 | `R`, `MR`, `LR`, or `CR` is rejected. | Use KEYENCE two-digit bit notation, such as `R200:BIT` or `MR100:BIT`. |
 | `AT`, `VM`, `VB`, `CTH`, or `CTC` is rejected on KV-X500. | Select the correct profile and check the range catalog before using model-specific areas. |
+| `CTH` or `CTC` is rejected on a profile whose catalog shows those rows. | Treat `CTH` and `CTC` as catalog metadata only; they are not accepted as address input. |
 | A read works on one PLC but not another. | The canonical profile controls the supported range table; see [PLC profiles](PROFILES.md). |

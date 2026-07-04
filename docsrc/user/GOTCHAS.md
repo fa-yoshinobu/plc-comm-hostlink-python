@@ -165,3 +165,24 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## CTH or CTC address rejected
+
+| Field | Detail |
+|---|---|
+| Symptom | `CTH` or `CTC` appears in the range catalog but fails as an input address. |
+| Root cause | `CTH` and `CTC` are catalog metadata rows for supported profiles. The address parser does not accept them as device addresses. |
+| Fix | Treat them as catalog metadata only. |
+
+```python
+from hostlink import device_range_catalog_for_plc_profile
+
+
+def main() -> None:
+    catalog = device_range_catalog_for_plc_profile("keyence:kv-5000")
+    print(catalog.entry("CTH"))
+
+
+if __name__ == "__main__":
+    main()
+```
