@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Samples: Added read-only `multi_plc_monitor.py` and `config_polling.py` operational recipes with dry-run validation and reconnect backoff.
 - Docs: Added public API docstrings for the Host Link Python package and a CI coverage check for public API documentation.
 - Docs: Removed the per-library troubleshooting/code page; shared KV Host Link troubleshooting and code guidance now lives in the PLC Setup Guide.
 - Docs: Removed the per-library latest communication verification page and links so user docs stay focused on usage, not verification logs.

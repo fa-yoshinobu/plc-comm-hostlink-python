@@ -266,6 +266,27 @@ if __name__ == "__main__":
 
 `poll` yields a dictionary snapshot on each interval until cancellation or until your loop exits.
 
+## Operational recipes
+
+The samples directory includes two read-only operational recipes:
+
+- `samples/multi_plc_monitor.py` reads one or more PLCs in one loop and writes CSV rows as `timestamp,plc,tag,value`.
+- `samples/config_polling.py` runs the same polling workflow from a JSON or YAML configuration file.
+
+Both recipes use the same reconnect states as `polling_reconnect.py`: `connected`, `lost`, `reconnecting`, and `recovered`. The default reconnect backoff starts at 1 second and caps at 30 seconds.
+
+Validate a monitor setup without opening a PLC connection:
+
+```bash
+python samples/multi_plc_monitor.py --plc line-a=192.168.250.100,keyence:kv-8000,8501,tcp --tag dm100=DM100:U --cycles 1 --dry-run
+```
+
+Validate a configuration file without opening a PLC connection:
+
+```bash
+python samples/config_polling.py --config samples/config_polling.example.json --dry-run
+```
+
 ## Address reference table
 
 | Form | Example | Meaning |
@@ -359,5 +380,7 @@ Each script accepts `--host` and `--port` arguments.
 | `samples/high_level_async.py` | Async typed reads/writes, block reads, bit-in-word, named snapshots, and polling. |
 | `samples/high_level_sync.py` | Synchronous CLI wrapper that runs the async workflow with `asyncio.run`. |
 | `samples/basic_high_level_rw.py` | Compact typed read/write for unsigned, signed, double-word, and float values. |
+| `samples/multi_plc_monitor.py` | Read-only multi-PLC polling with reconnect state transitions and long-form CSV output. |
+| `samples/config_polling.py` | Read-only polling from a JSON or YAML configuration file, with a `--dry-run` validation mode. |
 | `samples/named_snapshot.py` | Mixed snapshot with `read_named`. |
 | `samples/polling_monitor.py` | Repeated snapshot loop with `poll`. |
