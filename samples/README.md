@@ -25,6 +25,14 @@ python samples/polling_reconnect.py --host 192.168.250.100 --plc-profile keyence
 ```
 
 ```bash
+python samples/multi_plc_monitor.py --plc line-a=192.168.250.100,keyence:kv-8000,8501,tcp --tag dm100=DM100:U --cycles 1 --dry-run
+```
+
+```bash
+python samples/config_polling.py --config samples/config_polling.example.json --dry-run
+```
+
+```bash
 python samples/named_snapshot.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
@@ -40,6 +48,8 @@ python samples/polling_monitor.py --host 192.168.250.100 --plc-profile keyence:k
 | `high_level_sync.py` | A synchronous CLI entrypoint that runs the same high-level async workflow with `asyncio.run`. |
 | `basic_high_level_rw.py` | A compact typed read/write example for unsigned, signed, double-word, and float values. |
 | `polling_reconnect.py` | Read-only polling loop with automatic reconnect and backoff after transport loss. |
+| `multi_plc_monitor.py` | Read-only multi-PLC polling with `connected`/`lost`/`reconnecting`/`recovered` states and long-form CSV output. |
+| `config_polling.py` | Read-only polling from JSON or YAML configuration, with `--dry-run` validation before connection. |
 | `named_snapshot.py` | A focused mixed snapshot using `read_named`. |
 | `polling_monitor.py` | A repeated snapshot loop using `poll`. |
 | `basic_test.py` | Low-level model, mode, and basic DM read/write validation. |
