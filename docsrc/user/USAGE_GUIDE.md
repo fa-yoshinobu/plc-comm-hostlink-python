@@ -66,6 +66,15 @@ Reuse one connected client for repeated reads and writes. Prefer
 many individual `read_typed` calls when one application snapshot can be read as
 one request.
 
+## Connection reuse and concurrent requests
+
+Keep one connected `AsyncHostLinkClient` open for repeated reads, writes, and
+polling. Requests on the same async client are serialized by the client lock, so
+overlapping awaits do not interleave Host Link frames on one connection.
+
+Use `close()` and `connect()` for an intentional reconnect. After a persistent
+connection failure, create a new client with the same `HostLinkConnectionOptions`.
+
 ## Read a single value
 
 ```python
@@ -95,6 +104,7 @@ if __name__ == "__main__":
 | `D` | Unsigned 32-bit double word | `int` |
 | `L` | Signed 32-bit double word | `int` |
 | `F` | IEEE 754 32-bit floating point | `float` |
+| `H` | Hexadecimal 16-bit word text | `str` |
 
 ## Write a single value
 

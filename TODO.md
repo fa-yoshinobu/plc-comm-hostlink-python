@@ -1,3 +1,5 @@
 # TODO: Host Link Communication Python
 
-No active TODOs are currently tracked for the Host Link Communication (Keyence KV) Python library.
+## Live verification
+
+- Verify high-level `:H` / `H` hexadecimal word read and write on a live KEYENCE KV PLC.

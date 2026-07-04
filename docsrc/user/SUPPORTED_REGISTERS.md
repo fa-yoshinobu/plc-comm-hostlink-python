@@ -50,6 +50,7 @@ This page lists the device families exposed by the Python high-level API. The ex
 | `:D` | `DM100:D` | Unsigned 32-bit double word. |
 | `:L` | `DM100:L` | Signed 32-bit double word. |
 | `:F` | `DM100:F` | IEEE 754 32-bit floating-point value. |
+| `:H` | `DM100:H` | Hexadecimal 16-bit word text. |
 | `:BIT` | `CR000:BIT` | Direct bit device value. |
 | `.n` | `DM100.A` | Bit `n` inside a word, where `n` is hexadecimal `0` to `F`. |
 | `:COMMENT` | `DM100:COMMENT` | Device comment text through `read_named`. |

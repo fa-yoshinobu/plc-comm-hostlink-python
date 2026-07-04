@@ -30,6 +30,7 @@ class TestAddressSurface(unittest.TestCase):
         self.assertEqual(normalize_address("dm100.d"), "DM100.D")
         self.assertEqual(normalize_address("dm100:u"), "DM100:U")
         self.assertEqual(normalize_address("dm100:f"), "DM100:F")
+        self.assertEqual(normalize_address("dm100:h"), "DM100:H")
         with self.assertRaisesRegex(ValueError, "default_suffix"):
             normalize_address("dm100:f", default_suffix="U")
 
@@ -49,6 +50,9 @@ class TestAddressSurface(unittest.TestCase):
         typed = parse_address("dm100:d")
         self.assertEqual(typed.text, "DM100:D")
         self.assertEqual(typed.dtype, "D")
+        hex_typed = parse_address("dm100:h")
+        self.assertEqual(hex_typed.text, "DM100:H")
+        self.assertEqual(hex_typed.dtype, "H")
         with self.assertRaisesRegex(ValueError, "default_suffix"):
             parse_address("dm100", default_suffix="D")
 

@@ -242,6 +242,7 @@ async def read_typed(
     - ``"D"``: unsigned 32-bit integer
     - ``"L"``: signed 32-bit integer
     - ``"F"``: IEEE 754 float32
+    - ``"H"``: hexadecimal 16-bit word text
 
     The ``"F"`` helper is implemented by reading two consecutive ``.U`` words
     and converting them into a Python ``float``.
@@ -252,8 +253,8 @@ async def read_typed(
         dtype: High-level data type code.
 
     Returns:
-        The converted value. Integer formats return ``int`` and ``"F"``
-        returns ``float``.
+        The converted value. Integer formats return ``int``, ``"F"`` returns
+        ``float``, and ``"H"`` returns uppercase hexadecimal ``str``.
 
     Raises:
         HostLinkProtocolError: If the PLC reply does not contain a value.
@@ -269,7 +270,7 @@ async def read_typed(
     """
     key = dtype.upper().lstrip(".").strip()
     if key == "":
-        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', or 'BIT'.")
+        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', 'H', or 'BIT'.")
 
     if key == "BIT":
         raw = await client.read(device, data_format=None)
@@ -281,6 +282,7 @@ async def read_typed(
     if key == "F":
         lo_word, hi_word = await read_words(client, device, 2)
         return _words_to_float32(lo_word, hi_word)
+
     fmt = f".{key}"
     result = await client.read(device, data_format=fmt)
     values = result if isinstance(result, list) else [result]
@@ -289,8 +291,12 @@ async def read_typed(
     addr = parse_device(device)
     if addr.device_type in {"T", "C"} and key in {"U", "S", "D", "L", "H"}:
         raw = values[-1]
+        if key == "H":
+            return str(raw).strip().upper()
         return int(raw) if isinstance(raw, str) else raw
     raw = values[0]
+    if key == "H":
+        return str(raw).strip().upper()
     return int(raw) if isinstance(raw, str) else raw
 
 
@@ -385,7 +391,7 @@ async def write_typed(
     """
     key = dtype.upper().lstrip(".").strip()
     if key == "":
-        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', or 'BIT'.")
+        raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', 'H', or 'BIT'.")
 
     if key == "F":
         lo_word, hi_word = _float32_to_words(float(value))
@@ -395,7 +401,10 @@ async def write_typed(
         await client.write(device, 1 if bool(value) else 0, data_format=None)
         return
     fmt = f".{key}"
-    write_val: int | str = str(value) if isinstance(value, float) else value
+    if key == "H" and isinstance(value, str):
+        write_val: int | str = value.strip().upper()
+    else:
+        write_val = str(value) if isinstance(value, float) else value
     await client.write(device, write_val, data_format=fmt)
 
 

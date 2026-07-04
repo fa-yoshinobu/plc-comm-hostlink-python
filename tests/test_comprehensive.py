@@ -320,6 +320,22 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"DM0:F": 1.25, "DM2:F": 12.5})
         self.assertEqual(self.server.last_received, ["RDS DM0.U 4"])
 
+    async def test_async_hex_typed_helpers(self):
+        self.server.responses["RD DM2.H"] = "00ff"
+        self.assertEqual(await read_typed(self.client, "DM2", "H"), "00FF")
+
+        await write_typed(self.client, "DM2", "H", 0x00FF)
+        self.assertEqual(self.server.last_received[-1], "WR DM2.H FF")
+
+        await write_typed(self.client, "DM3", "H", "00aa")
+        self.assertEqual(self.server.last_received[-1], "WR DM3.H 00AA")
+
+        self.server.last_received.clear()
+        self.server.responses["RD DM4.H"] = "ABCD"
+        result = await read_named(self.client, ["DM4:H"])
+        self.assertEqual(result, {"DM4:H": "ABCD"})
+        self.assertEqual(self.server.last_received, ["RD DM4.H"])
+
     async def test_async_timer_counter_composite_read_returns_set_value(self):
         self.server.responses["RD T0.D"] = "0,0000000010,0000000020"
 
