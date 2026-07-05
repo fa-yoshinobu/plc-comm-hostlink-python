@@ -5,7 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from hostlink.device_ranges import _range_table, available_plc_profiles, device_range_catalog_for_plc_profile, display_name
+from hostlink.device_ranges import (
+    _range_table,
+    available_plc_profiles,
+    device_range_catalog_for_plc_profile,
+    display_name,
+)
 
 
 def test_embedded_range_table_matches_canonical_fixture() -> None:
