@@ -11,7 +11,7 @@ SUPPORTED_FORMATS = {"", ".U", ".S", ".D", ".L", ".H"}
 BIT_BANK_DEVICE_TYPES = {"R", "MR", "LR", "CR"}
 XYM_BIT_DEVICE_TYPES = {"X", "Y"}
 DIRECT_BIT_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
-NATIVE_32BIT_DEVICE_TYPES = {"T", "TC", "TS", "C", "CC", "CS", "Z", "AT"}
+NATIVE_32BIT_DEVICE_TYPES = {"T", "TC", "TS", "C", "CC", "CS", "CTH", "CTC", "Z", "AT"}
 
 # KEYENCE expression + XYM expression
 DEVICE_RANGES = {
@@ -34,6 +34,8 @@ DEVICE_RANGES = {
     "C": (0, 3999, 10),
     "CC": (0, 3999, 10),
     "CS": (0, 3999, 10),
+    "CTH": (0, 3, 10),
+    "CTC": (0, 7, 10),
     "AT": (0, 7, 10),
     "CM": (0, 7599, 10),
     "VM": (0, 589823, 10),
@@ -46,9 +48,9 @@ DEVICE_RANGES = {
     "F": (0, 32767, 10),
 }
 
-FORCE_SINGLE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
+FORCE_SINGLE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "CTH", "CTC", "VB", "X", "Y", "M", "L"}
 FORCE_CONSECUTIVE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
-MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "VB", "X", "Y", "M", "L"}
+MBS_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "CTH", "CTC", "VB", "X", "Y", "M", "L"}
 MWS_DEVICE_TYPES = {
     "R",
     "B",
@@ -89,6 +91,8 @@ RDC_DEVICE_TYPES = {
     "Z",
     "T",
     "C",
+    "CTH",
+    "CTC",
     "CM",
     "X",
     "Y",
@@ -98,7 +102,7 @@ RDC_DEVICE_TYPES = {
     "E",
     "F",
 }
-WS_DEVICE_TYPES = {"T", "C"}
+WS_DEVICE_TYPES = {"T", "C", "CTH", "CTC"}
 WR_DEVICE_TYPES = set(DEVICE_RANGES) - {"AT"}
 
 DEFAULT_FORMAT_BY_DEVICE_TYPE = {
@@ -124,6 +128,8 @@ DEFAULT_FORMAT_BY_DEVICE_TYPE = {
     "C": ".D",
     "CC": ".D",
     "CS": ".D",
+    "CTH": ".D",
+    "CTC": ".D",
     # XYM aliases
     "X": "",
     "Y": "",
@@ -169,6 +175,8 @@ _COUNT_CATEGORY_BY_DEVICE_TYPE = {
     "C": "t_c",
     "CC": "t_c",
     "CS": "t_c",
+    "CTH": "t_c",
+    "CTC": "t_c",
 }
 
 TYPE_PATTERN = "|".join(sorted(DEVICE_RANGES.keys(), key=len, reverse=True))

@@ -25,7 +25,7 @@ class KvDeviceRangeCategory(Enum):
     WORD = "word"
     TIMER_COUNTER = "timer_counter"
     INDEX = "index"
-    FILE_REFRESH = "file_refresh"
+    FILE_REGISTER = "file_register"
 
 
 @dataclass(frozen=True)
@@ -324,7 +324,7 @@ def _device_metadata(device_type: str) -> tuple[KvDeviceRangeCategory, bool]:
     if device_type == "Z":
         return KvDeviceRangeCategory.INDEX, False
     if device_type == "ZF":
-        return KvDeviceRangeCategory.FILE_REFRESH, False
+        return KvDeviceRangeCategory.FILE_REGISTER, False
     if device_type in {"T", "C", "AT", "CTH", "CTC"}:
         return KvDeviceRangeCategory.TIMER_COUNTER, False
     if _is_direct_bit_device_type(device_type):
@@ -489,6 +489,38 @@ def _range_table() -> _RangeTable:
                 "T0000-T3999",
             ),
             _row(
+                "TC",
+                KvDeviceRangeNotation.DECIMAL,
+                "TC0000-TC0511",
+                "TC0000-TC0511",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+                "TC0000-TC3999",
+            ),
+            _row(
+                "TS",
+                KvDeviceRangeNotation.DECIMAL,
+                "TS0000-TS0511",
+                "TS0000-TS0511",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+                "TS0000-TS3999",
+            ),
+            _row(
                 "C",
                 KvDeviceRangeNotation.DECIMAL,
                 "C0000-C0255",
@@ -503,6 +535,38 @@ def _range_table() -> _RangeTable:
                 "C0000-C3999",
                 "C0000-C3999",
                 "C0000-C3999",
+            ),
+            _row(
+                "CC",
+                KvDeviceRangeNotation.DECIMAL,
+                "CC0000-CC0255",
+                "CC0000-CC0255",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+                "CC0000-CC3999",
+            ),
+            _row(
+                "CS",
+                KvDeviceRangeNotation.DECIMAL,
+                "CS0000-CS0255",
+                "CS0000-CS0255",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
+                "CS0000-CS3999",
             ),
             _row(
                 "DM",
