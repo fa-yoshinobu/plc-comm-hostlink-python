@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from hostlink.device_ranges import _range_table, available_plc_profiles, device_range_catalog_for_plc_profile
+from hostlink.device_ranges import _range_table, available_plc_profiles, device_range_catalog_for_plc_profile, display_name
 
 
 def test_embedded_range_table_matches_canonical_fixture() -> None:
@@ -18,6 +18,9 @@ def test_embedded_range_table_matches_canonical_fixture() -> None:
     assert expected_profile_ids == [profile.plc_profile for profile in table.profiles]
     assert [profile.display_name for profile in table.profiles] == [
         profile["source_label"] for profile in expected["profiles"].values()
+    ]
+    assert [display_name(profile_id) for profile_id in expected_profile_ids] == [
+        profile["display_name"] for profile in expected["profiles"].values()
     ]
 
     assert len(expected["device_range_rows"]) == len(table.rows)
@@ -46,4 +49,3 @@ def test_range_catalog_matches_canonical_fixture() -> None:
             else:
                 assert entry.supported
                 assert entry.address_range == expected_range
-

@@ -107,10 +107,36 @@ class _RangeProfile:
     plc_profile: str
 
 
+_PROFILE_DISPLAY_NAMES = {
+    "keyence:kv-nano": "KEYENCE KV-NANO",
+    "keyence:kv-nano-xym": "KEYENCE KV-NANO (XYM)",
+    "keyence:kv-3000": "KEYENCE KV-3000",
+    "keyence:kv-3000-xym": "KEYENCE KV-3000 (XYM)",
+    "keyence:kv-5000": "KEYENCE KV-5000",
+    "keyence:kv-5000-xym": "KEYENCE KV-5000 (XYM)",
+    "keyence:kv-7000": "KEYENCE KV-7000",
+    "keyence:kv-7000-xym": "KEYENCE KV-7000 (XYM)",
+    "keyence:kv-8000": "KEYENCE KV-8000",
+    "keyence:kv-8000-xym": "KEYENCE KV-8000 (XYM)",
+    "keyence:kv-x500": "KEYENCE KV-X500",
+    "keyence:kv-x500-xym": "KEYENCE KV-X500 (XYM)",
+}
+
+
 def available_plc_profiles() -> list[str]:
     """Return canonical PLC profile strings supported by the embedded range table."""
 
     return [profile.plc_profile for profile in _range_table().profiles]
+
+
+def display_name(plc_profile: str) -> str:
+    """Return the canonical human-readable display name for a PLC profile."""
+
+    normalized = _normalize_plc_profile(plc_profile)
+    if not normalized:
+        raise HostLinkProtocolError("PLC profile must not be empty.")
+    _range_profile_for_plc_profile(_range_table(), normalized)
+    return _PROFILE_DISPLAY_NAMES[normalized]
 
 
 def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatalog:

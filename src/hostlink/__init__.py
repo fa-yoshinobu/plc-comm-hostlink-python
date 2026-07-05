@@ -43,6 +43,7 @@ from .device_ranges import (
     KvDeviceRangeSegment,
     available_plc_profiles,
     device_range_catalog_for_plc_profile,
+    display_name,
 )
 from .errors import (
     HostLinkBaseError,
@@ -101,6 +102,7 @@ __all__ = [
     "KvDeviceRangeSegment",
     "available_plc_profiles",
     "device_range_catalog_for_plc_profile",
+    "display_name",
     "HostLinkAddress",
     "HostLinkConnectionOptions",
     "TimerCounterValue",
