@@ -38,10 +38,7 @@ def test_embedded_range_table_matches_canonical_fixture() -> None:
 def test_range_catalog_matches_canonical_fixture() -> None:
     fixture = Path(__file__).parent / "fixtures" / "kv_device_ranges.json"
     expected = json.loads(fixture.read_text(encoding="utf-8"))
-    catalogs = {
-        profile_id: device_range_catalog_for_plc_profile(profile_id)
-        for profile_id in expected["profiles"]
-    }
+    catalogs = {profile_id: device_range_catalog_for_plc_profile(profile_id) for profile_id in expected["profiles"]}
 
     for row in expected["device_range_rows"]:
         device_type = row["device_type"]
