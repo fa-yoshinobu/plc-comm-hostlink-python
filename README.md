@@ -1,11 +1,15 @@
 [![CI](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml/badge.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml)
-[![PyPI](https://img.shields.io/pypi/v/kv-hostlink.svg)](https://pypi.org/project/kv-hostlink/)
+[![PyPI](https://img.shields.io/pypi/v/plc-comm-kv-hostlink.svg)](https://pypi.org/project/plc-comm-kv-hostlink/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # KEYENCE KV Host Link for Python
 
 Python library for KEYENCE KV Host Link PLC communication.
+
+## PLC Comm Family
+
+This library is part of the plc-comm family. See the [package matrix](https://fa-yoshinobu.github.io/plc-comm-docs-site/package-matrix/) for protocol, language, registry, and install-command mapping.
 
 ## Supported PLC profiles
 
@@ -18,7 +22,7 @@ The shared device and range tables are in the [KV Host Link Device Ranges](https
 ## Installation
 
 ```bash
-pip install kv-hostlink
+pip install plc-comm-kv-hostlink
 ```
 
 ## Quick example
@@ -56,8 +60,8 @@ asyncio.run(main())
 | Item | Value |
 | --- | --- |
 | License | [MIT](LICENSE) |
-| Registry | [PyPI](https://pypi.org/project/kv-hostlink/) |
-| Package | `kv-hostlink` |
+| Registry | [PyPI](https://pypi.org/project/plc-comm-kv-hostlink/) |
+| Package | `plc-comm-kv-hostlink` |
 
 ## Commercial support
 

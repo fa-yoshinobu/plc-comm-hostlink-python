@@ -4,6 +4,7 @@ import threading
 import unittest
 from datetime import datetime
 
+import hostlink
 from hostlink import (
     AsyncHostLinkClient,
     HostLinkClient,
@@ -18,6 +19,10 @@ from hostlink import (
     write_typed,
 )
 from hostlink.device import DeviceAddress, parse_device
+
+
+def test_import_name_stays_hostlink_after_package_rename() -> None:
+    assert hostlink.__name__ == "hostlink"
 
 
 class MockSyncServer:

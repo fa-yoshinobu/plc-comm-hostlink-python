@@ -15,7 +15,7 @@ This page gets you from an empty Python project to your first KEYENCE KV Host Li
 ## Install
 
 ```bash
-pip install kv-hostlink
+pip install plc-comm-kv-hostlink
 ```
 
 ## Choose profile
