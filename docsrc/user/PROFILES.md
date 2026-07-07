@@ -1,7 +1,7 @@
 # PLC profiles
 
 This library supports all KV series models. Device ranges differ by model. Your application selects the catalog with a canonical PLC profile name such as `keyence:kv-7000`; the library does not query the PLC to choose a profile for you.
-Use `display_name(plc_profile)` for UI labels. Store the canonical profile
+Use package-root `display_name(plc_profile)` for UI labels. Store the canonical profile
 string, not the display name.
 
 ## Device families and ranges

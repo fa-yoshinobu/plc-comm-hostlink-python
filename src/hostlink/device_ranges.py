@@ -9,6 +9,12 @@ from functools import lru_cache
 
 from .device import DEFAULT_FORMAT_BY_DEVICE_TYPE
 from .errors import HostLinkProtocolError
+from .plc_profiles import (
+    _KvHostLinkPlcProfileDefinition,
+    _profile_definition_from_name,
+    _profiles,
+    normalize_plc_profile,
+)
 
 
 class KvDeviceRangeNotation(Enum):
@@ -97,46 +103,8 @@ class _RangeRow:
 
 @dataclass(frozen=True)
 class _RangeTable:
-    profiles: tuple[_RangeProfile, ...]
+    profiles: tuple[_KvHostLinkPlcProfileDefinition, ...]
     rows: tuple[_RangeRow, ...]
-
-
-@dataclass(frozen=True)
-class _RangeProfile:
-    display_name: str
-    plc_profile: str
-
-
-_PROFILE_DISPLAY_NAMES = {
-    "keyence:kv-nano": "KEYENCE KV-NANO",
-    "keyence:kv-nano-xym": "KEYENCE KV-NANO (XYM)",
-    "keyence:kv-3000": "KEYENCE KV-3000",
-    "keyence:kv-3000-xym": "KEYENCE KV-3000 (XYM)",
-    "keyence:kv-5000": "KEYENCE KV-5000",
-    "keyence:kv-5000-xym": "KEYENCE KV-5000 (XYM)",
-    "keyence:kv-7000": "KEYENCE KV-7000",
-    "keyence:kv-7000-xym": "KEYENCE KV-7000 (XYM)",
-    "keyence:kv-8000": "KEYENCE KV-8000",
-    "keyence:kv-8000-xym": "KEYENCE KV-8000 (XYM)",
-    "keyence:kv-x500": "KEYENCE KV-X500",
-    "keyence:kv-x500-xym": "KEYENCE KV-X500 (XYM)",
-}
-
-
-def available_plc_profiles() -> list[str]:
-    """Return canonical PLC profile strings supported by the embedded range table."""
-
-    return [profile.plc_profile for profile in _range_table().profiles]
-
-
-def display_name(plc_profile: str) -> str:
-    """Return the canonical human-readable display name for a PLC profile."""
-
-    normalized = _normalize_plc_profile(plc_profile)
-    if not normalized:
-        raise HostLinkProtocolError("PLC profile must not be empty.")
-    _range_profile_for_plc_profile(_range_table(), normalized)
-    return _PROFILE_DISPLAY_NAMES[normalized]
 
 
 def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatalog:
@@ -146,21 +114,19 @@ def device_range_catalog_for_plc_profile(plc_profile: str) -> KvDeviceRangeCatal
 
 
 def _build_catalog(plc_profile: str, model_code: str | None) -> KvDeviceRangeCatalog:
-    requested_plc_profile = _normalize_plc_profile(plc_profile)
-    if not requested_plc_profile:
-        raise HostLinkProtocolError("PLC profile must not be empty.")
+    requested_plc_profile = normalize_plc_profile(plc_profile)
 
     table = _range_table()
     resolved_profile = _range_profile_for_plc_profile(table, requested_plc_profile)
     model_index = table.profiles.index(resolved_profile)
 
-    entries = tuple(_build_entry(row, model_index, resolved_profile.display_name) for row in table.rows)
+    entries = tuple(_build_entry(row, model_index, resolved_profile.source_label) for row in table.rows)
     return KvDeviceRangeCatalog(
-        plc_profile=resolved_profile.plc_profile,
+        plc_profile=resolved_profile.name,
         model_code=model_code or "",
         has_model_code=model_code is not None,
         requested_plc_profile=requested_plc_profile,
-        resolved_plc_profile=resolved_profile.plc_profile,
+        resolved_plc_profile=resolved_profile.name,
         entries=entries,
     )
 
@@ -345,36 +311,22 @@ def _notation_for_device(
     return KvDeviceRangeNotation.HEXADECIMAL if device_type in {"B", "W", "VB", "X", "Y"} else fallback
 
 
-def _range_profile_for_plc_profile(table: _RangeTable, plc_profile: str) -> _RangeProfile:
-    normalized = _normalize_plc_profile(plc_profile)
+def _range_profile_for_plc_profile(
+    table: _RangeTable,
+    plc_profile: str,
+) -> _KvHostLinkPlcProfileDefinition:
+    normalized = _profile_definition_from_name(plc_profile).name
     for profile in table.profiles:
-        if profile.plc_profile == normalized:
+        if profile.name == normalized:
             return profile
-    supported = ", ".join(available_plc_profiles())
+    supported = ", ".join(profile.name for profile in table.profiles)
     raise HostLinkProtocolError(f"Unsupported PLC profile {plc_profile!r}. Supported PLC profiles: {supported}.")
-
-
-def _normalize_plc_profile(text: str) -> str:
-    return text.strip().rstrip("\0")
 
 
 @lru_cache(maxsize=1)
 def _range_table() -> _RangeTable:
     return _RangeTable(
-        profiles=(
-            _RangeProfile("KV-NANO", "keyence:kv-nano"),
-            _RangeProfile("KV-NANO(XYM)", "keyence:kv-nano-xym"),
-            _RangeProfile("KV-3000", "keyence:kv-3000"),
-            _RangeProfile("KV-3000(XYM)", "keyence:kv-3000-xym"),
-            _RangeProfile("KV-5000", "keyence:kv-5000"),
-            _RangeProfile("KV-5000(XYM)", "keyence:kv-5000-xym"),
-            _RangeProfile("KV-7000", "keyence:kv-7000"),
-            _RangeProfile("KV-7000(XYM)", "keyence:kv-7000-xym"),
-            _RangeProfile("KV-8000", "keyence:kv-8000"),
-            _RangeProfile("KV-8000(XYM)", "keyence:kv-8000-xym"),
-            _RangeProfile("KV-X500", "keyence:kv-x500"),
-            _RangeProfile("KV-X500(XYM)", "keyence:kv-x500-xym"),
-        ),
+        profiles=_profiles(),
         rows=(
             _row(
                 "R",

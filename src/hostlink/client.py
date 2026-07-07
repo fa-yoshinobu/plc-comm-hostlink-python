@@ -98,9 +98,9 @@ def _normalize_connection_plc_profile(plc_profile: str | None) -> str:
     if plc_profile is None:
         raise ValueError("plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'.")
 
-    from .device_ranges import device_range_catalog_for_plc_profile
+    from .plc_profiles import normalize_plc_profile
 
-    return device_range_catalog_for_plc_profile(plc_profile).plc_profile
+    return normalize_plc_profile(plc_profile)
 
 
 class HostLinkBase:

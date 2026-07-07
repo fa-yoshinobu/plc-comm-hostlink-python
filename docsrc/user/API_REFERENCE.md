@@ -53,7 +53,8 @@ prefer `open_and_connect` plus the high-level helper functions.
 | Operation | Public API |
 | --- | --- |
 | Device range catalog | `KvDeviceRangeCatalog`, `KvDeviceRangeEntry`, `KvDeviceRangeSegment`, `KvDeviceRangeCategory`, `KvDeviceRangeNotation` |
-| Profile lookup | `available_plc_profiles`, `device_range_catalog_for_plc_profile`, `display_name` |
+| Profile lookup | `KvHostLinkPlcProfile`, `available_plc_profiles`, `normalize_plc_profile`, `profile_from_name`, `display_name` |
+| Device range catalog lookup | `device_range_catalog_for_plc_profile` |
 | Error handling | `HostLinkBaseError`, `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError`, `decode_error_code` |
 
 ## Public Symbol Index
@@ -65,10 +66,12 @@ The package exports these public names from `hostlink.__all__`:
 `HostLinkError`, `HostLinkProtocolError`, `HostLinkTraceDirection`,
 `HostLinkTraceFrame`, `KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
 `KvDeviceRangeEntry`, `KvDeviceRangeNotation`, `KvDeviceRangeSegment`,
-`ModelInfo`, `TimerCounterValue`, `available_plc_profiles`,
-`decode_error_code`, `device_range_catalog_for_plc_profile`, `display_name`,
-`format_address`, `normalize_address`, `open_and_connect`, `parse_address`,
-`poll`, `read_comments`, `read_counter`, `read_dwords`,
+`KvHostLinkPlcProfile`, `ModelInfo`, `TimerCounterValue`,
+`available_plc_profiles`, `decode_error_code`,
+`device_range_catalog_for_plc_profile`, `display_name`, `format_address`,
+`normalize_address`, `normalize_plc_profile`, `open_and_connect`,
+`parse_address`, `poll`, `profile_from_name`, `read_comments`,
+`read_counter`, `read_dwords`,
 `read_dwords_chunked`, `read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,
 `read_timer_counter`, `read_typed`, `read_words`, `read_words_chunked`,
