@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### BREAKING
 - Library: Moved PLC profile lookup APIs into `hostlink.plc_profiles`; import `available_plc_profiles`, `normalize_plc_profile`, `profile_from_name`, and `display_name` from the package root or `hostlink.plc_profiles`, not `hostlink.device_ranges`.
 
+### Changed
+- Docs: Updated PLC profile documentation and API reference entries for the new `hostlink.plc_profiles` module.
+- Tests: Updated canonical PLC profile display-name coverage to use the profile API.
+
 ## [2.0.0] - 2026-07-06
 
 ### BREAKING
