@@ -2,11 +2,6 @@
 
 This document describes the test structure and verification approach for `plc-comm-hostlink-python`.
 
-Related documents:
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [PROTOCOL_SPEC.md](PROTOCOL_SPEC.md)
-
 ## Automated Tests
 
 The test suite is under `tests/`.
@@ -36,13 +31,10 @@ The test suite covers:
 - 32-bit value packing (DWord, Float32)
 - Extension utilities: `read_typed`, `write_typed`, `write_bit_in_word`, `poll`
 
-## Hardware Verification
+## Hardware Checks
 
-Verified hardware targets:
-
-- KEYENCE KV-7500 (TCP and UDP)
-
-For live hardware verification, use the scripts in `scripts/`.
+For live hardware checks, use the scripts in `scripts/`.
+Keep current target support in the profile data, not in this maintainer guide.
 
 ## Cross-Library Parity
 
@@ -53,7 +45,7 @@ When adding or changing a method, verify:
 1. The equivalent .NET operation exists and has the same semantics.
 2. `HostLinkClient` and `AsyncHostLinkClient` stay internally aligned.
 3. Exported helper utilities in `utils.py` are updated where applicable.
-4. Intentional public API design differences remain documented in `API_UNIFICATION_POLICY.md`.
+4. Intentional public API differences stay covered by tests and public docs.
 
 ## Linting and Type Checking
 

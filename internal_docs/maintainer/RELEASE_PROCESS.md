@@ -8,7 +8,6 @@ Check these before tagging:
 
 - [Usage Guide](../../docsrc/user/USAGE_GUIDE.md)
 - [CHANGELOG](../../CHANGELOG.md)
-- [Protocol Spec](PROTOCOL_SPEC.md)
 
 ## 2. Run Local Verification
 
