@@ -596,7 +596,11 @@ class HostLinkClient(HostLinkBase):
                     return line
                 raise HostLinkConnectionError("Connection closed by PLC")
             self._rx_buffer += chunk
-            if len(self._rx_buffer) > self.buffer_size and b"\r" not in self._rx_buffer and b"\n" not in self._rx_buffer:
+            if (
+                len(self._rx_buffer) > self.buffer_size
+                and b"\r" not in self._rx_buffer
+                and b"\n" not in self._rx_buffer
+            ):
                 self._close_unlocked()
                 raise HostLinkProtocolError(f"Response line exceeds {self.buffer_size} bytes")
 
