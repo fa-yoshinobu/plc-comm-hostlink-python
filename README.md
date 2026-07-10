@@ -1,7 +1,7 @@
 [![CI](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml/badge.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/plc-comm-kv-hostlink.svg)](https://pypi.org/project/plc-comm-kv-hostlink/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/blob/main/LICENSE)
 
 # KEYENCE KV Host Link for Python
 
@@ -13,7 +13,7 @@ This library is part of the plc-comm family. See the [package matrix](https://fa
 
 ## Supported PLC profiles
 
-The maintained profile table is in [PLC profiles](docsrc/user/PROFILES.md). Choose one exact canonical PLC profile from that table.
+The maintained profile table is in [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/PROFILES/). Choose one exact canonical PLC profile from that table.
 
 ## Supported device types
 
@@ -46,20 +46,20 @@ asyncio.run(main())
 | Page | Use it for |
 |---|---|
 | [Full documentation site](https://fa-yoshinobu.github.io/plc-comm-docs-site/) | Unified docs for all PLC communication libraries. |
-| [Getting started](docsrc/user/GETTING_STARTED.md) | Install the package, connect to your PLC, and run your first read/write. |
-| [Usage guide](docsrc/user/USAGE_GUIDE.md) | Use the high-level API and common Host Link workflows. |
-| [API reference](docsrc/user/API_REFERENCE.md) | Find public client methods, helpers, profile APIs, and error types. |
-| [PLC profiles](docsrc/user/PROFILES.md) | Choose the canonical profile that matches your PLC model and device ranges. |
+| [Getting started](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/GETTING_STARTED/) | Install the package, connect to your PLC, and run your first read/write. |
+| [Usage guide](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/USAGE_GUIDE/) | Use the high-level API and common Host Link workflows. |
+| [API reference](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/API_REFERENCE/) | Find public client methods, helpers, profile APIs, and error types. |
+| [PLC profiles](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/PROFILES/) | Choose the canonical profile that matches your PLC model and device ranges. |
 | [KV Host Link Device Ranges](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/device-ranges/) | Check shared device families, address notation, and range tables. |
 | [KV Host Link Troubleshooting & Codes](https://fa-yoshinobu.github.io/plc-comm-docs-site/plc-setup/kv/troubleshooting-codes/) | Troubleshoot common port, profile, address, write-permission, and PLC error-code symptoms. |
-| [Gotchas](docsrc/user/GOTCHAS.md) | Check whether this library has any current library-specific caveats. |
-| [Examples](samples/README.md) | Run maintained Python samples: `samples/high_level_async.py`, `samples/high_level_sync.py`, `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, `samples/polling_monitor.py`. |
+| [Gotchas](https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/GOTCHAS/) | Check whether this library has any current library-specific caveats. |
+| [Examples](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/blob/main/samples/README.md) | Run maintained Python samples: `samples/high_level_async.py`, `samples/high_level_sync.py`, `samples/basic_high_level_rw.py`, `samples/named_snapshot.py`, `samples/polling_monitor.py`. |
 
 ## License and registry
 
 | Item | Value |
 | --- | --- |
-| License | [MIT](LICENSE) |
+| License | [MIT](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/blob/main/LICENSE) |
 | Registry | [PyPI](https://pypi.org/project/plc-comm-kv-hostlink/) |
 | Package | `plc-comm-kv-hostlink` |
 

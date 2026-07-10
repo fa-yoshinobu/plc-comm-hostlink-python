@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Release: Bumped package metadata and `hostlink.__version__` to `3.0.0`.
+- Docs: Replaced relative README links with absolute URLs so they resolve on package registry pages.
 
 ### BREAKING
 - Library: Breaking: Moved PLC profile lookup APIs into `hostlink.plc_profiles`; imports from `hostlink.device_ranges` are no longer supported.
