@@ -17,10 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.1] - 2026-07-10
+## [3.1.0] - 2026-07-10
+
+### Added
+- Library: Added `KvHostLinkPlcProfileDescriptor` and `plc_profile_descriptors()` for canonical Host Link profile metadata.
 
 ### Changed
-- Release: Bumped package metadata and `hostlink.__version__` to `3.0.1`.
+- Release: Bumped package metadata and `hostlink.__version__` to `3.1.0`.
 
 ### Fixed
 - Library: Discard sync and async TCP/UDP transports after timeout, cancellation, partial response, or socket failure.
