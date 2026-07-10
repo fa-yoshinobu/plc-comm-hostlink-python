@@ -32,7 +32,7 @@ workflows, but the helpers above are the recommended entry points for normal
 application code and generated user documentation.
 """
 
-__version__ = "3.0.1"
+__version__ = "3.1.0"
 
 from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTraceDirection, HostLinkTraceFrame, ModelInfo
 from .device_ranges import (
@@ -52,9 +52,11 @@ from .errors import (
 )
 from .plc_profiles import (
     KvHostLinkPlcProfile,
+    KvHostLinkPlcProfileDescriptor,
     available_plc_profiles,
     display_name,
     normalize_plc_profile,
+    plc_profile_descriptors,
     profile_from_name,
 )
 from .utils import (
@@ -106,10 +108,12 @@ __all__ = [
     "KvDeviceRangeNotation",
     "KvDeviceRangeSegment",
     "KvHostLinkPlcProfile",
+    "KvHostLinkPlcProfileDescriptor",
     "available_plc_profiles",
     "device_range_catalog_for_plc_profile",
     "display_name",
     "normalize_plc_profile",
+    "plc_profile_descriptors",
     "profile_from_name",
     "HostLinkAddress",
     "HostLinkConnectionOptions",

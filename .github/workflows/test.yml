@@ -16,6 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check release workflows do not auto-publish
+        shell: pwsh
+        run: ./scripts/check_no_auto_publish.ps1
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:

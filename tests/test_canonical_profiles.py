@@ -12,6 +12,7 @@ from hostlink.device_ranges import (
 from hostlink.plc_profiles import (
     available_plc_profiles,
     display_name,
+    plc_profile_descriptors,
 )
 
 
@@ -35,6 +36,18 @@ def test_embedded_range_table_matches_canonical_fixture() -> None:
         assert expected_row["device_type"] == actual_row.device_type
         assert expected_row["notation"] == actual_row.notation.value
         assert list(expected_row["ranges"].values()) == list(actual_row.ranges)
+
+
+def test_profile_descriptors_match_canonical_profile_metadata() -> None:
+    fixture = Path(__file__).parent / "fixtures" / "kv_device_ranges.json"
+    expected = json.loads(fixture.read_text(encoding="utf-8"))["profiles"]
+
+    descriptors = plc_profile_descriptors()
+    assert [descriptor.canonical_name for descriptor in descriptors] == list(expected)
+    for descriptor, expected_profile in zip(descriptors, expected.values(), strict=True):
+        assert descriptor.display_name == expected_profile["display_name"]
+        assert descriptor.connectable is True
+        assert descriptor.base_profile == expected_profile.get("base_profile")
 
 
 def test_range_catalog_matches_canonical_fixture() -> None:
