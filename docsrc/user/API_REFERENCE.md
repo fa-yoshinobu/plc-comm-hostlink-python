@@ -5,14 +5,16 @@ Use the usage guide for examples, and this page when you need to find the
 operation name for a specific Host Link workflow.
 
 The sync `HostLinkClient` and async `AsyncHostLinkClient` expose the same
-low-level operation names unless noted otherwise. For normal application code,
-prefer `open_and_connect` plus the high-level helper functions.
+low-level operation names unless noted otherwise. The atomic
+`AsyncHostLinkClient.write_bit_in_word` compound operation is async-only. For
+normal application code, prefer `open_and_connect` plus the high-level helper
+functions.
 
 ## Connection And PLC Control
 
 | Operation | Public API |
 | --- | --- |
-| Open a ready-to-use queued connection | `open_and_connect`, `HostLinkConnectionOptions` |
+| Open a ready-to-use serialized connection | `open_and_connect`, `HostLinkConnectionOptions` |
 | Low-level sync/async clients | `HostLinkClient`, `AsyncHostLinkClient` |
 | Raw command exchange | `send_raw` |
 | PLC mode and error control | `change_mode`, `clear_error`, `check_error_no`, `confirm_operating_mode` |

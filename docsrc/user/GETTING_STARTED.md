@@ -104,8 +104,3 @@ Only write to a test address that is safe for your machine and program.
 | Profile selection fails. | Use one of the exact strings in [PLC profiles](PROFILES.md); aliases and combined old names are rejected. |
 | Reads fail while you are trying the first example. | Start with `DM` word reads; do not start with timer/counter or expansion buffer access. |
 | Timer/counter preset writes return `E1`. | Timer/Counter preset writes (`WS`/`WSS`) are only supported on KV-8000/7000-series. |
-
-## Next steps
-
-- Open the runnable samples: [samples README](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/tree/main/samples).
-- Continue with the [Usage guide](USAGE_GUIDE.md) and [Gotchas](GOTCHAS.md).

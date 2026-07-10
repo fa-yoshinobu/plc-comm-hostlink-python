@@ -17,19 +17,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-07-10
+
+### Changed
+- Release: Bumped package metadata and `hostlink.__version__` to `3.0.1`.
+
+### Fixed
+- Library: Discard sync and async TCP/UDP transports after timeout, cancellation, partial response, or socket failure.
+- Library: Parse BIT writes from explicit boolean tokens and reject ambiguous values before communication.
+- Library: Serialize bit-in-word read-modify-write pairs across the full compound operation.
+- CI: Require exact-tag checkout and verify tag, manifest, runtime, and distribution versions before a GitHub Release upload.
+- Docs: Correct the supported-profile scope, `CTH`/`CTC` parser behavior, optional YAML dependency, and maintainer commands.
+
+### Deprecated
+- Library: Deprecated the ineffective `allow_omitted_type` parser argument; device types remain explicit.
+
 ## [3.0.0] - 2026-07-10
 
 ### Changed
 - Release: Bumped package metadata and `hostlink.__version__` to `3.0.0`.
 - Docs: Replaced relative README links with absolute URLs so they resolve on package registry pages.
+- Docs: Updated PLC profile documentation and API reference entries for the new `hostlink.plc_profiles` module.
+- Tests: Updated canonical PLC profile display-name coverage to use the profile API.
 
 ### BREAKING
 - Library: Breaking: Moved PLC profile lookup APIs into `hostlink.plc_profiles`; imports from `hostlink.device_ranges` are no longer supported.
 - Migration: Import `available_plc_profiles`, `normalize_plc_profile`, `profile_from_name`, and `display_name` from the package root or `hostlink.plc_profiles`.
-
-### Changed
-- Docs: Updated PLC profile documentation and API reference entries for the new `hostlink.plc_profiles` module.
-- Tests: Updated canonical PLC profile display-name coverage to use the profile API.
 
 ## [2.0.0] - 2026-07-06
 

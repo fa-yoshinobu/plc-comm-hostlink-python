@@ -398,7 +398,7 @@ async def write_typed(
         await client.write_consecutive(device, [lo_word, hi_word], data_format=".U")
         return
     if key == "BIT":
-        await client.write(device, 1 if bool(value) else 0, data_format=None)
+        await client.write(device, 1 if _parse_bit_write_value(value) else 0, data_format=None)
         return
     fmt = f".{key}"
     if key == "H" and isinstance(value, str):
@@ -417,6 +417,16 @@ def _parse_bool_token(token: int | str) -> bool:
     if text in {"0", "OFF", "FALSE"}:
         return False
     raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
+
+
+def _parse_bit_write_value(value: int | float | bool | str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return value == 1
+    if isinstance(value, str):
+        return _parse_bool_token(value)
+    raise HostLinkProtocolError(f"Invalid BIT write value: {value!r}. Use bool, 0/1, OFF/ON, or FALSE/TRUE.")
 
 
 async def write_bit_in_word(
@@ -445,16 +455,7 @@ async def write_bit_in_word(
 
             await write_bit_in_word(client, "DM100", 3, True)
     """
-    if not 0 <= bit_index <= 15:
-        raise ValueError(f"bit_index must be 0-15, got {bit_index}")
-    result = await client.read(device, data_format=".U")
-    values = result if isinstance(result, list) else [result]
-    current = int(values[0]) if isinstance(values[0], str) else int(values[0])
-    if value:
-        current |= 1 << bit_index
-    else:
-        current &= ~(1 << bit_index)
-    await client.write(device, current & 0xFFFF, data_format=".U")
+    await client.write_bit_in_word(device, bit_index, value)
 
 
 async def read_named(

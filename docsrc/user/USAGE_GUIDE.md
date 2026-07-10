@@ -242,6 +242,11 @@ if __name__ == "__main__":
 
 The `.n` notation uses hexadecimal bit indexes from `0` through `F`; `.A` means bit 10.
 
+Calls on the same `AsyncHostLinkClient` hold its request lock across the full
+read-modify-write pair, so concurrent bit updates through that client do not
+overwrite one another. Separate PLC connections cannot share that lock; the
+application must coordinate them when they can update the same word.
+
 ## Polling
 
 ```python
@@ -272,6 +277,9 @@ The samples directory includes two read-only operational recipes:
 
 - `samples/multi_plc_monitor.py` reads one or more PLCs in one loop and writes CSV rows as `timestamp,plc,tag,value`.
 - `samples/config_polling.py` runs the same polling workflow from a JSON or YAML configuration file.
+
+JSON configuration needs no extra package. YAML configuration requires
+PyYAML: `python -m pip install PyYAML`.
 
 Both recipes use the same reconnect states as `polling_reconnect.py`: `connected`, `lost`, `reconnecting`, and `recovered`. The default reconnect backoff starts at 1 second and caps at 30 seconds.
 
