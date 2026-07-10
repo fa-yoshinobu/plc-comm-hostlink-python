@@ -32,7 +32,7 @@ import asyncio
 from hostlink import HostLinkConnectionOptions, device_range_catalog_for_plc_profile, open_and_connect, read_typed
 
 async def main() -> None:
-    catalog = device_range_catalog_for_plc_profile("keyence:kv-7000")
+    catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")

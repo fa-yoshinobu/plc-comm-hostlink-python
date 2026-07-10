@@ -11,33 +11,25 @@ Check these before tagging:
 
 ## 2. Run Local Verification
 
-Clean old packaging artifacts first:
-
 ```powershell
-Remove-Item -Recurse -Force build, dist, *.egg-info
-```
-
-```powershell
-python -m unittest discover -s tests -v
-python -m ruff check .
-python -m mypy src scripts
+call run_ci.bat
 python -m build
+python -m twine check dist/*
 ```
 
 Expected result:
 
-- tests pass
-- `ruff` passes
-- `mypy` passes
+- all checks and the complete pytest suite in `run_ci.bat` pass
 - `dist/` contains a source distribution and wheel
+- `twine check` accepts both artifacts
 
 ## 3. Run the Minimum Live Check
 
-If the release changes live behavior, run the focused script for that area.
-
-Typical examples:
-
-- `scripts/connection_check.py --host <host> --port <port>`
+If the release changes live behavior, perform the separately approved focused
+check on a controlled test PLC. Record the exact profile, endpoint, device,
+read/write intent, and test purpose before communication. Build or select a
+focused probe for the behavior under test rather than assuming a generic live
+check exists.
 
 ## 4. Artifact Policy
 
@@ -56,12 +48,9 @@ Typical examples:
 
 If you are publishing artifacts:
 
-```powershell
-python -m twine check dist/*
-```
-
 Then:
 
 - push the release commit and tag to the repository
-- create the GitHub release entry
+- let the tag workflow create the GitHub release entry, or manually dispatch it
+  with the version of an existing `v*` tag
 - upload `dist/` artifacts if distributing release packages outside the repository

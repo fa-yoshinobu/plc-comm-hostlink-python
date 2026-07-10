@@ -1,6 +1,6 @@
 # PLC profiles
 
-This library supports all KV series models. Device ranges differ by model. Your application selects the catalog with a canonical PLC profile name such as `keyence:kv-7000`; the library does not query the PLC to choose a profile for you.
+This library provides canonical profiles for the KV families listed below. Device ranges differ by model. Your application selects the catalog with a canonical PLC profile name such as `keyence:kv-7000`; the library does not query the PLC to choose a profile for you. Models not represented below, including KV-700 and KV-1000, do not currently have a canonical profile.
 Use package-root `display_name(plc_profile)` for UI labels. Store the canonical profile
 string, not the display name.
 
@@ -65,7 +65,7 @@ Unsupported strings fail immediately. Use the exact strings in the table above.
 
 KV-NANO profiles do not include `EM`, `FM`, `ZF`, or `AT`. Use `DM` for first reads and check the device range catalog before using model-specific areas.
 
-KV-NANO, KV-3000, and KV-5000 catalogs include `CTH` and `CTC` range rows, but those rows are catalog metadata only. The address parser does not accept `CTH` or `CTC` as input addresses.
+KV-NANO, KV-3000, and KV-5000 catalogs include `CTH` and `CTC` range rows. The address parser accepts both device types; actual availability remains model- and unit-dependent and must be checked against the selected catalog and PLC configuration.
 
 KV-3000 and KV-5000 profiles include `AT`, but timer/counter preset writes (`WS`/`WSS`) are documented for KV-8000/7000-series only.
 

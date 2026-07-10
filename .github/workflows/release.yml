@@ -3,6 +3,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix"
+        required: true
+        type: string
 permissions:
   contents: write
 jobs:
@@ -10,16 +15,75 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v6
         with: { python-version: "3.11" }
+      - name: Verify release identity
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="$DISPATCH_VERSION"
+            tag="v$version"
+          else
+            tag="${{ github.ref_name }}"
+            version="${tag#v}"
+          fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || { echo "Invalid release version: $version" >&2; exit 1; }
+          actual_tag="$(git describe --tags --exact-match HEAD)"
+          [[ "$actual_tag" == "$tag" ]] || { echo "Checked out $actual_tag, expected $tag" >&2; exit 1; }
+          manifest_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          runtime_version="$(PYTHONPATH=src python -c 'import hostlink; print(hostlink.__version__)')"
+          [[ "$manifest_version" == "$version" ]] || { echo "pyproject.toml has $manifest_version, expected $version" >&2; exit 1; }
+          [[ "$runtime_version" == "$version" ]] || { echo "hostlink.__version__ is $runtime_version, expected $version" >&2; exit 1; }
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
       - name: Build
         run: |
-          pip install build
+          pip install build twine
           python -m build
+          python -m twine check dist/*
+      - name: Verify package metadata
+        run: |
+          python - <<'PY'
+          import email
+          import os
+          import pathlib
+          import tarfile
+          import zipfile
+
+          expected = os.environ["RELEASE_VERSION"]
+          artifacts = sorted(pathlib.Path("dist").iterdir())
+          if len(artifacts) != 2:
+              raise SystemExit(f"expected one wheel and one sdist, got: {artifacts}")
+          versions = []
+          for artifact in artifacts:
+              if artifact.suffix == ".whl":
+                  with zipfile.ZipFile(artifact) as archive:
+                      metadata_name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+                      metadata = email.message_from_bytes(archive.read(metadata_name))
+              elif artifact.name.endswith(".tar.gz"):
+                  with tarfile.open(artifact, "r:gz") as archive:
+                      pkg_info = next(member for member in archive.getmembers() if member.name.endswith("/PKG-INFO"))
+                      extracted = archive.extractfile(pkg_info)
+                      if extracted is None:
+                          raise SystemExit(f"cannot read {pkg_info.name}")
+                      metadata = email.message_from_binary_file(extracted)
+              else:
+                  raise SystemExit(f"unexpected artifact: {artifact}")
+              versions.append(metadata["Version"])
+          if versions != [expected, expected]:
+              raise SystemExit(f"artifact versions {versions} do not match {expected}")
+          PY
       - name: Upload
         env:
           GH_TOKEN: "${{ github.token }}"
         run: |
-          tag="${{ github.ref_name }}"; if [[ -z "$tag" || "$tag" == "main" ]]; then tag="v0.1.2"; fi
-          gh release upload "$tag" dist/* --clobber || gh release create "$tag" dist/* --title "Release $tag" --generate-notes
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/* --verify-tag --title "Release $RELEASE_TAG" --generate-notes
+          fi

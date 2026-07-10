@@ -9,16 +9,11 @@ The test suite is under `tests/`.
 Run with:
 
 ```powershell
-python -m unittest discover -s tests -v
+call run_ci.bat
 ```
 
-Or with pytest:
-
-```powershell
-python -m pytest tests/ -v
-```
-
-Expected result: all tests pass.
+`run_ci.bat` is the canonical local gate. It runs Ruff, formatting, mypy,
+documentation/sample validation, and the complete pytest suite.
 
 ## Test Coverage
 
@@ -49,9 +44,4 @@ When adding or changing a method, verify:
 
 ## Linting and Type Checking
 
-```powershell
-python -m ruff check .
-python -m mypy src scripts
-```
-
-Both must pass with 0 errors before release.
+Use `run_ci.bat` so lint and type-check targets stay aligned with CI.

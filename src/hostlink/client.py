@@ -549,6 +549,7 @@ class HostLinkClient(HostLinkBase):
             self._sock = sock
             self._rx_buffer = b""
 
+        exchange_complete = False
         try:
             self._fire_trace(HostLinkTraceDirection.SEND, payload)
             self._sock.sendall(payload)
@@ -556,16 +557,21 @@ class HostLinkClient(HostLinkBase):
                 response = self._sock.recv(UDP_RECEIVE_BUFFER_SIZE)
             else:
                 response = self._recv_tcp_line()
+            exchange_complete = True
             self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
             return response
         except TimeoutError as exc:
-            if self.transport == "tcp":
-                self._close_unlocked()
             raise HostLinkConnectionError("Timeout while waiting response from PLC") from exc
+        except HostLinkConnectionError:
+            raise
         except OSError as exc:
-            if self.transport == "tcp":
-                self._close_unlocked()
             raise HostLinkConnectionError("Socket communication failed") from exc
+        finally:
+            if not exchange_complete:
+                # Host Link responses do not carry a transaction ID. Discard
+                # the whole transport so a late response cannot satisfy the
+                # next request, including when the transport is UDP.
+                self._close_unlocked()
 
     def _recv_tcp_line(self) -> bytes:
         if self._sock is None:
@@ -590,11 +596,12 @@ class HostLinkClient(HostLinkBase):
 
             chunk = self._sock.recv(self.buffer_size)
             if not chunk:
-                if self._rx_buffer:
-                    line = self._rx_buffer
-                    self._rx_buffer = b""
-                    return line
-                raise HostLinkConnectionError("Connection closed by PLC")
+                message = (
+                    "Connection closed by PLC before the response terminator"
+                    if self._rx_buffer
+                    else "Connection closed by PLC"
+                )
+                raise HostLinkConnectionError(message)
             self._rx_buffer += chunk
             if (
                 len(self._rx_buffer) > self.buffer_size
@@ -804,6 +811,8 @@ class AsyncHostLinkClient(HostLinkBase):
             _allow_manual_profile=_allow_manual_profile,
         )
         self.timeout = timeout
+        if buffer_size <= 0:
+            raise ValueError("buffer_size must be positive")
         self.buffer_size = buffer_size
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
@@ -859,25 +868,34 @@ class AsyncHostLinkClient(HostLinkBase):
             await self._close_unlocked()
 
     async def _close_unlocked(self) -> None:
-        if self._writer is not None:
-            self._writer.close()
+        writer = self._writer
+        self._writer = None
+        self._reader = None
+        udp_transport = self._udp_transport
+        udp_protocol = self._udp_protocol
+        self._udp_transport = None
+        self._udp_protocol = None
+
+        if udp_protocol is not None:
+            udp_protocol.cancel_pending_response()
+        if udp_transport is not None:
+            udp_transport.close()
+        if writer is not None:
+            writer.close()
             try:
-                await self._writer.wait_closed()
+                await writer.wait_closed()
             except Exception:
                 pass
-            self._writer = None
-            self._reader = None
-        if self._udp_transport is not None:
-            self._udp_transport.close()
-            self._udp_transport = None
-            self._udp_protocol = None
 
     async def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
         """Send one raw Host Link command body and return the decoded response text."""
 
         async with self._lock:
-            response = await self._exchange(self._build_command(body))
-            return self._process_response(response, decoder=decoder)
+            return await self._send_raw_unlocked(body, decoder=decoder)
+
+    async def _send_raw_unlocked(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
+        response = await self._exchange(self._build_command(body))
+        return self._process_response(response, decoder=decoder)
 
     async def _expect_ok(self, body: str) -> None:
         response = await self.send_raw(body)
@@ -889,6 +907,7 @@ class AsyncHostLinkClient(HostLinkBase):
         if self._reader is None and self._udp_transport is None:
             await self._connect_unlocked()
 
+        exchange_complete = False
         try:
             if self.transport == "tcp":
                 if self._writer is None:
@@ -899,6 +918,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._writer.write(payload)
                 await self._writer.drain()
                 response = await asyncio.wait_for(self._recv_tcp_line(), timeout=self.timeout)
+                exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
             else:
@@ -910,16 +930,20 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
                 response = await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=self.timeout)
+                exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
         except asyncio.TimeoutError as exc:
-            if self.transport == "tcp":
-                await self._close_unlocked()
             raise HostLinkConnectionError("Timeout while waiting response from PLC") from exc
+        except HostLinkConnectionError:
+            raise
         except OSError as exc:
-            if self.transport == "tcp":
-                await self._close_unlocked()
             raise HostLinkConnectionError("Socket communication failed") from exc
+        finally:
+            if not exchange_complete:
+                # This also runs for CancelledError, which intentionally is
+                # not translated into a library exception.
+                await self._close_unlocked()
 
     async def _recv_tcp_line(self) -> bytes:
         if self._reader is None:
@@ -928,9 +952,10 @@ class AsyncHostLinkClient(HostLinkBase):
         while True:
             byte = await self._reader.read(1)
             if not byte:
-                if line:
-                    return bytes(line)
-                raise HostLinkConnectionError("Connection closed by PLC")
+                message = (
+                    "Connection closed by PLC before the response terminator" if line else "Connection closed by PLC"
+                )
+                raise HostLinkConnectionError(message)
             if byte[0] in (10, 13):
                 if line:
                     return bytes(line)
@@ -1023,6 +1048,36 @@ class AsyncHostLinkClient(HostLinkBase):
         """Write one device with the Host Link ``WR`` command."""
 
         await self._expect_ok(self._build_write_command(device, value, data_format))
+
+    async def write_bit_in_word(self, device: str, bit_index: int, value: bool) -> None:
+        """Atomically set or clear one bit in a word for this client.
+
+        The client request lock is held across the read-modify-write pair, so
+        concurrent calls on the same client cannot overwrite each other's
+        updates. The PLC may still be updated by another connection between
+        the two Host Link commands.
+        """
+
+        if not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index}")
+        if not isinstance(value, bool):
+            raise TypeError("value must be bool")
+
+        read_body, suffix = self._build_read_command(device, ".U")
+        async with self._lock:
+            response = await self._send_raw_unlocked(read_body)
+            result = self._decode_read_response(response, suffix)
+            values = result if isinstance(result, list) else [result]
+            current = int(values[0])
+            if value:
+                current |= 1 << bit_index
+            else:
+                current &= ~(1 << bit_index)
+
+            write_body = self._build_write_command(device, current & 0xFFFF, ".U")
+            write_response = await self._send_raw_unlocked(write_body)
+            if write_response != "OK":
+                raise HostLinkProtocolError(f"Expected 'OK' but received {write_response!r} for command {write_body!r}")
 
     async def write_consecutive(
         self,
@@ -1134,9 +1189,17 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
             self._future.set_exception(exc)
 
     def prepare_response(self) -> None:
+        self.cancel_pending_response()
         self._future = asyncio.get_running_loop().create_future()
 
     async def wait_response(self) -> bytes:
         if self._future is None:
             raise HostLinkConnectionError("Not connected")
         return await self._future
+
+    def cancel_pending_response(self) -> None:
+        """Cancel and forget any response waiter owned by this endpoint."""
+
+        if self._future is not None and not self._future.done():
+            self._future.cancel()
+        self._future = None
