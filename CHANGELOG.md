@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -17,13 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.1] - 2026-07-10
+## [3.0.0] - 2026-07-10
 
 ### Changed
-- Release: Bumped package metadata and `hostlink.__version__` to `2.0.1`.
+- Release: Bumped package metadata and `hostlink.__version__` to `3.0.0`.
 
 ### BREAKING
-- Library: Moved PLC profile lookup APIs into `hostlink.plc_profiles`; import `available_plc_profiles`, `normalize_plc_profile`, `profile_from_name`, and `display_name` from the package root or `hostlink.plc_profiles`, not `hostlink.device_ranges`.
+- Library: Breaking: Moved PLC profile lookup APIs into `hostlink.plc_profiles`; imports from `hostlink.device_ranges` are no longer supported.
+- Migration: Import `available_plc_profiles`, `normalize_plc_profile`, `profile_from_name`, and `display_name` from the package root or `hostlink.plc_profiles`.
 
 ### Changed
 - Docs: Updated PLC profile documentation and API reference entries for the new `hostlink.plc_profiles` module.
