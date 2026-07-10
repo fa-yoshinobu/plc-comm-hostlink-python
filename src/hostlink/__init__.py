@@ -52,9 +52,11 @@ from .errors import (
 )
 from .plc_profiles import (
     KvHostLinkPlcProfile,
+    KvHostLinkPlcProfileDescriptor,
     available_plc_profiles,
     display_name,
     normalize_plc_profile,
+    plc_profile_descriptors,
     profile_from_name,
 )
 from .utils import (
@@ -106,10 +108,12 @@ __all__ = [
     "KvDeviceRangeNotation",
     "KvDeviceRangeSegment",
     "KvHostLinkPlcProfile",
+    "KvHostLinkPlcProfileDescriptor",
     "available_plc_profiles",
     "device_range_catalog_for_plc_profile",
     "display_name",
     "normalize_plc_profile",
+    "plc_profile_descriptors",
     "profile_from_name",
     "HostLinkAddress",
     "HostLinkConnectionOptions",

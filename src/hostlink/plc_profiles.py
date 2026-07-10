@@ -16,28 +16,47 @@ class KvHostLinkPlcProfile:
 
 
 @dataclass(frozen=True)
+class KvHostLinkPlcProfileDescriptor:
+    """Metadata used to present and select one canonical KV PLC profile."""
+
+    canonical_name: str
+    display_name: str
+    connectable: bool
+    base_profile: str | None
+
+
+@dataclass(frozen=True)
 class _KvHostLinkPlcProfileDefinition:
     name: str
     display_name: str
     source_label: str
+    base_profile: str | None = None
 
     def to_public_profile(self) -> KvHostLinkPlcProfile:
         return KvHostLinkPlcProfile(self.name, self.display_name)
 
+    def to_descriptor(self) -> KvHostLinkPlcProfileDescriptor:
+        return KvHostLinkPlcProfileDescriptor(
+            canonical_name=self.name,
+            display_name=self.display_name,
+            connectable=True,
+            base_profile=self.base_profile,
+        )
+
 
 _PROFILES = (
     _KvHostLinkPlcProfileDefinition("keyence:kv-nano", "KEYENCE KV-NANO", "KV-NANO"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-nano-xym", "KEYENCE KV-NANO (XYM)", "KV-NANO(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-nano-xym", "KEYENCE KV-NANO (XYM)", "KV-NANO(XYM)", "keyence:kv-nano"),
     _KvHostLinkPlcProfileDefinition("keyence:kv-3000", "KEYENCE KV-3000", "KV-3000"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-3000-xym", "KEYENCE KV-3000 (XYM)", "KV-3000(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-3000-xym", "KEYENCE KV-3000 (XYM)", "KV-3000(XYM)", "keyence:kv-3000"),
     _KvHostLinkPlcProfileDefinition("keyence:kv-5000", "KEYENCE KV-5000", "KV-5000"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-5000-xym", "KEYENCE KV-5000 (XYM)", "KV-5000(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-5000-xym", "KEYENCE KV-5000 (XYM)", "KV-5000(XYM)", "keyence:kv-5000"),
     _KvHostLinkPlcProfileDefinition("keyence:kv-7000", "KEYENCE KV-7000", "KV-7000"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-7000-xym", "KEYENCE KV-7000 (XYM)", "KV-7000(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-7000-xym", "KEYENCE KV-7000 (XYM)", "KV-7000(XYM)", "keyence:kv-7000"),
     _KvHostLinkPlcProfileDefinition("keyence:kv-8000", "KEYENCE KV-8000", "KV-8000"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-8000-xym", "KEYENCE KV-8000 (XYM)", "KV-8000(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-8000-xym", "KEYENCE KV-8000 (XYM)", "KV-8000(XYM)", "keyence:kv-8000"),
     _KvHostLinkPlcProfileDefinition("keyence:kv-x500", "KEYENCE KV-X500", "KV-X500"),
-    _KvHostLinkPlcProfileDefinition("keyence:kv-x500-xym", "KEYENCE KV-X500 (XYM)", "KV-X500(XYM)"),
+    _KvHostLinkPlcProfileDefinition("keyence:kv-x500-xym", "KEYENCE KV-X500 (XYM)", "KV-X500(XYM)", "keyence:kv-x500"),
 )
 
 
@@ -45,6 +64,12 @@ def available_plc_profiles() -> list[str]:
     """Return canonical PLC profile strings supported by the library."""
 
     return [profile.name for profile in _PROFILES]
+
+
+def plc_profile_descriptors() -> tuple[KvHostLinkPlcProfileDescriptor, ...]:
+    """Return presentation and connection metadata for every canonical KV profile."""
+
+    return tuple(profile.to_descriptor() for profile in _PROFILES)
 
 
 def normalize_plc_profile(plc_profile: str) -> str:
