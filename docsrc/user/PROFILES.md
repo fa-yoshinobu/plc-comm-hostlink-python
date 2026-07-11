@@ -36,7 +36,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options):
         print("Connected")
 

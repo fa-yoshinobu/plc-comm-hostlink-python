@@ -66,6 +66,7 @@ async def poll_forever(args: argparse.Namespace) -> None:
         host=args.host,
         plc_profile=args.plc_profile,
         port=args.port,
+        transport="tcp",
         timeout=args.timeout,
     )
 

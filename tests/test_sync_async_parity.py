@@ -11,7 +11,7 @@ from hostlink import AsyncHostLinkClient, HostLinkClient
 
 class _RecordingSyncHostLinkClient(HostLinkClient):
     def __init__(self, response: bytes) -> None:
-        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", auto_connect=False)
+        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
         self.response = response
         self.sent_frames: list[bytes] = []
 
@@ -22,7 +22,7 @@ class _RecordingSyncHostLinkClient(HostLinkClient):
 
 class _RecordingAsyncHostLinkClient(AsyncHostLinkClient):
     def __init__(self, response: bytes) -> None:
-        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", auto_connect=False)
+        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
         self.response = response
         self.sent_frames: list[bytes] = []
 
@@ -101,8 +101,8 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read",
-        lambda client: client.read("DM100.U"),
-        lambda client: client.read("DM100.U"),
+        lambda client: client.read("DM100", data_format=".U"),
+        lambda client: client.read("DM100", data_format=".U"),
         response=b"123\r\n",
     ),
     _ParityCase(
@@ -113,20 +113,20 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read_consecutive",
-        lambda client: client.read_consecutive("DM100.U", 2),
-        lambda client: client.read_consecutive("DM100.U", 2),
+        lambda client: client.read_consecutive("DM100", 2, data_format=".U"),
+        lambda client: client.read_consecutive("DM100", 2, data_format=".U"),
         response=b"10 20\r\n",
     ),
     _ParityCase(
         "read_consecutive_legacy",
-        lambda client: client.read_consecutive_legacy("DM100.U", 2),
-        lambda client: client.read_consecutive_legacy("DM100.U", 2),
+        lambda client: client.read_consecutive_legacy("DM100", 2, data_format=".U"),
+        lambda client: client.read_consecutive_legacy("DM100", 2, data_format=".U"),
         response=b"10 20\r\n",
     ),
     _ParityCase(
         "write",
-        lambda client: client.write("DM100.U", 1234),
-        lambda client: client.write("DM100.U", 1234),
+        lambda client: client.write("DM100", 1234, data_format=".U"),
+        lambda client: client.write("DM100", 1234, data_format=".U"),
     ),
     _ParityCase(
         "write_hex_format",
@@ -135,23 +135,23 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "write_consecutive",
-        lambda client: client.write_consecutive("DM100.U", [100, 200, 300]),
-        lambda client: client.write_consecutive("DM100.U", [100, 200, 300]),
+        lambda client: client.write_consecutive("DM100", [100, 200, 300], data_format=".U"),
+        lambda client: client.write_consecutive("DM100", [100, 200, 300], data_format=".U"),
     ),
     _ParityCase(
         "write_consecutive_legacy",
-        lambda client: client.write_consecutive_legacy("DM100.U", [100, 200, 300]),
-        lambda client: client.write_consecutive_legacy("DM100.U", [100, 200, 300]),
+        lambda client: client.write_consecutive_legacy("DM100", [100, 200, 300], data_format=".U"),
+        lambda client: client.write_consecutive_legacy("DM100", [100, 200, 300], data_format=".U"),
     ),
     _ParityCase(
         "write_set_value",
-        lambda client: client.write_set_value("T0.D", 1000),
-        lambda client: client.write_set_value("T0.D", 1000),
+        lambda client: client.write_set_value("T0", 1000, data_format=".D"),
+        lambda client: client.write_set_value("T0", 1000, data_format=".D"),
     ),
     _ParityCase(
         "write_set_value_consecutive",
-        lambda client: client.write_set_value_consecutive("C0.D", [10, 20]),
-        lambda client: client.write_set_value_consecutive("C0.D", [10, 20]),
+        lambda client: client.write_set_value_consecutive("C0", [10, 20], data_format=".D"),
+        lambda client: client.write_set_value_consecutive("C0", [10, 20], data_format=".D"),
     ),
     _ParityCase(
         "register_monitor_bits",
@@ -160,8 +160,8 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "register_monitor_words",
-        lambda client: client.register_monitor_words("DM0.U", "DM1.U"),
-        lambda client: client.register_monitor_words("DM0.U", "DM1.U"),
+        lambda client: client.register_monitor_words([("DM0", ".U"), ("DM1", ".U")]),
+        lambda client: client.register_monitor_words([("DM0", ".U"), ("DM1", ".U")]),
     ),
     _ParityCase(
         "read_monitor_bits",
@@ -188,8 +188,8 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read_expansion_unit_buffer",
-        lambda client: client.read_expansion_unit_buffer(1, 100, 2),
-        lambda client: client.read_expansion_unit_buffer(1, 100, 2),
+        lambda client: client.read_expansion_unit_buffer(1, 100, 2, data_format=".U"),
+        lambda client: client.read_expansion_unit_buffer(1, 100, 2, data_format=".U"),
         response=b"123 456\r\n",
     ),
     _ParityCase(

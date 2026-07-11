@@ -37,8 +37,8 @@
     {"id": "ws_t0_1000",       "command": "write_set_value",       "device": "T0.D",  "value": 1000,           "expected_body": "WS T0.D 1000"},
     {"id": "wss_t0_vals",      "command": "write_set_value_consecutive","device": "T0.D","values": [1000, 2000],  "expected_body": "WSS T0.D 2 1000 2000"},
     {"id": "be_3",             "command": "switch_bank",           "bank": 3,          "expected_body": "BE 3"},
-    {"id": "urd_unit2_100_3",  "command": "read_expansion_unit_buffer","unit": 2, "address": 100, "count": 3,  "expected_body": "URD 02 100.U 3"},
-    {"id": "uwr_unit2_100_vals","command": "write_expansion_unit_buffer","unit": 2, "address": 100, "values": [1, 2], "expected_body": "UWR 02 100.U 2 1 2"},
+    {"id": "urd_unit2_100_3",  "command": "read_expansion_unit_buffer","unit": 2, "address": 100, "count": 3, "data_format": ".U", "expected_body": "URD 02 100.U 3"},
+    {"id": "uwr_unit2_100_vals","command": "write_expansion_unit_buffer","unit": 2, "address": 100, "values": [1, 2], "data_format": ".U", "expected_body": "UWR 02 100.U 2 1 2"},
     {"id": "rdc_dm100",        "command": "read_comments",         "device": "DM100", "expected_body": "RDC DM100"}
   ]
 }

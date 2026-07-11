@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> None:
-    options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port)
+    options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port, transport="tcp")
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
         seen = 0

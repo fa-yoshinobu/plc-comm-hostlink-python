@@ -272,13 +272,9 @@ def parse_device(text: str, *, allow_omitted_type: bool | None = None) -> Device
     return DeviceAddress(device_type=device_type, number=number, suffix=suffix)
 
 
-def parse_device_text(text: str, *, default_suffix: str = "") -> str:
+def parse_device_text(text: str) -> str:
     """Parse/validate device text and return normalized command token."""
-    addr = parse_device(text)
-    suffix = normalize_suffix(default_suffix) if default_suffix else addr.suffix
-    if suffix != addr.suffix:
-        addr = DeviceAddress(addr.device_type, addr.number, suffix)
-    return addr.to_text()
+    return parse_device(text).to_text()
 
 
 def _format_bit_bank_number(number: int) -> str:
@@ -337,14 +333,23 @@ def resolve_effective_format(device_type: str, suffix: str) -> str:
 def require_explicit_format(addr: DeviceAddress, data_format: str | None = None) -> str:
     """Return a usable data-format suffix or reject ambiguous word access."""
 
-    suffix = normalize_suffix(data_format) if data_format is not None else addr.suffix
+    if addr.suffix:
+        raise HostLinkProtocolError(
+            f"Low-level device {addr.to_text()!r} must not contain a data-format suffix; "
+            "pass the base device and data_format separately."
+        )
+    if data_format is None or (isinstance(data_format, str) and not data_format.strip()):
+        if addr.device_type in DIRECT_BIT_DEVICE_TYPES:
+            return ""
+        expected = resolve_effective_format(addr.device_type, "") or ".U"
+        raise HostLinkProtocolError(
+            f"data_format is required for numeric device {addr.to_text()!r}; "
+            f"specify {expected!r} or another supported numeric format."
+        )
+    suffix = normalize_suffix(data_format)
     if suffix:
         return suffix
-    if resolve_effective_format(addr.device_type, "") == "":
-        return ""
-    raise HostLinkProtocolError(
-        f"Device {addr.to_text()!r} requires an explicit data format suffix such as '.U', '.S', '.D', '.L', or '.H'."
-    )
+    raise HostLinkProtocolError(f"data_format is required for numeric device {addr.to_text()!r}.")
 
 
 def validate_device_type(command: str, device_type: str, allowed_types: set[str]) -> None:

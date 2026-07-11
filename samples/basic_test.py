@@ -36,14 +36,14 @@ def main():
 
             # 3. Simple Read/Write Test (DM0.S - Signed Word)
             print("Reading DM0.S...")
-            val = plc.read("DM0.S")
+            val = plc.read("DM0", data_format=".S")
             print(f"Current DM0 value: {val}")
 
             new_val = (val + 1) % 32768 if isinstance(val, int) else 1
             print(f"Writing {new_val} to DM0.S...")
-            plc.write("DM0.S", new_val)
+            plc.write("DM0", new_val, data_format=".S")
 
-            val_after = plc.read("DM0.S")
+            val_after = plc.read("DM0", data_format=".S")
             print(f"Verified DM0 value: {val_after}")
 
             if val_after == new_val:

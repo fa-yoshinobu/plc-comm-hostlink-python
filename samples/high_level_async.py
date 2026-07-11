@@ -4,8 +4,8 @@ KEYENCE Host Link - High-Level Asynchronous API Sample
 ======================================================
 Demonstrates the core high-level *async* utility helpers shipped with the
 hostlink package (HostLinkConnectionOptions, open_and_connect,
-parse_address, format_address, normalize_address, read_typed, write_typed, read_named, read_words_single_request,
-read_dwords_single_request, read_words_chunked, read_dwords_chunked,
+parse_address, format_address, normalize_address, read_typed, write_typed, read_named,
+read_words_single_request, read_dwords_single_request,
 write_bit_in_word, poll).
 
 Usage
@@ -31,11 +31,9 @@ from hostlink import (
     open_and_connect,
     parse_address,
     poll,
-    read_dwords_chunked,
     read_dwords_single_request,
     read_named,
     read_typed,
-    read_words_chunked,
     read_words_single_request,
     write_bit_in_word,
     write_typed,
@@ -85,7 +83,9 @@ async def demo_open_and_connect(host: str, port: int, plc_profile: str) -> None:
     Returns a connected client object for the helper functions below.
     """
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
-    client = await open_and_connect(HostLinkConnectionOptions(host=host, plc_profile=plc_profile, port=port))
+    client = await open_and_connect(
+        HostLinkConnectionOptions(host=host, plc_profile=plc_profile, port=port, transport="tcp")
+    )
     print(f"[open_and_connect] Connected to {host}:{port}")
     await client.close()
 
@@ -139,8 +139,8 @@ async def demo_array_reads(client) -> None:
     """
     Explicit contiguous helpers.
 
-    `*_single_request` keeps one logical read on one PLC request.
-    `*_chunked` is the explicit opt-in surface for large multi-request reads.
+    `*_single_request` keeps one logical read on one PLC request. Larger reads
+    must be divided deliberately by the application so timing boundaries are visible.
 
     Use case: reading a data table of 10 consecutive words in one
               Host Link command instead of 10 individual reads.
@@ -152,12 +152,6 @@ async def demo_array_reads(client) -> None:
     # Read consecutive 32-bit values in one PLC request.
     dwords = await read_dwords_single_request(client, "DM0", 4)
     print(f"[read_dwords_single_request] DM0-DM7 (as 4 x uint32) = {dwords}")
-
-    # Read larger areas only when explicit multi-request chunking is acceptable.
-    large_words = await read_words_chunked(client, "DM1000", 1000)
-    large_dwords = await read_dwords_chunked(client, "DM2000", 120)
-    print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
-    print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
 
 async def demo_bit_in_word(client) -> None:
@@ -244,7 +238,7 @@ async def run(args: argparse.Namespace) -> None:
     # 2-6. connect once, run all demos
     # Reuse one connection for the remaining helper demos.
     client = await open_and_connect(
-        HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port)
+        HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port, transport="tcp")
     )
     try:
         await demo_typed_rw(client)

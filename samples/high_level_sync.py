@@ -26,11 +26,9 @@ from hostlink import (
     normalize_address,
     open_and_connect,
     poll,
-    read_dwords_chunked,
     read_dwords_single_request,
     read_named,
     read_typed,
-    read_words_chunked,
     read_words_single_request,
     write_bit_in_word,
     write_typed,
@@ -100,12 +98,6 @@ async def run(args: argparse.Namespace) -> None:
             dwords = await read_dwords_single_request(client, "DM30", 3)
             print(f"[read_words_single_request] DM20-DM25 = {words}")
             print(f"[read_dwords_single_request] DM30-DM35 = {dwords}")
-
-            # Read larger areas only when explicit multi-request chunking is acceptable.
-            large_words = await read_words_chunked(client, "DM1000", 1000)
-            large_dwords = await read_dwords_chunked(client, "DM2000", 120)
-            print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
-            print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
             # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
             await write_bit_in_word(client, "DM50", bit_index=0, value=True)

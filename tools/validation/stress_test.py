@@ -15,7 +15,7 @@ def run_sync_stress(host, plc_profile, port, transport, count=500):
             start = time.perf_counter()
             try:
                 # Read DM0
-                plc.read("DM0.U")
+                plc.read("DM0", data_format=".U")
                 end = time.perf_counter()
                 latencies.append((end - start) * 1000)
                 if i % 100 == 0:
@@ -63,14 +63,14 @@ def run_bulk_test(host, plc_profile, port, transport, words=1000):
         try:
             # Test Bulk Read
             start = time.perf_counter()
-            data = plc.read_consecutive("DM1000.U", words)
+            data = plc.read_consecutive("DM1000", words, data_format=".U")
             end = time.perf_counter()
             print(f"Bulk Read {words} words: {(end - start) * 1000:.2f}ms (Size: {len(data)} items)")
 
             # Test Bulk Write
             write_data = [i % 65535 for i in range(words)]
             start = time.perf_counter()
-            plc.write_consecutive("DM1000.U", write_data)
+            plc.write_consecutive("DM1000", write_data, data_format=".U")
             end = time.perf_counter()
             print(f"Bulk Write {words} words: {(end - start) * 1000:.2f}ms")
 

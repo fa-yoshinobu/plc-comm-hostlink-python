@@ -105,9 +105,8 @@ class TestComprehensiveSync(unittest.TestCase):
     def setUp(self):
         self.server = MockSyncServer(transport="tcp")
         self.server.start()
-        self.client = HostLinkClient(
-            "127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, auto_connect=True
-        )
+        self.client = HostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, transport="tcp")
+        self.client.connect()
 
     def tearDown(self):
         self.client.close()
@@ -140,13 +139,13 @@ class TestComprehensiveSync(unittest.TestCase):
             plc_profile="keyence:kv-8000",
             port=server.port,
             transport="udp",
-            auto_connect=True,
         )
+        client.connect()
         try:
             large_response = "7" * 9000
             server.responses["LARGE"] = large_response
 
-            self.assertEqual(client.send_raw("LARGE"), large_response)
+            self.assertEqual(client.send_raw("LARGE"), large_response.encode("ascii"))
         finally:
             client.close()
             server.stop()
@@ -175,15 +174,15 @@ class TestComprehensiveSync(unittest.TestCase):
         self.assertEqual(self.server.last_received[-1], "RSS R100 3")
 
     def test_write_set_value(self):
-        self.client.write_set_value("T0.D", 100)
+        self.client.write_set_value("T0", 100, data_format=".D")
         self.assertEqual(self.server.last_received[-1], "WS T0.D 100")
-        self.client.write_set_value_consecutive("C0.D", [10, 20])
+        self.client.write_set_value_consecutive("C0", [10, 20], data_format=".D")
         self.assertEqual(self.server.last_received[-1], "WSS C0.D 2 10 20")
 
     def test_monitor(self):
         self.client.register_monitor_bits("R0", "R1", "R2")
         self.assertEqual(self.server.last_received[-1], "MBS R000 R001 R002")
-        self.client.register_monitor_words("DM0.U", "DM1.U")
+        self.client.register_monitor_words([("DM0", ".U"), ("DM1", ".U")])
         self.assertEqual(self.server.last_received[-1], "MWS DM0.U DM1.U")
         self.server.responses["MBR"] = "1 0 1"
         self.assertEqual(self.client.read_monitor_bits(), [1, 0, 1])
@@ -206,7 +205,7 @@ class TestComprehensiveSync(unittest.TestCase):
 
     def test_expansion_unit(self):
         self.server.responses["URD 01 100.U 2"] = "123 456"
-        vals = self.client.read_expansion_unit_buffer(1, 100, 2)
+        vals = self.client.read_expansion_unit_buffer(1, 100, 2, data_format=".U")
         self.assertEqual(vals, [123, 456])
         self.client.write_expansion_unit_buffer(1, 200, [789, 1011], data_format=".S")
         self.assertEqual(self.server.last_received[-1], "UWR 01 200.S 2 789 1011")
@@ -224,7 +223,7 @@ class TestComprehensiveSync(unittest.TestCase):
     def test_errors(self):
         self.server.responses["RD DM0.U"] = "E0"
         with self.assertRaises(HostLinkError):
-            self.client.read("DM0.U")
+            self.client.read("DM0", data_format=".U")
         with self.assertRaises(HostLinkProtocolError):
             self.client.read("INVALID")
 
@@ -235,27 +234,27 @@ class TestComprehensiveSync(unittest.TestCase):
             with HostLinkClient(
                 "127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp"
             ) as client:
-                client.write("DM0.U", 123)
+                client.write("DM0", 123, data_format=".U")
                 self.assertEqual(udp_server.last_received[-1], "WR DM0.U 123")
         finally:
             udp_server.stop()
 
     def test_consecutive_commands(self):
         self.server.responses["RDS DM0.U 3"] = "10 20 30"
-        self.assertEqual(self.client.read_consecutive("DM0.U", 3), [10, 20, 30])
-        self.client.write_consecutive("DM10.U", [100, 200])
+        self.assertEqual(self.client.read_consecutive("DM0", 3, data_format=".U"), [10, 20, 30])
+        self.client.write_consecutive("DM10", [100, 200], data_format=".U")
         self.assertEqual(self.server.last_received[-1], "WRS DM10.U 2 100 200")
 
     def test_hex_reads_return_hex_strings(self):
         self.server.responses["RD DM2.H"] = "00FF"
-        self.assertEqual(self.client.read("DM2.H"), "00FF")
+        self.assertEqual(self.client.read("DM2", data_format=".H"), "00FF")
         self.server.responses["RDS DM2.H 2"] = "00FF 000A"
-        self.assertEqual(self.client.read_consecutive("DM2.H", 2), ["00FF", "000A"])
+        self.assertEqual(self.client.read_consecutive("DM2", 2, data_format=".H"), ["00FF", "000A"])
 
     def test_legacy_commands(self):
         self.server.responses["RDE DM0.U 2"] = "1 2"
-        self.assertEqual(self.client.read_consecutive_legacy("DM0.U", 2), [1, 2])
-        self.client.write_consecutive_legacy("DM10.U", [5, 6])
+        self.assertEqual(self.client.read_consecutive_legacy("DM0", 2, data_format=".U"), [1, 2])
+        self.client.write_consecutive_legacy("DM10", [5, 6], data_format=".U")
         self.assertEqual(self.server.last_received[-1], "WRE DM10.U 2 5 6")
 
 
@@ -263,7 +262,10 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = MockSyncServer(transport="tcp")
         self.server.start()
-        self.client = AsyncHostLinkClient("127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port)
+        self.client = AsyncHostLinkClient(
+            "127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, transport="tcp"
+        )
+        await self.client.connect()
 
     async def asyncTearDown(self):
         await self.client.close()
@@ -273,7 +275,7 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         await self.client.change_mode("RUN")
         self.assertEqual(self.server.last_received[-1], "M1")
         self.server.responses["RD DM0.U"] = "555"
-        val = await self.client.read("DM0.U")
+        val = await self.client.read("DM0", data_format=".U")
         self.assertEqual(val, 555)
 
     async def test_async_udp(self):
@@ -283,10 +285,10 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
             async with AsyncHostLinkClient(
                 "127.0.0.1", plc_profile="keyence:kv-8000", port=udp_server.port, transport="udp"
             ) as client:
-                await client.write("DM10.U", 999)
+                await client.write("DM10", 999, data_format=".U")
                 self.assertEqual(udp_server.last_received[-1], "WR DM10.U 999")
                 udp_server.responses["RD DM10.U"] = "999"
-                val = await client.read("DM10.U")
+                val = await client.read("DM10", data_format=".U")
                 self.assertEqual(val, 999)
         finally:
             udp_server.stop()
@@ -294,22 +296,28 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
     async def test_async_parallel(self):
         self.server.responses["RD DM0.U"] = "0"
         self.server.responses["RD DM1.U"] = "1"
-        tasks = [self.client.read("DM0.U"), self.client.read("DM1.U")]
+        tasks = [
+            self.client.read("DM0", data_format=".U"),
+            self.client.read("DM1", data_format=".U"),
+        ]
         results = await asyncio.gather(*tasks)
         self.assertIn(0, results)
         self.assertIn(1, results)
 
     async def test_async_consecutive_commands(self):
         self.server.responses["RDS DM0.U 3"] = "10 20 30"
-        self.assertEqual(await self.client.read_consecutive("DM0.U", 3), [10, 20, 30])
-        await self.client.write_consecutive("DM10.U", [100, 200])
+        self.assertEqual(await self.client.read_consecutive("DM0", 3, data_format=".U"), [10, 20, 30])
+        await self.client.write_consecutive("DM10", [100, 200], data_format=".U")
         self.assertEqual(self.server.last_received[-1], "WRS DM10.U 2 100 200")
 
     async def test_async_hex_reads_return_hex_strings(self):
         self.server.responses["RD DM2.H"] = "00FF"
-        self.assertEqual(await self.client.read("DM2.H"), "00FF")
+        self.assertEqual(await self.client.read("DM2", data_format=".H"), "00FF")
         self.server.responses["RDS DM2.H 2"] = "00FF 000A"
-        self.assertEqual(await self.client.read_consecutive("DM2.H", 2), ["00FF", "000A"])
+        self.assertEqual(
+            await self.client.read_consecutive("DM2", 2, data_format=".H"),
+            ["00FF", "000A"],
+        )
 
     async def test_async_float_helpers(self):
         self.server.responses["RDS DM0.U 2"] = "0 16288"
@@ -333,7 +341,7 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.server.last_received[-1], "WR DM2.H FF")
 
         await write_typed(self.client, "DM3", "H", "00aa")
-        self.assertEqual(self.server.last_received[-1], "WR DM3.H 00AA")
+        self.assertEqual(self.server.last_received[-1], "WR DM3.H AA")
 
         self.server.last_received.clear()
         self.server.responses["RD DM4.H"] = "ABCD"
@@ -454,15 +462,15 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_legacy_commands(self):
         self.server.responses["RDE DM0.U 2"] = "1 2"
-        self.assertEqual(await self.client.read_consecutive_legacy("DM0.U", 2), [1, 2])
-        await self.client.write_consecutive_legacy("DM10.U", [5, 6])
+        self.assertEqual(await self.client.read_consecutive_legacy("DM0", 2, data_format=".U"), [1, 2])
+        await self.client.write_consecutive_legacy("DM10", [5, 6], data_format=".U")
         self.assertEqual(self.server.last_received[-1], "WRE DM10.U 2 5 6")
 
     async def test_async_expansion(self):
         self.server.responses["URD 00 500.U 1"] = "999"
-        val = await self.client.read_expansion_unit_buffer(0, 500, 1)
+        val = await self.client.read_expansion_unit_buffer(0, 500, 1, data_format=".U")
         self.assertEqual(val, [999])
-        await self.client.write_expansion_unit_buffer(0, 600, [111])
+        await self.client.write_expansion_unit_buffer(0, 600, [111], data_format=".U")
         self.assertEqual(self.server.last_received[-1], "UWR 00 600.U 1 111")
 
 

@@ -30,10 +30,11 @@ def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:
         "127.0.0.1",
         plc_profile="keyence:kv-8000",
         port=port,
+        transport="tcp",
         timeout=1.0,
-        auto_connect=False,
     )
     try:
+        client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
             client.send_raw("READ")
         assert client._sock is None
@@ -68,15 +69,16 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
         port=port,
         transport="udp",
         timeout=0.05,
-        auto_connect=False,
     )
     try:
+        client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
             client.send_raw("FIRST")
         assert client._sock is None
 
         client.timeout = 1.0
-        assert client.send_raw("SECOND") == "SECOND"
+        client.connect()
+        assert client.send_raw("SECOND") == b"SECOND"
     finally:
         client.close()
         thread.join(timeout=3.0)
@@ -119,15 +121,16 @@ async def test_async_udp_timeout_discards_delayed_response() -> None:
         port=port,
         transport="udp",
         timeout=0.05,
-        auto_connect=False,
     )
     try:
+        await client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
             await client.send_raw("FIRST")
         assert client._udp_transport is None
 
         client.timeout = 1.0
-        assert await client.send_raw("SECOND") == "SECOND"
+        await client.connect()
+        assert await client.send_raw("SECOND") == b"SECOND"
         assert protocol.count == 2
     finally:
         await client.close()
@@ -175,10 +178,11 @@ async def test_async_tcp_cancellation_discards_delayed_response() -> None:
         "127.0.0.1",
         plc_profile="keyence:kv-8000",
         port=port,
+        transport="tcp",
         timeout=1.0,
-        auto_connect=False,
     )
     try:
+        await client.connect()
         first_request = asyncio.create_task(client.send_raw("FIRST"))
         await asyncio.wait_for(first_seen.wait(), timeout=1.0)
         first_request.cancel()
@@ -187,7 +191,8 @@ async def test_async_tcp_cancellation_discards_delayed_response() -> None:
         assert client._writer is None
 
         release_first.set()
-        assert await client.send_raw("SECOND") == "SECOND"
+        await client.connect()
+        assert await client.send_raw("SECOND") == b"SECOND"
     finally:
         release_first.set()
         await client.close()
@@ -212,10 +217,11 @@ async def test_async_tcp_eof_before_terminator_rejects_partial_response() -> Non
         "127.0.0.1",
         plc_profile="keyence:kv-8000",
         port=port,
+        transport="tcp",
         timeout=1.0,
-        auto_connect=False,
     )
     try:
+        await client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
             await client.send_raw("READ")
         assert client._writer is None
@@ -230,7 +236,8 @@ class _AtomicWordClient(AsyncHostLinkClient):
         super().__init__(
             "127.0.0.1",
             plc_profile="keyence:kv-8000",
-            auto_connect=False,
+            port=8501,
+            transport="tcp",
         )
         self.word = 0
 

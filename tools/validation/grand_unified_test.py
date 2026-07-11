@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import time
+from datetime import datetime
 
 from hostlink import AsyncHostLinkClient, HostLinkClient
 from hostlink.errors import HostLinkError
@@ -15,7 +16,8 @@ async def grand_unified_test(host, plc_profile, port, transport):
     reconn_start = time.perf_counter()
     for i in range(50):
         try:
-            client = HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport, auto_connect=True)
+            client = HostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport)
+            client.connect()
             client.query_model()
             client.close()
             if i % 10 == 0:
@@ -28,7 +30,7 @@ async def grand_unified_test(host, plc_profile, port, transport):
     print("\n[Phase 2] System Control & Mode Toggle")
     async with AsyncHostLinkClient(host, plc_profile=plc_profile, port=port, transport=transport) as plc:
         for i in range(5):
-            await plc.set_time()  # Clock Sync
+            await plc.set_time(datetime.now())  # Clock Sync
             await plc.change_mode("PROGRAM")
             await plc.change_mode("RUN")
             if i % 2 == 0:
@@ -38,8 +40,8 @@ async def grand_unified_test(host, plc_profile, port, transport):
         # --- Phase 3: Monitoring Limits (120 Devices) ---
         print("\n[Phase 3] Max Monitoring Test (120 devices)")
         # Register 120 DM devices
-        monitor_devs = [f"DM{i}.U" for i in range(120)]
-        await plc.register_monitor_words(*monitor_devs)
+        monitor_devs = [(f"DM{i}", ".U") for i in range(120)]
+        await plc.register_monitor_words(monitor_devs)
         print("  Registered 120 devices for monitoring.")
 
         mon_start = time.perf_counter()
@@ -74,7 +76,7 @@ async def grand_unified_test(host, plc_profile, port, transport):
         for addr in range(0, 101):
             try:
                 # Read 1 word from Buffer Memory
-                res = await plc.read_expansion_unit_buffer(unit_no, addr, 1)
+                res = await plc.read_expansion_unit_buffer(unit_no, addr, 1, data_format=".U")
                 success_urd += 1
             except HostLinkError:
                 pass  # Unit might not exist at this addr

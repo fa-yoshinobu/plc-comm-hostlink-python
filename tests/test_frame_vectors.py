@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from hostlink import HostLinkClient
+from hostlink.device import DeviceAddress, parse_device
 from hostlink.errors import HostLinkProtocolError
 
 _VECTORS_PATH = Path(__file__).parent / "vectors" / "hostlink_frame_vectors.json"
@@ -20,7 +21,7 @@ _VECTORS = json.loads(_VECTORS_PATH.read_text())["vectors"]
 
 class _FakeHostLinkClient(HostLinkClient):
     def __init__(self) -> None:
-        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", auto_connect=False)
+        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
         self.sent_frames: list[bytes] = []
 
     def _exchange(self, payload: bytes) -> bytes:
@@ -31,13 +32,17 @@ class _FakeHostLinkClient(HostLinkClient):
 def _run_command(client: _FakeHostLinkClient, vec: dict[str, Any]) -> None:
     cmd = vec["command"]
     if cmd == "read":
-        client.read(vec["device"])
+        device, data_format = _device_and_format(vec["device"])
+        client.read(device, data_format=data_format)
     elif cmd == "read_consecutive":
-        client.read_consecutive(vec["device"], vec["count"])
+        device, data_format = _device_and_format(vec["device"])
+        client.read_consecutive(device, vec["count"], data_format=data_format)
     elif cmd == "write":
-        client.write(vec["device"], vec["value"])
+        device, data_format = _device_and_format(vec["device"])
+        client.write(device, vec["value"], data_format=data_format)
     elif cmd == "write_consecutive":
-        client.write_consecutive(vec["device"], vec["values"])
+        device, data_format = _device_and_format(vec["device"])
+        client.write_consecutive(device, vec["values"], data_format=data_format)
     elif cmd == "change_mode":
         client.change_mode(vec["mode"])
     elif cmd == "clear_error":
@@ -65,17 +70,21 @@ def _run_command(client: _FakeHostLinkClient, vec: dict[str, Any]) -> None:
     elif cmd == "read_monitor_words":
         client.read_monitor_words()
     elif cmd == "read_consecutive_legacy":
-        client.read_consecutive_legacy(vec["device"], vec["count"])
+        device, data_format = _device_and_format(vec["device"])
+        client.read_consecutive_legacy(device, vec["count"], data_format=data_format)
     elif cmd == "write_consecutive_legacy":
-        client.write_consecutive_legacy(vec["device"], vec["values"])
+        device, data_format = _device_and_format(vec["device"])
+        client.write_consecutive_legacy(device, vec["values"], data_format=data_format)
     elif cmd == "register_monitor_bits":
         client.register_monitor_bits(*vec["devices"])
     elif cmd == "register_monitor_words":
-        client.register_monitor_words(*vec["devices"])
+        client.register_monitor_words([_monitor_entry(device) for device in vec["devices"]])
     elif cmd == "write_set_value":
-        client.write_set_value(vec["device"], vec["value"])
+        device, data_format = _device_and_format(vec["device"])
+        client.write_set_value(device, vec["value"], data_format=data_format)
     elif cmd == "write_set_value_consecutive":
-        client.write_set_value_consecutive(vec["device"], vec["values"])
+        device, data_format = _device_and_format(vec["device"])
+        client.write_set_value_consecutive(device, vec["values"], data_format=data_format)
     elif cmd == "switch_bank":
         client.switch_bank(vec.get("bank", vec.get("bank_no")))
     elif cmd == "read_expansion_unit_buffer":
@@ -98,13 +107,25 @@ def _run_command(client: _FakeHostLinkClient, vec: dict[str, Any]) -> None:
         raise ValueError(f"Unknown command: {cmd}")
 
 
+def _device_and_format(device: str) -> tuple[str, str | None]:
+    parsed = parse_device(device)
+    base = DeviceAddress(parsed.device_type, parsed.number, "").to_text()
+    return base, parsed.suffix or None
+
+
+def _monitor_entry(device: str) -> str | tuple[str, str]:
+    base, data_format = _device_and_format(device)
+    return base if data_format is None else (base, data_format)
+
+
 @pytest.mark.parametrize("vec", _VECTORS, ids=lambda v: v["id"])
 def test_frame_body(vec: dict[str, Any]) -> None:
     client = _FakeHostLinkClient()
     try:
         _run_command(client, vec)
     except HostLinkProtocolError:
-        raise
+        if not client.sent_frames:
+            raise
     except Exception:
         pass  # Ignore parse/value errors on the fake "OK" response; only care what was sent
     expected = (vec["expected_body"] + "\r").encode("ascii")

@@ -17,6 +17,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Library: Require explicit `port`, `transport`, and canonical `plc_profile` connection settings while retaining the common 3-second timeout default.
+- Library: Constructors now perform local initialization only; commands require an explicit successful `connect()` and never reconnect or retry implicitly after transport failure.
+- Library: Fix normal command framing to CR, make PLC clock values and expansion-buffer formats mandatory, and strictly validate typed write values and response tokens without masking or fallback conversion.
+- Library: Return undecoded response-body `bytes` from maintainer `send_raw`; semantic operations use private command-specific decoding.
+- Library: Normalize comment padding by removing trailing ASCII space bytes only, and serialize sync and async bit-in-word read-modify-write operations as one compound critical section.
+- Library: Enforce an internal 65,536-byte response-body cap for TCP and UDP while keeping receive chunk sizing private.
+- Docs: Document the explicit connection lifecycle, base-device plus separate-format low-level contract, and single-request timing boundary.
+
+### Removed
+
+- Library: Breaking: Remove `auto_connect`, `append_lf_on_send`, public receive-buffer sizing, public trace exports/options, comment padding switches, default address suffixes, and public automatic word/dword chunking helpers.
+- Library: Breaking: Reject suffix-bearing numeric low-level devices such as `DM0.U`; pass `device="DM0"` and `data_format=".U"` separately.
+
+### Fixed
+
+- Library: Reject missing or contradictory numeric formats before communication, eliminating the conflicting low-level `DM100.D` dword and high-level `DM100.D` bit-13 interpretations.
+- Library: Preserve raw PLC error and non-ASCII response bytes, reject invalid calendar/weekday combinations, and discard transports after response overflow or incomplete exchanges.
+
 ## [3.1.0] - 2026-07-10
 
 ### Added

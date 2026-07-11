@@ -18,8 +18,6 @@
 | `poll` | Read repeated snapshots on a fixed interval. |
 | `read_words_single_request` | Read contiguous 16-bit words in one PLC request. |
 | `read_dwords_single_request` | Read contiguous 32-bit values in one PLC request. |
-| `read_words_chunked` | Read a large 16-bit word block by explicit chunks. |
-| `read_dwords_chunked` | Read a large 32-bit value block by explicit chunks. |
 | `write_bit_in_word` | Set or clear one bit inside a word device. |
 | `read_timer_counter` | Read timer or counter status, current value, and preset. |
 | `read_timer` | Read a timer as status, current value, and preset. |
@@ -78,7 +76,6 @@ async def main() -> None:
         port=8501,
         transport="tcp",
         timeout=3.0,
-        append_lf_on_send=False,
     )
     async with await open_and_connect(options) as client:
         print("Connected")
@@ -88,7 +85,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`HostLinkConnectionOptions` defaults to TCP, port `8501`, a 3-second timeout, and no LF appended after CR.
+`host`, `port`, `transport`, and `plc_profile` are required. The timeout may be
+omitted and defaults to 3 seconds. Frames always end in CR as required by this
+library contract.
 
 ## Performance notes
 
@@ -119,7 +118,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         unsigned_word = await read_typed(client, "DM0", "U")
         signed_word = await read_typed(client, "DM1", "S")
@@ -150,7 +149,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, wr
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         address = "DM100"
         original = await read_typed(client, address, "U")
@@ -176,7 +175,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_named
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         addresses = ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.A", "DM0:COMMENT"]
         snapshot = await read_named(client, addresses)
@@ -197,29 +196,27 @@ import asyncio
 from hostlink import (
     HostLinkConnectionOptions,
     open_and_connect,
-    read_dwords_chunked,
     read_dwords_single_request,
-    read_words_chunked,
     read_words_single_request,
 )
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         words = await read_words_single_request(client, "DM200", 8)
         dwords = await read_dwords_single_request(client, "DM300", 4)
-        large_words = await read_words_chunked(client, "DM1000", 128, max_per_request=64)
-        large_dwords = await read_dwords_chunked(client, "DM2000", 64, max_dwords_per_request=32)
         print(f"Words: {len(words)}, DWords: {len(dwords)}")
-        print(f"Chunked words: {len(large_words)}, chunked DWords: {len(large_dwords)}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Single-request methods send one PLC command. Chunked methods split only where you explicitly choose a chunk size.
+Single-request methods send exactly one PLC command. The library does not expose
+an automatic chunking helper: if a larger logical read is required, the
+application must divide it explicitly and account for the fact that each
+request observes the PLC at a different time.
 
 ## Bit in word
 
@@ -229,7 +226,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, wr
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         await write_bit_in_word(client, "DM50", bit_index=10, value=True)
         snapshot = await read_named(client, ["DM50.A"])
@@ -255,7 +252,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, poll
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         count = 0
         async for snapshot in poll(client, ["DM0:U", "DM1:S", "DM4:F"], interval=1.0):
@@ -318,7 +315,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_counter, 
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         timer = await read_timer(client, "T0")
         counter = await read_counter(client, "C0")
@@ -353,7 +350,7 @@ from hostlink import (
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         buffer_words = await read_expansion_unit_buffer(
             client,
