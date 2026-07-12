@@ -25,7 +25,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: endpoint validation and argument requirements are locally testable; no communication was performed.
 - [x] Documentation and changelog agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-052 — Explicit transport
 
@@ -50,7 +50,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: no live communication is required for constructor validation.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-053 — Three-second timeout default
 
@@ -74,7 +74,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: timeout configuration validation is locally testable; timeout recovery uses local TCP/UDP fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-054 — CR-only command framing
 
@@ -98,7 +98,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: fixed frame bytes are covered by deterministic repository-local command tests; no PLC communication required.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-055 — Library-owned receive buffering and cap
 
@@ -124,7 +124,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: framing and cap behavior use deterministic local transport fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-056 — Maintainer-only opt-in trace
 
@@ -148,7 +148,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: hook ordering and isolation are transport-independent and locally verified.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-057 — Constructor never connects
 
@@ -172,7 +172,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: constructor side effects are locally observable and require no PLC.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-058 — Explicit connection lifecycle
 
@@ -196,7 +196,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: lifecycle/error sequences are covered by local TCP/UDP fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-059 — Explicit PLC clock value
 
@@ -220,7 +220,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: command construction/validation is deterministic; PLC clock mutation was not performed.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-060 — Raw response bytes
 
@@ -244,7 +244,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: raw framing/decoding contract is locally fixture-tested.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-061 — Fixed comment padding normalization
 
@@ -268,7 +268,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: byte fixtures cover normalization and encodings without PLC communication.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-062 — Explicit expansion-buffer format
 
@@ -292,7 +292,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: this batch changes pre-send format/range policy and deterministic frames only; existing profile-specific URD/UWR support is not newly claimed, so no live check is required for this item.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-063 — No public automatic chunking
 
@@ -316,7 +316,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: request count and pre-send limits are locally deterministic.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-064 — Separate required numeric data format
 
@@ -341,7 +341,7 @@ Acceptance criteria:
 - [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: input semantics and wire frames are deterministic; no PLC communication required.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+- [x] Final cross-language acceptance verified in `D:\\APP\\Close\\instructions/hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## PY-HL-CLAUDE-20260712 — Independent-review corrections
 
@@ -409,4 +409,4 @@ Use `send_raw` only for maintainer investigation. It now returns response-body `
 - Unit/contract suite: `release_check.bat` passed with `197 passed`, zero skip, on Python 3.14.3.
 - Type checking: `python -m mypy src/hostlink` passed; Ruff, docs/sample checks, build, Twine, wheel, and sdist checks passed.
 - Claude: the user ran the authorized HostLink batch outside Codex; its result and Codex disposition are preserved in the workspace review record.
-- Live PLC: not invoked.
+- Live PLC: on 2026-07-12, the public async high-level API connected to KEYENCE KV-X500 profile `keyence:kv-x500` at `192.168.250.100:8501` over TCP and read one unsigned word from `DM0`; the result was `5878`. No write, retry, or fallback was performed. This evidence is limited to that endpoint, profile, device, transport, and operation.
