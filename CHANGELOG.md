@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Library: Normalize comment padding by removing trailing ASCII space bytes only, and serialize sync and async bit-in-word read-modify-write operations as one compound critical section.
 - Library: Enforce an internal 65,536-byte response-body cap for TCP and UDP while keeping receive chunk sizing private.
 - Docs: Document the explicit connection lifecycle, base-device plus separate-format low-level contract, and single-request timing boundary.
+- Samples/Tooling: Require an explicit destination port for every runnable single-PLC, multi-PLC, configuration-driven, and validation entry point. Multi-PLC inputs may inherit only an explicitly supplied common port; no `8501` runtime fallback remains.
 
 ### Removed
 

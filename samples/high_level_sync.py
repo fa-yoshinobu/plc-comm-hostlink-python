@@ -42,12 +42,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
     parser.add_argument(
         "--transport",
         choices=("tcp", "udp"),
-        default="tcp",
-        help="Transport protocol (default tcp)",
+        required=True,
+        help="Required transport protocol",
     )
     parser.add_argument("--timeout", type=float, default=3.0, help="Timeout in seconds (default 3.0)")
     parser.add_argument("--poll-count", type=int, default=3, help="Number of poll snapshots (default 3)")
@@ -58,7 +58,7 @@ async def run(args: argparse.Namespace) -> None:
     print(f"[normalize_address] dm20 -> {normalize_address('dm20')}")
     print(f"[normalize_address] dm20.a -> {normalize_address('dm20.a')}")
 
-    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
+    # Connect only to the explicitly selected endpoint and transport.
     async with await open_and_connect(
         HostLinkConnectionOptions(
             host=args.host,

@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         description="Read one KEYENCE Host Link value forever and reconnect after transport loss."
     )
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link TCP port (default 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link TCP port")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     parser.add_argument("--device", default="DM100", help="Device to poll (default DM100)")
     parser.add_argument("--dtype", choices=("BIT", "U", "S", "D", "L", "F"), default="U", help="Read type")

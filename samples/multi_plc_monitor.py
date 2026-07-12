@@ -29,8 +29,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Read the same tag set from multiple Host Link PLCs concurrently.")
     parser.add_argument("--plc", action="append", required=True, metavar="NAME=HOST,PROFILE[,PORT[,TRANSPORT]]")
     parser.add_argument("--tag", action="append", default=[], metavar="NAME=ADDRESS")
-    parser.add_argument("--port", type=int, default=8501, help="Default port when a --plc omits it")
-    parser.add_argument("--transport", type=parse_transport, default="tcp", help="Default transport")
+    parser.add_argument("--port", type=int, default=None, help="Default port when a --plc omits it")
+    parser.add_argument("--transport", type=parse_transport, default=None, help="Default transport")
     parser.add_argument("--timeout", type=positive_float, default=3.0, help="Socket timeout in seconds")
     parser.add_argument("--interval", type=positive_float, default=1.0, help="Polling interval in seconds")
     parser.add_argument(

@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Host Link mixed snapshot example")
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
     return parser.parse_args()
 
 

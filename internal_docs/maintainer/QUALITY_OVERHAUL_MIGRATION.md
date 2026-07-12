@@ -4,7 +4,28 @@ Branch: `quality/2026-07-overhaul`
 Authoritative approvals: `D:\APP\omittable_configuration_decisions_20260711.md`  
 Related findings: B-18 through B-29 in `D:\APP\library_bug_consistency_review_20260710.md`
 
-This record describes the Python implementation of approved decisions D-052 through D-064. A checked item requires recorded evidence. Claude has not been invoked; its items remain pending explicit user authorization. No live PLC operation was performed for this batch.
+This record describes the Python implementation of approved cross-family D-001 and HostLink decisions D-052 through D-064. A checked item requires recorded evidence. Claude has not been invoked; its items remain pending explicit user authorization. No live PLC operation was performed for this batch.
+
+## D-001 — Explicit destination port
+
+Scope: sync/async clients, connection options, user samples, multi-PLC/config inputs, and maintainer validation tools.
+
+Target contract: every communicating entry point receives an explicit integer port in `1..65535`. New UI defaults in other products do not authorize a Python runtime fallback.
+
+Acceptance criteria:
+
+1. Public constructors/options reject omission, Boolean, zero, negative, overflow, and wrong-type values before transport creation.
+2. Single-PLC CLI tools require the port argument; multi-PLC/config inputs require it per endpoint or through an explicitly supplied common value.
+3. Source inspection finds no runnable `8501` port fallback.
+
+- [x] Implementation and sample/tool migration completed.
+- [x] `run_ci.bat` passed Ruff, mypy, docs/sample/release checks, and 217 tests after the final diff.
+- [x] Codex reviewed constructor validation, CLI/config parsing, and no-fallback source search.
+- [ ] Claude source review completed. Pending explicit user authorization.
+- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Live-PLC disposition recorded: endpoint validation and argument requirements are locally testable; no communication was performed.
+- [x] Documentation and changelog agree.
+- [ ] Final cross-language acceptance verified.
 
 ## D-052 — Explicit transport
 
@@ -19,6 +40,7 @@ Acceptance criteria:
 1. Missing transport is rejected by the Python call signature before transport creation.
 2. Empty and unknown transport values are rejected before transport creation.
 3. Explicit TCP and UDP values are retained unchanged after normalization.
+4. Every communicating sample/tool passes a transport explicitly; no executable TCP fallback remains.
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.

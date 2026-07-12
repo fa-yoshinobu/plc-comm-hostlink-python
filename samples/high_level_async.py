@@ -55,8 +55,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--port",
         type=int,
-        default=8501,
-        help="Host Link TCP port (default 8501)",
+        required=True,
+        help="Required Host Link TCP port",
     )
     p.add_argument(
         "--poll-count",
@@ -82,7 +82,7 @@ async def demo_open_and_connect(host: str, port: int, plc_profile: str) -> None:
 
     Returns a connected client object for the helper functions below.
     """
-    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
+    # Connect only to the explicitly selected endpoint.
     client = await open_and_connect(
         HostLinkConnectionOptions(host=host, plc_profile=plc_profile, port=port, transport="tcp")
     )

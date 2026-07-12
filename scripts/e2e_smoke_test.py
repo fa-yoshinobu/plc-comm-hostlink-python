@@ -95,12 +95,12 @@ def run(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="KEYENCE Host Link E2E smoke test")
     parser.add_argument("--host", required=True, help="PLC IP/hostname")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default: 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
     parser.add_argument(
         "--transport",
         choices=("tcp", "udp"),
-        default="tcp",
-        help="Transport (default: tcp)",
+        required=True,
+        help="Required transport",
     )
     parser.add_argument(
         "--timeout",
