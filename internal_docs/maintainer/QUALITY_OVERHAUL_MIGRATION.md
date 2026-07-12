@@ -1,8 +1,8 @@
 # HostLink Python quality-overhaul contract and migration
 
 Branch: `quality/2026-07-overhaul`  
-Authoritative approvals: `D:\APP\omittable_configuration_decisions_20260711.md`  
-Related findings: B-18 through B-29 in `D:\APP\library_bug_consistency_review_20260710.md`
+Authoritative approvals: `D:\APP\Close\instructions\omittable_configuration_decisions_20260711.md`
+Related findings: B-18 through B-29 in `D:\APP\Close\instructions\library_bug_consistency_review_20260710.md`
 
 This record describes the Python implementation of approved cross-family D-001 and HostLink decisions D-052 through D-064. A checked item requires recorded evidence. The user ran the authorized HostLink Claude review batch outside Codex on 2026-07-12; repository-specific findings and their disposition are recorded below. No live PLC operation was performed for this correction batch.
 
