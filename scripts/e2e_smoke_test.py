@@ -4,7 +4,6 @@ import argparse
 from typing import Any
 
 from hostlink import HostLinkClient
-from hostlink.errors import HostLinkError
 
 
 def _print_ok(message: str) -> None:
@@ -34,7 +33,7 @@ def run(args: argparse.Namespace) -> int:
             port=args.port,
             transport=args.transport,
             timeout=args.timeout,
-            append_lf_on_send=args.append_lf,
+            plc_profile=args.plc_profile,
         ) as plc:
             _print_ok(f"Connected to {args.host}:{args.port} ({args.transport.upper()})")
 
@@ -68,16 +67,12 @@ def run(args: argparse.Namespace) -> int:
                 print("[SKIP] Write test disabled. Use --allow-write to enable.")
 
             if args.test_error_response:
-                try:
-                    plc.send_raw("INVALID")
-                    _print_ng("Expected E1 for invalid command, but command succeeded")
+                response = plc.send_raw("INVALID")
+                if response == b"E1":
+                    _print_ok("Invalid command returned raw E1 bytes as expected")
+                else:
+                    _print_ng(f"Invalid command returned unexpected raw body: {response!r}")
                     failures += 1
-                except HostLinkError as exc:
-                    if exc.code == "E1":
-                        _print_ok("Invalid command returned E1 as expected")
-                    else:
-                        _print_ng(f"Invalid command returned unexpected code: {exc.code}")
-                        failures += 1
             else:
                 print("[SKIP] Error-response test disabled.")
 
@@ -108,7 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=3.0,
         help="Socket timeout seconds (default: 3.0)",
     )
-    parser.add_argument("--append-lf", action="store_true", help="Send CRLF instead of CR")
+    parser.add_argument("--plc-profile", required=True, help="Required canonical PLC profile")
 
     parser.add_argument("--read-device", default="DM0", help="Device for read checks (default: DM0)")
     parser.add_argument(

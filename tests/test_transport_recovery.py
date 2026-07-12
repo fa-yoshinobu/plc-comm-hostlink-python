@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from hostlink import AsyncHostLinkClient, HostLinkClient, write_bit_in_word
-from hostlink.errors import HostLinkConnectionError
+from hostlink.errors import HostLinkConnectionError, HostLinkProtocolError
 
 
 def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:
@@ -87,6 +87,35 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
     assert server_error == []
 
 
+def test_sync_udp_missing_terminator_invalidates_transport() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind(("127.0.0.1", 0))
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        _, address = server.recvfrom(4096)
+        server.sendto(b"UNTERMINATED", address)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="udp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        with pytest.raises(HostLinkProtocolError, match="terminator"):
+            client.send_raw("READ")
+        assert client._sock is None
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+
 class _DelayedUdpServer(asyncio.DatagramProtocol):
     def __init__(self) -> None:
         self.transport: asyncio.DatagramTransport | None = None
@@ -105,6 +134,18 @@ class _DelayedUdpServer(asyncio.DatagramProtocol):
     def _send(self, data: bytes, address: tuple[str | Any, int]) -> None:
         if self.transport is not None:
             self.transport.sendto(data, address)
+
+
+class _UnterminatedUdpServer(asyncio.DatagramProtocol):
+    def __init__(self) -> None:
+        self.transport: asyncio.DatagramTransport | None = None
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        self.transport = transport  # type: ignore[assignment]
+
+    def datagram_received(self, data: bytes, address: tuple[str | Any, int]) -> None:
+        assert self.transport is not None
+        self.transport.sendto(b"UNTERMINATED", address)
 
 
 @pytest.mark.asyncio
@@ -132,6 +173,32 @@ async def test_async_udp_timeout_discards_delayed_response() -> None:
         await client.connect()
         assert await client.send_raw("SECOND") == b"SECOND"
         assert protocol.count == 2
+    finally:
+        await client.close()
+        transport.close()
+
+
+@pytest.mark.asyncio
+async def test_async_udp_missing_terminator_invalidates_transport() -> None:
+    loop = asyncio.get_running_loop()
+    transport, _ = await loop.create_datagram_endpoint(
+        _UnterminatedUdpServer,
+        local_addr=("127.0.0.1", 0),
+    )
+    port = transport.get_extra_info("sockname")[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="udp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        with pytest.raises(HostLinkProtocolError, match="terminator"):
+            await client.send_raw("READ")
+        assert client._udp_transport is None
+        assert client._udp_protocol is None
     finally:
         await client.close()
         transport.close()

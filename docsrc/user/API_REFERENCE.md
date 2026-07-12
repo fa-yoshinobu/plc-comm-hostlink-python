@@ -41,6 +41,14 @@ their bit meaning is determined by the device family and command. `set_time`
 requires an explicit datetime/calendar value, and expansion-buffer reads and
 writes require an explicit format.
 
+Semantic read operations validate the exact command-derived response token
+count. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`. UDP responses require a
+CR/LF terminator; missing framing is a protocol error and discards the
+transport. Datetime clock values must be in years 2000 through 2099.
+For direct-bit devices, numeric single reads require the corresponding 16- or
+32-point response. Any malformed semantic response shape invalidates the
+session before another request.
+
 ## High-Level Helpers
 
 | Operation | Public API |
@@ -52,6 +60,11 @@ writes require an explicit format.
 | Word/dword reads | `read_words`, `read_dwords` |
 | Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
 | Bit-in-word write | `write_bit_in_word` |
+
+`read_named` and `poll` require at least one address. A named snapshot may use
+multiple sequential PLC requests for mixed or non-contiguous addresses and is
+therefore a logical dictionary, not an atomic PLC-time snapshot. Contiguous
+single-request size limits are rejected rather than silently split.
 
 ## Address, Profile, And Diagnostics
 

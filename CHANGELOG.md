@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Library: Reject missing or contradictory numeric formats before communication, eliminating the conflicting low-level `DM100.D` dword and high-level `DM100.D` bit-13 interpretations.
 - Library: Preserve raw PLC error and non-ASCII response bytes, reject invalid calendar/weekday combinations, and discard transports after response overflow or incomplete exchanges.
+- Library: Require exact command-derived response token counts, strict documented `0`/`1`/`ON`/`OFF` direct-bit tokens, and CR/LF-terminated UDP datagrams; malformed UDP framing invalidates the transport.
+- Library: Derive single-read token counts from device width (including 16/32-point direct-bit numeric reads) and discard the session after malformed semantic response shapes.
+- Library: Reject CR/LF and other control characters in maintainer raw command bodies, preventing multi-frame injection and response desynchronization.
+- Library: Reject empty named reads/polls and Float32 overflow with the documented `ValueError`; datetime clock values are limited to years 2000 through 2099.
+- Tooling: Update the E2E smoke script to require `plc_profile`, remove the deleted LF option, and verify raw `b"E1"` behavior.
+- Tests: Remove library-local cross-implementation frame vectors; cross-language verification is maintained as a separate repository and test concern.
 
 ## [3.1.0] - 2026-07-10
 

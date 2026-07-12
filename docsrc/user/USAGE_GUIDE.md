@@ -187,7 +187,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Use `read_named` when one application snapshot mixes unsigned words, signed words, double words, floats, comments, and bit-in-word values.
+Use `read_named` when one application result groups unsigned words, signed
+words, double words, floats, comments, and bit-in-word values. Mixed or
+non-contiguous addresses can require multiple sequential PLC requests, so the
+returned dictionary is not guaranteed to represent one instant in PLC time.
+The address list must not be empty. A contiguous group that exceeds one Host
+Link request is rejected rather than automatically split.
 
 ## Block reads
 
@@ -266,7 +271,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`poll` yields a dictionary snapshot on each interval until cancellation or until your loop exits.
+`poll` requires a non-empty address list and yields one logical dictionary on
+each interval until cancellation or until your loop exits. The same
+non-atomic, potentially multi-request behavior as `read_named` applies.
 
 ## Operational recipes
 

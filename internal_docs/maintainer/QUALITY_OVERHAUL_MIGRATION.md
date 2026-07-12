@@ -4,7 +4,7 @@ Branch: `quality/2026-07-overhaul`
 Authoritative approvals: `D:\APP\omittable_configuration_decisions_20260711.md`  
 Related findings: B-18 through B-29 in `D:\APP\library_bug_consistency_review_20260710.md`
 
-This record describes the Python implementation of approved cross-family D-001 and HostLink decisions D-052 through D-064. A checked item requires recorded evidence. Claude has not been invoked; its items remain pending explicit user authorization. No live PLC operation was performed for this batch.
+This record describes the Python implementation of approved cross-family D-001 and HostLink decisions D-052 through D-064. A checked item requires recorded evidence. The user ran the authorized HostLink Claude review batch outside Codex on 2026-07-12; repository-specific findings and their disposition are recorded below. No live PLC operation was performed for this correction batch.
 
 ## D-001 — Explicit destination port
 
@@ -19,13 +19,13 @@ Acceptance criteria:
 3. Source inspection finds no runnable `8501` port fallback.
 
 - [x] Implementation and sample/tool migration completed.
-- [x] `run_ci.bat` passed Ruff, mypy, docs/sample/release checks, and 217 tests after the final diff.
+- [x] `release_check.bat` passed Ruff, mypy, docs/sample/release checks, 197 tests, and distribution validation after the final diff.
 - [x] Codex reviewed constructor validation, CLI/config parsing, and no-fallback source search.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: endpoint validation and argument requirements are locally testable; no communication was performed.
 - [x] Documentation and changelog agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-052 — Explicit transport
 
@@ -46,11 +46,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, sample, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: no live communication is required for constructor validation.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-053 — Three-second timeout default
 
@@ -70,11 +70,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, sample, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: timeout configuration validation is locally testable; timeout recovery uses local TCP/UDP fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-054 — CR-only command framing
 
@@ -86,19 +86,19 @@ Compatibility impact: `append_lf_on_send` and related builder arguments are remo
 
 Acceptance criteria:
 
-1. Frame vectors end in `0x0D`.
+1. Deterministic frame-builder tests end every command in `0x0D`.
 2. Public constructors and builders expose no LF option.
 3. User documentation contains no LF setting.
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
-- [x] Static, unit, vector, documentation, and package checks passed.
+- [x] Static, unit, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
-- [x] Live-PLC disposition recorded: fixed frame bytes are covered by deterministic vectors; no PLC communication required.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
+- [x] Live-PLC disposition recorded: fixed frame bytes are covered by deterministic repository-local command tests; no PLC communication required.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-055 — Library-owned receive buffering and cap
 
@@ -113,16 +113,18 @@ Acceptance criteria:
 1. Public signatures contain no buffer-size parameter.
 2. TCP accepts exactly 65,536 body bytes and rejects 65,537.
 3. UDP receives enough data to detect cap overflow and invalidates the socket on overflow.
+4. UDP requires a CR/LF terminator and invalidates the transport on missing framing.
+5. RD, RDS/RDE, monitor reads, and URD reject shorter or longer token lists than the command-derived expected count.
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, local transport, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: framing and cap behavior use deterministic local transport fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-056 — Maintainer-only opt-in trace
 
@@ -142,11 +144,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: hook ordering and isolation are transport-independent and locally verified.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-057 — Constructor never connects
 
@@ -166,11 +168,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: constructor side effects are locally observable and require no PLC.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-058 — Explicit connection lifecycle
 
@@ -190,11 +192,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, local transport, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: lifecycle/error sequences are covered by local TCP/UDP fixtures.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-059 — Explicit PLC clock value
 
@@ -212,13 +214,13 @@ Acceptance criteria:
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
-- [x] Static, unit, vector, sample, documentation, and package checks passed.
+- [x] Static, unit, sample, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: command construction/validation is deterministic; PLC clock mutation was not performed.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-060 — Raw response bytes
 
@@ -238,11 +240,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, local transport, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: raw framing/decoding contract is locally fixture-tested.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-061 — Fixed comment padding normalization
 
@@ -262,11 +264,11 @@ Acceptance criteria:
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: byte fixtures cover normalization and encodings without PLC communication.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-062 — Explicit expansion-buffer format
 
@@ -284,13 +286,13 @@ Acceptance criteria:
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
-- [x] Static, unit, vector, documentation, and package checks passed.
+- [x] Static, unit, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: this batch changes pre-send format/range policy and deterministic frames only; existing profile-specific URD/UWR support is not newly claimed, so no live check is required for this item.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-063 — No public automatic chunking
 
@@ -303,18 +305,18 @@ Compatibility impact: all public `*chunked` helpers are removed without aliases.
 Acceptance criteria:
 
 1. Chunk helpers are absent from package exports and generated API documentation.
-2. Samples do not combine multiple PLC requests into one apparent snapshot/result.
+2. Samples do not use a hidden range-splitting helper. `read_named`/`poll` explicitly document that mixed logical results may require sequential requests and are not atomic snapshots.
 3. single-request helpers reject protocol limits instead of splitting.
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
 - [x] Static, unit, documentation, sample, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: request count and pre-send limits are locally deterministic.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
 
 ## D-064 — Separate required numeric data format
 
@@ -333,13 +335,59 @@ Acceptance criteria:
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
-- [x] Static, unit, vector, sample, documentation, and package checks passed.
+- [x] Static, unit, sample, documentation, and package checks passed.
 - [x] Codex self-review completed against the approved contract.
-- [ ] Claude source review completed. Pending explicit user authorization.
-- [ ] Every Claude finding dispositioned and affected checks rerun. Pending review.
+- [x] Claude source review completed; the user ran the authorized batch outside Codex.
+- [x] Every Python Claude finding dispositioned and affected checks rerun.
 - [x] Live-PLC disposition recorded: input semantics and wire frames are deterministic; no PLC communication required.
 - [x] Documentation, migration notes, changelog, and API reference agree.
-- [ ] Final cross-language acceptance verified.
+- [x] Final cross-language acceptance verified in `D:\\APP\\hostlink_cross_implementation_final_comparison_20260712.md`.
+
+## PY-HL-CLAUDE-20260712 — Independent-review corrections
+
+Scope: Claude HostLink findings 3, 4, 5, 9, 10, 18, 19, 20, and 21 for
+the Python repository, plus the cross-language clock-century consistency found
+during Codex self-review.
+
+Target contract: response shapes are derived from the issued command and
+validated exactly; UDP requires a terminator and invalidates malformed
+transport; direct-bit tokens are only `0`/`1`/`ON`/`OFF`; raw bodies cannot inject control
+characters; empty named work and Float32 overflow fail predictably; clock years
+are 2000 through 2099; current E2E tooling uses only current public APIs.
+Cross-implementation vectors belong to the separate cross-verification
+repository, not this library.
+
+Compatibility impact: malformed-but-previously-accepted responses, empty named
+operations, raw control characters, out-of-century datetimes, and Float32
+overflow now fail. A `read_named` group beyond a single Host Link range limit
+continues to fail before transport; it is intentionally not hidden-split.
+
+Acceptance criteria:
+
+1. RD uses exactly one token except documented timer/counter composite RD,
+   RDS/RDE and URD use exactly the requested count, and monitor reads use the
+   successful registration count.
+2. Missing UDP terminators, invalid bit tokens, and raw CR/LF/control bytes
+   raise `HostLinkProtocolError`; uncertain UDP state is discarded.
+3. `read_named([])`, `poll([])`, Float32 ±overflow, and datetime years outside
+   2000..2099 reject before send with the documented exception family.
+4. The E2E script requires profile/endpoint intent and verifies raw `b"E1"`;
+   no removed LF option or decoded-raw behavior remains.
+5. A 1001-word named range rejects before send and no library-local
+   cross-implementation vector or runner remains.
+6. Direct-bit numeric single reads require 16 or 32 response tokens according
+   to the explicit format, and any command-derived response-shape mismatch
+   invalidates the session before another request.
+
+- [x] Implementation completed in this repository.
+- [x] Tests added or updated for every acceptance criterion.
+- [x] Full static, unit, sample, documentation, build, and package checks passed (`release_check.bat`, 197 tests, zero skip).
+- [x] Codex self-review completed against response shapes, public API, validation order, UDP/TCP state, exception families, docs, tools, and package contents.
+- [x] Claude source review completed; the user ran the authorized batch and its result is preserved in the workspace.
+- [x] Codex dispositioned all Python findings and reran affected checks.
+- [x] No additional live-PLC check is required for response-shape, local UDP framing, validation, and tooling corrections.
+- [x] Documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified for this repository; HostLink family-level acceptance remains separate.
 
 ## Migration summary
 
@@ -358,7 +406,7 @@ Use `send_raw` only for maintainer investigation. It now returns response-body `
 
 ## Verification evidence
 
-- Unit/contract suite: repository CI passed with `217 passed` on Python 3.14.3; final evidence is also recorded in the root overhaul goal.
-- Type checking: `python -m mypy src/hostlink` passed.
-- Claude: not invoked; explicit authorization is still required.
+- Unit/contract suite: `release_check.bat` passed with `197 passed`, zero skip, on Python 3.14.3.
+- Type checking: `python -m mypy src/hostlink` passed; Ruff, docs/sample checks, build, Twine, wheel, and sdist checks passed.
+- Claude: the user ran the authorized HostLink batch outside Codex; its result and Codex disposition are preserved in the workspace review record.
 - Live PLC: not invoked.

@@ -15,7 +15,16 @@ LF = b"\n"
 def build_frame(body: str) -> bytes:
     """Encode a Host Link command body and append the required line ending."""
 
-    payload = body.strip().encode("ascii")
+    if not isinstance(body, str):
+        raise HostLinkProtocolError("Host Link command body must be a string")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in body):
+        raise HostLinkProtocolError("Host Link command body must not contain control characters")
+    try:
+        payload = body.strip().encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise HostLinkProtocolError("Host Link command body must contain ASCII characters only") from exc
+    if not payload:
+        raise HostLinkProtocolError("Host Link command body must not be empty")
     return payload + CR
 
 
@@ -107,10 +116,12 @@ def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
                 f"Numeric response token {token!r} is outside the range for format {data_format!r}"
             )
         return parsed
-    try:
-        return int(token, 10)
-    except ValueError:
-        return token
+    normalized = token.upper()
+    if normalized in {"1", "ON"}:
+        return 1
+    if normalized in {"0", "OFF"}:
+        return 0
+    raise HostLinkProtocolError(f"Invalid direct bit response token {token!r}; expected 0/1 or OFF/ON")
 
 
 def parse_data_tokens(tokens: Iterable[str], *, data_format: str = "") -> list[int | str]:

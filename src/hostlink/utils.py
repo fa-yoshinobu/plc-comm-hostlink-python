@@ -512,7 +512,7 @@ async def read_named(
             snapshot = await read_named(client, ["DM10:U", "DM20:F", "DM30.A"])
     """
     if not addresses:
-        return {}
+        raise ValueError("read_named addresses must not be empty")
 
     plan = _try_compile_read_named_plan(addresses)
     if plan is not None:
@@ -546,7 +546,9 @@ async def poll(
         async for snapshot in poll(client, ["DM100:U", "DM200:F"], interval=0.5):
             print(snapshot)
     """
-    plan = _try_compile_read_named_plan(addresses) if addresses else None
+    if not addresses:
+        raise ValueError("poll addresses must not be empty")
+    plan = _try_compile_read_named_plan(addresses)
     while True:
         if plan is not None:
             yield await _execute_read_named_plan(client, plan)
@@ -806,7 +808,13 @@ def _words_to_float32(lo_word: int, hi_word: int) -> float:
 def _float32_to_words(value: float) -> tuple[int, int]:
     if not math.isfinite(value):
         raise ValueError(f"Float value must be finite, got {value!r}.")
-    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    try:
+        packed = struct.pack("<f", value)
+    except OverflowError as exc:
+        raise ValueError(f"Float value is outside the finite float32 range: {value!r}.") from exc
+    if not math.isfinite(struct.unpack("<f", packed)[0]):
+        raise ValueError(f"Float value is outside the finite float32 range: {value!r}.")
+    bits = struct.unpack("<I", packed)[0]
     return bits & 0xFFFF, (bits >> 16) & 0xFFFF
 
 
