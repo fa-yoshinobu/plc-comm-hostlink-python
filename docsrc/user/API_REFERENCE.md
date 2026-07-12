@@ -6,7 +6,7 @@ operation name for a specific Host Link workflow.
 
 The sync `HostLinkClient` and async `AsyncHostLinkClient` expose the same
 low-level operation names unless noted otherwise. The atomic
-`AsyncHostLinkClient.write_bit_in_word` compound operation is async-only. For
+`write_bit_in_word` compound operation is available on both clients. For
 normal application code, prefer `open_and_connect` plus the high-level helper
 functions.
 
@@ -16,11 +16,9 @@ functions.
 | --- | --- |
 | Open a ready-to-use serialized connection | `open_and_connect`, `HostLinkConnectionOptions` |
 | Low-level sync/async clients | `HostLinkClient`, `AsyncHostLinkClient` |
-| Raw command exchange | `send_raw` |
 | PLC mode and error control | `change_mode`, `clear_error`, `check_error_no`, `confirm_operating_mode` |
 | PLC model and clock | `query_model`, `set_time`, `ModelInfo` |
 | Connection lifecycle | `connect`, `close` |
-| Trace capture | `HostLinkTraceDirection`, `HostLinkTraceFrame` |
 
 ## Device Operations
 
@@ -36,6 +34,21 @@ functions.
 | Data bank switching | `switch_bank` |
 | Expansion unit buffer access | `read_expansion_unit_buffer`, `write_expansion_unit_buffer` |
 
+Numeric low-level operations require a base device and a separate format, for
+example `read("DM100", data_format=".D")`. Suffix-bearing low-level input such
+as `read("DM100.D")` is rejected. Bare direct-bit devices remain valid because
+their bit meaning is determined by the device family and command. `set_time`
+requires an explicit datetime/calendar value, and expansion-buffer reads and
+writes require an explicit format.
+
+Semantic read operations validate the exact command-derived response token
+count. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`. UDP responses require a
+CR/LF terminator; missing framing is a protocol error and discards the
+transport. Datetime clock values must be in years 2000 through 2099.
+For direct-bit devices, numeric single reads require the corresponding 16- or
+32-point response. Any malformed semantic response shape invalidates the
+session before another request.
+
 ## High-Level Helpers
 
 | Operation | Public API |
@@ -46,9 +59,12 @@ functions.
 | Named snapshots and polling | `read_named`, `poll` |
 | Word/dword reads | `read_words`, `read_dwords` |
 | Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
-| Explicit chunked writes | `write_words_chunked`, `write_dwords_chunked` |
-| Explicit chunked reads | `read_words_chunked`, `read_dwords_chunked` |
 | Bit-in-word write | `write_bit_in_word` |
+
+`read_named` and `poll` require at least one address. A named snapshot may use
+multiple sequential PLC requests for mixed or non-contiguous addresses and is
+therefore a logical dictionary, not an atomic PLC-time snapshot. Contiguous
+single-request size limits are rejected rather than silently split.
 
 ## Address, Profile, And Diagnostics
 
@@ -65,8 +81,7 @@ The package exports these public names from `hostlink.__all__`:
 
 `AsyncHostLinkClient`, `HostLinkAddress`, `HostLinkBaseError`,
 `HostLinkClient`, `HostLinkConnectionError`, `HostLinkConnectionOptions`,
-`HostLinkError`, `HostLinkProtocolError`, `HostLinkTraceDirection`,
-`HostLinkTraceFrame`, `KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
+`HostLinkError`, `HostLinkProtocolError`, `KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
 `KvDeviceRangeEntry`, `KvDeviceRangeNotation`, `KvDeviceRangeSegment`,
 `KvHostLinkPlcProfile`, `KvHostLinkPlcProfileDescriptor`, `ModelInfo`, `TimerCounterValue`,
 `available_plc_profiles`, `decode_error_code`,
@@ -74,12 +89,12 @@ The package exports these public names from `hostlink.__all__`:
 `normalize_address`, `normalize_plc_profile`, `open_and_connect`,
 `parse_address`, `poll`, `plc_profile_descriptors`, `profile_from_name`, `read_comments`,
 `read_counter`, `read_dwords`,
-`read_dwords_chunked`, `read_dwords_single_request`,
+`read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,
-`read_timer_counter`, `read_typed`, `read_words`, `read_words_chunked`,
+`read_timer_counter`, `read_typed`, `read_words`,
 `read_words_single_request`, `try_parse_address`, `write_bit_in_word`,
-`write_dwords_chunked`, `write_dwords_single_request`,
-`write_expansion_unit_buffer`, `write_typed`, `write_words_chunked`,
+`write_dwords_single_request`,
+`write_expansion_unit_buffer`, `write_typed`,
 `write_words_single_request`.
 
 ## Generated API Details

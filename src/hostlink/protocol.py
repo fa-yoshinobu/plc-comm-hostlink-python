@@ -12,20 +12,27 @@ CR = b"\r"
 LF = b"\n"
 
 
-def build_frame(body: str, *, append_lf: bool = False) -> bytes:
+def build_frame(body: str) -> bytes:
     """Encode a Host Link command body and append the required line ending."""
 
-    payload = body.strip().encode("ascii")
-    if append_lf:
-        return payload + CR + LF
+    if not isinstance(body, str):
+        raise HostLinkProtocolError("Host Link command body must be a string")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in body):
+        raise HostLinkProtocolError("Host Link command body must not contain control characters")
+    try:
+        payload = body.strip().encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise HostLinkProtocolError("Host Link command body must contain ASCII characters only") from exc
+    if not payload:
+        raise HostLinkProtocolError("Host Link command body must not be empty")
     return payload + CR
 
 
-def build_command(command: str, *params: str, append_lf: bool = False) -> bytes:
+def build_command(command: str, *params: str) -> bytes:
     """Build one Host Link command frame from a command name and parameters."""
 
     parts = [command, *[p for p in params if p != ""]]
-    return build_frame(" ".join(parts), append_lf=append_lf)
+    return build_frame(" ".join(parts))
 
 
 def decode_response(raw: bytes) -> str:
@@ -50,8 +57,8 @@ def decode_comment_response(raw: bytes) -> str:
     """Decode comment responses which may be UTF-8 or Shift_JIS.
 
     Normal Host Link responses are ASCII, but PLC comments often contain
-    localized text. This decoder preserves trailing spaces so callers can
-    decide whether to strip padding.
+    localized text. Host Link comment padding is trailing ASCII space bytes.
+    Remove only those bytes before decoding so other whitespace remains.
     """
 
     if not raw:
@@ -59,6 +66,7 @@ def decode_comment_response(raw: bytes) -> str:
     payload = raw.rstrip(b"\r\n")
     if not payload:
         raise HostLinkProtocolError(f"Malformed response frame: {raw!r}")
+    payload = payload.rstrip(b" ")
 
     try:
         return payload.decode("utf-8")
@@ -89,11 +97,31 @@ def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
     """Convert one response token according to the selected Host Link data format."""
 
     if data_format == ".H":
-        return token.upper()
-    try:
-        return int(token, 10)
-    except ValueError:
-        return token
+        normalized = token.upper()
+        if not re.fullmatch(r"[0-9A-F]{1,4}", normalized):
+            raise HostLinkProtocolError(f"Invalid hexadecimal response token {token!r}")
+        return normalized
+    if data_format in {".U", ".S", ".D", ".L"}:
+        if not re.fullmatch(r"-?\d+", token):
+            raise HostLinkProtocolError(f"Invalid numeric response token {token!r} for format {data_format!r}")
+        parsed = int(token, 10)
+        limits = {
+            ".U": (0, 0xFFFF),
+            ".S": (-0x8000, 0x7FFF),
+            ".D": (0, 0xFFFFFFFF),
+            ".L": (-0x80000000, 0x7FFFFFFF),
+        }[data_format]
+        if not limits[0] <= parsed <= limits[1]:
+            raise HostLinkProtocolError(
+                f"Numeric response token {token!r} is outside the range for format {data_format!r}"
+            )
+        return parsed
+    normalized = token.upper()
+    if normalized in {"1", "ON"}:
+        return 1
+    if normalized in {"0", "OFF"}:
+        return 0
+    raise HostLinkProtocolError(f"Invalid direct bit response token {token!r}; expected 0/1 or OFF/ON")
 
 
 def parse_data_tokens(tokens: Iterable[str], *, data_format: str = "") -> list[int | str]:

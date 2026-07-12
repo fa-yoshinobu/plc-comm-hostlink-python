@@ -1,6 +1,6 @@
 """
 Basic Communication Test for KEYENCE KV Host Link.
-Usage: python basic_test.py <host> <plc-profile> [port] [transport: tcp/udp]
+Usage: python basic_test.py <host> <plc-profile> <port> <transport: tcp/udp>
 """
 
 import sys
@@ -10,14 +10,14 @@ from hostlink.errors import HostLinkConnectionError, HostLinkError
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: python basic_test.py <host> <plc-profile> [port] [transport: tcp/udp]")
+    if len(sys.argv) < 5:
+        print("Usage: python basic_test.py <host> <plc-profile> <port> <transport: tcp/udp>")
         sys.exit(1)
 
     host = sys.argv[1]
     plc_profile = sys.argv[2]
-    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
-    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    port = int(sys.argv[3])
+    transport = sys.argv[4]
 
     print(f"Connecting to {host}:{port} via {transport} ({plc_profile})...")
 
@@ -36,14 +36,14 @@ def main():
 
             # 3. Simple Read/Write Test (DM0.S - Signed Word)
             print("Reading DM0.S...")
-            val = plc.read("DM0.S")
+            val = plc.read("DM0", data_format=".S")
             print(f"Current DM0 value: {val}")
 
             new_val = (val + 1) % 32768 if isinstance(val, int) else 1
             print(f"Writing {new_val} to DM0.S...")
-            plc.write("DM0.S", new_val)
+            plc.write("DM0", new_val, data_format=".S")
 
-            val_after = plc.read("DM0.S")
+            val_after = plc.read("DM0", data_format=".S")
             print(f"Verified DM0 value: {val_after}")
 
             if val_after == new_val:

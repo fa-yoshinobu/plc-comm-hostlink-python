@@ -46,8 +46,9 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
         self.server = MockHostLinkServer()
         await self.server.start()
         self.client = AsyncHostLinkClient(
-            "127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, auto_connect=False
+            "127.0.0.1", plc_profile="keyence:kv-8000", port=self.server.port, transport="tcp"
         )
+        await self.client.connect()
 
     async def asyncTearDown(self):
         await self.client.close()
@@ -55,18 +56,18 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_dm0(self):
         self.server.responses["RD DM0.U"] = "1234"
-        val = await self.client.read("DM0.U")
+        val = await self.client.read("DM0", data_format=".U")
         self.assertEqual(val, 1234)
 
     async def test_write_dm0(self):
         self.server.responses["WR DM0.U 5678"] = "OK"
-        await self.client.write("DM0.U", 5678)
+        await self.client.write("DM0", 5678, data_format=".U")
         # No exception means OK
 
     async def test_error_response(self):
         self.server.responses["RD DM999.U"] = "E1"
         with self.assertRaises(HostLinkError) as cm:
-            await self.client.read("DM999.U")
+            await self.client.read("DM999", data_format=".U")
         self.assertEqual(cm.exception.code, "E1")
 
     async def test_change_mode(self):
@@ -75,7 +76,7 @@ class TestAsyncHostLinkClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_reads(self):
         self.server.responses["RDS DM0.U 2"] = "100 200"
-        vals = await self.client.read_consecutive("DM0.U", 2)
+        vals = await self.client.read_consecutive("DM0", 2, data_format=".U")
         self.assertEqual(vals, [100, 200])
 
     async def test_float_suffix_is_rejected_by_low_level_client(self):

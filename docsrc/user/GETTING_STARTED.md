@@ -44,7 +44,7 @@ from hostlink import HostLinkConnectionOptions, device_range_catalog_for_plc_pro
 
 async def main() -> None:
     catalog = device_range_catalog_for_plc_profile("keyence:kv-8000")
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         dm0 = await read_typed(client, "DM0", "U")
         print(f"DM0 = {dm0}")
@@ -70,7 +70,7 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, read_typed, wr
 
 
 async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501)
+    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         test_address = "DM100"
         original = await read_typed(client, test_address, "U")

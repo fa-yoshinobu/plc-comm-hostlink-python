@@ -20,12 +20,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Host Link mixed snapshot example")
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
     return parser.parse_args()
 
 
 async def run(args: argparse.Namespace) -> None:
-    options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port)
+    options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port, transport="tcp")
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
         # Read a mixed snapshot containing word values and bit-in-word values.

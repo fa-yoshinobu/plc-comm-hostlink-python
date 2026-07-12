@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import socket
 import threading
 from collections.abc import Callable, Sequence
@@ -12,6 +13,7 @@ from enum import Enum
 from typing import Any, TypeVar, cast
 
 from .device import (
+    DIRECT_BIT_DEVICE_TYPES,
     FORCE_CONSECUTIVE_DEVICE_TYPES,
     FORCE_SINGLE_DEVICE_TYPES,
     MBS_DEVICE_TYPES,
@@ -41,7 +43,8 @@ from .protocol import (
     split_data_tokens,
 )
 
-UDP_RECEIVE_BUFFER_SIZE = 65_535
+ABSOLUTE_RESPONSE_CAP = 65_536
+UDP_RECEIVE_BUFFER_SIZE = ABSOLUTE_RESPONSE_CAP + 2
 
 
 class HostLinkTraceDirection(Enum):
@@ -109,44 +112,52 @@ class HostLinkBase:
     def __init__(
         self,
         host: str,
-        port: int = 8501,
-        transport: str = "tcp",
-        append_lf_on_send: bool = False,
-        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
+        port: int,
+        transport: str,
         *,
-        plc_profile: str | None = None,
-        _allow_manual_profile: bool = False,
+        plc_profile: str,
     ) -> None:
-        self.host = host
-        self.port = port
-        self.transport = transport.lower()
-        self.append_lf_on_send = append_lf_on_send
-        if self.transport not in {"tcp", "udp"}:
+        if not isinstance(host, str) or not host.strip():
+            raise ValueError("host is required and must be a non-empty string")
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+            raise ValueError("port is required and must be an integer in the range 1..65535")
+        if not isinstance(transport, str) or transport.strip().lower() not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
-        self.trace_hook = trace_hook
-        if plc_profile is None and not _allow_manual_profile:
-            raise ValueError(
-                "plc_profile is required for the standard HostLinkClient route "
-                "unless you explicitly opt into a low-level raw Host Link path."
-            )
-        self.plc_profile = _normalize_connection_plc_profile(plc_profile) if plc_profile is not None else None
+        self.host = host.strip()
+        self.port = port
+        self.transport = transport.strip().lower()
+        self._maintainer_trace_hook: Callable[[HostLinkTraceFrame], None] | None = None
+        self.plc_profile = _normalize_connection_plc_profile(plc_profile)
+        self._monitor_bit_count = 0
+        self._monitor_word_count = 0
 
     def _fire_trace(self, direction: HostLinkTraceDirection, data: bytes) -> None:
-        if self.trace_hook:
-            self.trace_hook(HostLinkTraceFrame(direction, data, datetime.now(timezone.utc)))
+        if self._maintainer_trace_hook:
+            try:
+                self._maintainer_trace_hook(HostLinkTraceFrame(direction, data, datetime.now(timezone.utc)))
+            except Exception:
+                # Maintainer diagnostics must not change command success, ordering, or retry behavior.
+                pass
 
     # --- Internal helpers ----------------------------------------------
 
     def _build_command(self, body: str) -> bytes:
-        return build_frame(body, append_lf=self.append_lf_on_send)
+        return build_frame(body)
 
     def _process_response(self, response: bytes, *, decoder: Callable[[bytes], str] = decode_response) -> str:
         return ensure_success(decoder(response))
 
+    @staticmethod
+    def _validate_response_cap(response: bytes) -> bytes:
+        body = response.rstrip(b"\r\n")
+        if len(body) > ABSOLUTE_RESPONSE_CAP:
+            raise HostLinkProtocolError(f"Response line exceeds {ABSOLUTE_RESPONSE_CAP} bytes")
+        return response
+
     def _device_token(self, device: str, *, drop_suffix: bool = False) -> str:
         addr = parse_device(device)
         if drop_suffix and addr.suffix:
-            addr = DeviceAddress(addr.device_type, addr.number, "")
+            raise HostLinkProtocolError(f"Device {device!r} must not contain a data-format suffix for this command")
         return addr.to_text()
 
     def _device_with_format(self, device: str, data_format: str | None, count: int = 1) -> tuple[str, str]:
@@ -175,22 +186,47 @@ class HostLinkBase:
 
     @staticmethod
     def _format_value(value: int | str, data_format: str) -> str:
-        if isinstance(value, int):
-            if data_format == ".H":
-                return format(value & 0xFFFF, "X")
-            return str(value)
-        return str(value).strip()
+        if data_format == "":
+            if isinstance(value, bool):
+                return "1" if value else "0"
+            if type(value) is int and value in {0, 1}:
+                return str(value)
+            raise HostLinkProtocolError(f"BIT value must be bool or integer 0/1, got {value!r}")
+        limits = {
+            ".U": (0, 0xFFFF),
+            ".S": (-0x8000, 0x7FFF),
+            ".D": (0, 0xFFFFFFFF),
+            ".L": (-0x80000000, 0x7FFFFFFF),
+            ".H": (0, 0xFFFF),
+        }.get(data_format)
+        if limits is None or type(value) is not int or not limits[0] <= value <= limits[1]:
+            raise HostLinkProtocolError(f"value {value!r} is outside the range for data_format {data_format!r}")
+        return format(value, "X") if data_format == ".H" else str(value)
 
     def _build_read_command(self, device: str, data_format: str | None = None) -> tuple[str, str]:
         token, suffix = self._device_with_format(device, data_format)
         return f"RD {token}", suffix
 
     @staticmethod
-    def _decode_read_response(response: str, data_format: str) -> int | str | list[int | str]:
+    def _decode_read_response(response: str, data_format: str, expected_count: int = 1) -> int | str | list[int | str]:
         values = parse_data_tokens(split_data_tokens(response), data_format=data_format)
-        if len(values) == 1:
-            return values[0]
-        return values
+        if len(values) != expected_count:
+            raise HostLinkProtocolError(
+                f"Read response token count mismatch: expected {expected_count}, received {len(values)}"
+            )
+        return values[0] if expected_count == 1 else values
+
+    @staticmethod
+    def _read_response_token_count(device: str, data_format: str) -> int:
+        device_type = parse_device(device).device_type
+        if device_type in {"T", "C"}:
+            return 3
+        if device_type in DIRECT_BIT_DEVICE_TYPES:
+            if data_format in {".U", ".S", ".H"}:
+                return 16
+            if data_format in {".D", ".L"}:
+                return 32
+        return 1
 
     def _build_read_consecutive_command(
         self,
@@ -206,8 +242,15 @@ class HostLinkBase:
         return f"{command} {token} {count}", suffix
 
     @staticmethod
-    def _decode_data_response(response: str, data_format: str = "") -> list[int | str]:
-        return parse_data_tokens(split_data_tokens(response), data_format=data_format)
+    def _decode_data_response(
+        response: str, data_format: str = "", expected_count: int | None = None
+    ) -> list[int | str]:
+        values = parse_data_tokens(split_data_tokens(response), data_format=data_format)
+        if expected_count is not None and len(values) != expected_count:
+            raise HostLinkProtocolError(
+                f"Read response token count mismatch: expected {expected_count}, received {len(values)}"
+            )
+        return values
 
     def _build_read_comments_command(self, device: str) -> str:
         addr = parse_device(device)
@@ -216,8 +259,8 @@ class HostLinkBase:
         return f"RDC {token}"
 
     @staticmethod
-    def _decode_read_comments_response(response: str, *, strip_padding: bool = True) -> str:
-        return response.rstrip(" ") if strip_padding else response
+    def _decode_read_comments_response(response: str) -> str:
+        return response
 
     def _build_write_command(self, device: str, value: int | str, data_format: str | None = None) -> str:
         token, suffix = self._device_with_format(device, data_format)
@@ -280,27 +323,40 @@ class HostLinkBase:
 
     def _build_register_monitor_words_command(
         self,
-        devices: Sequence[str] | tuple[Sequence[str], ...],
+        entries: Sequence[str | tuple[str, str]],
     ) -> str:
-        targets = self._flatten_devices(devices)
+        targets = list(entries)
         if not targets:
             raise HostLinkProtocolError("At least one device is required")
         if len(targets) > 120:
             raise HostLinkProtocolError("Maximum 120 devices can be registered")
         tokens: list[str] = []
-        for device in targets:
+        for entry in targets:
+            if isinstance(entry, str):
+                device = entry
+                data_format: str | None = None
+            elif isinstance(entry, tuple) and len(entry) == 2 and all(isinstance(value, str) for value in entry):
+                device, data_format = entry
+            else:
+                raise HostLinkProtocolError(
+                    "register_monitor_words entries must be a device string or (device, data_format) tuple"
+                )
             addr = parse_device(device)
             validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
-            tok, _ = self._device_with_format(device, None)
+            tok, _ = self._device_with_format(device, data_format)
             tokens.append(tok)
         return "MWS " + " ".join(tokens)
 
     def _decode_monitor_bits_response(self, response: str) -> list[int | str]:
-        return self._decode_data_response(response)
+        return self._decode_data_response(response, expected_count=self._monitor_bit_count)
 
-    @staticmethod
-    def _decode_monitor_words_response(response: str) -> list[str]:
-        return split_data_tokens(response)
+    def _decode_monitor_words_response(self, response: str) -> list[str]:
+        values = split_data_tokens(response)
+        if len(values) != self._monitor_word_count:
+            raise HostLinkProtocolError(
+                f"Monitor response token count mismatch: expected {self._monitor_word_count}, received {len(values)}"
+            )
+        return values
 
     def _build_change_mode_command(self, mode: int | str) -> str:
         if isinstance(mode, str):
@@ -343,19 +399,12 @@ class HostLinkBase:
 
     def _build_set_time_command(
         self,
-        value: datetime | tuple[int, int, int, int, int, int, int] | None = None,
+        value: datetime | tuple[int, int, int, int, int, int, int],
     ) -> str:
-        if value is None:
-            now = datetime.now()
-            year = now.year % 100
-            month = now.month
-            day = now.day
-            hour = now.hour
-            minute = now.minute
-            second = now.second
-            week = (now.weekday() + 1) % 7
-        elif isinstance(value, datetime):
-            year = value.year % 100
+        if isinstance(value, datetime):
+            if not 2000 <= value.year <= 2099:
+                raise HostLinkProtocolError("datetime year must be in range 2000..2099")
+            year = value.year - 2000
             month = value.month
             day = value.day
             hour = value.hour
@@ -363,6 +412,10 @@ class HostLinkBase:
             second = value.second
             week = (value.weekday() + 1) % 7
         else:
+            if not isinstance(value, tuple) or len(value) != 7 or any(type(field) is not int for field in value):
+                raise HostLinkProtocolError(
+                    "time value must contain integer year, month, day, hour, minute, second, and week fields"
+                )
             year, month, day, hour, minute, second, week = value
 
         validate_range("year(YY)", year, 0, 99)
@@ -372,6 +425,14 @@ class HostLinkBase:
         validate_range("minute", minute, 0, 59)
         validate_range("second", second, 0, 59)
         validate_range("week", week, 0, 6)
+        if not isinstance(value, datetime):
+            try:
+                calendar = datetime(2000 + year, month, day, hour, minute, second)
+            except ValueError as exc:
+                raise HostLinkProtocolError("time value contains a nonexistent calendar date") from exc
+            expected_week = (calendar.weekday() + 1) % 7
+            if week != expected_week:
+                raise HostLinkProtocolError(f"week {week} does not match the calendar date (expected {expected_week})")
 
         return "WRT " + " ".join(
             [
@@ -406,41 +467,52 @@ class HostLinkBase:
         unit_no: int,
         address: int,
         count: int,
-        data_format: str = "",
+        data_format: str,
     ) -> tuple[str, str]:
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", count)
-        validate_expansion_buffer_span(address, suffix or ".U", count)
-        effective_suffix = suffix or ".U"
+        suffix = self._require_expansion_data_format(data_format)
+        validate_expansion_buffer_count(suffix, count)
+        validate_expansion_buffer_span(address, suffix, count)
+        effective_suffix = suffix
         parts = ["URD", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(count))
         return " ".join(parts), suffix
 
-    def _decode_expansion_unit_buffer_response(self, response: str, data_format: str) -> list[int | str]:
-        return self._decode_data_response(response, data_format=data_format)
+    def _decode_expansion_unit_buffer_response(
+        self, response: str, data_format: str, expected_count: int
+    ) -> list[int | str]:
+        return self._decode_data_response(response, data_format=data_format, expected_count=expected_count)
 
     def _build_write_expansion_unit_buffer_command(
         self,
         unit_no: int,
         address: int,
         values: Sequence[int | str],
-        data_format: str = "",
+        data_format: str,
     ) -> str:
         if not values:
             raise HostLinkProtocolError("values must not be empty")
         validate_range("unit_no", unit_no, 0, 48)
         validate_range("address", address, 0, 59999)
-        suffix = normalize_suffix(data_format)
-        validate_expansion_buffer_count(suffix or ".U", len(values))
-        validate_expansion_buffer_span(address, suffix or ".U", len(values))
+        suffix = self._require_expansion_data_format(data_format)
+        validate_expansion_buffer_count(suffix, len(values))
+        validate_expansion_buffer_span(address, suffix, len(values))
         payload = " ".join(self._format_value(v, suffix) for v in values)
-        effective_suffix = suffix or ".U"
+        effective_suffix = suffix
         parts = ["UWR", f"{unit_no:02d}", f"{address}{effective_suffix}"]
         parts.append(str(len(values)))
         parts.append(payload)
         return " ".join(parts)
+
+    @staticmethod
+    def _require_expansion_data_format(data_format: str) -> str:
+        if not isinstance(data_format, str) or not data_format.strip():
+            raise HostLinkProtocolError("data_format is required for expansion unit buffer access")
+        suffix = normalize_suffix(data_format)
+        if suffix not in {".U", ".S", ".D", ".L", ".H"}:
+            raise HostLinkProtocolError(f"Unsupported expansion unit buffer data_format {data_format!r}")
+        return suffix
 
 
 class HostLinkClient(HostLinkBase):
@@ -450,35 +522,28 @@ class HostLinkClient(HostLinkBase):
         self,
         host: str,
         *,
-        port: int = 8501,
-        transport: str = "tcp",
+        port: int,
+        transport: str,
         timeout: float = 3.0,
-        plc_profile: str | None = None,
-        buffer_size: int = 8192,
-        append_lf_on_send: bool = False,
-        auto_connect: bool = True,
-        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
-        _allow_manual_profile: bool = False,
+        plc_profile: str,
     ) -> None:
         super().__init__(
             host,
             port,
             transport,
-            append_lf_on_send,
-            trace_hook,
             plc_profile=plc_profile,
-            _allow_manual_profile=_allow_manual_profile,
         )
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ValueError("timeout must be a positive finite number")
         self.timeout = timeout
-        if buffer_size <= 0:
-            raise ValueError("buffer_size must be positive")
-        self.buffer_size = buffer_size
         self._sock: socket.socket | None = None
         self._rx_buffer = b""
         self._lock = threading.Lock()
-
-        if auto_connect:
-            self.connect()
 
     def __enter__(self) -> HostLinkClient:
         self.connect()
@@ -513,6 +578,8 @@ class HostLinkClient(HostLinkBase):
             self._close_unlocked()
 
     def _close_unlocked(self) -> None:
+        self._monitor_bit_count = 0
+        self._monitor_word_count = 0
         if self._sock is None:
             return
         try:
@@ -521,33 +588,48 @@ class HostLinkClient(HostLinkBase):
             self._sock = None
             self._rx_buffer = b""
 
-    def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
-        """Send one raw Host Link command body and return the decoded response text."""
+    def send_raw(self, body: str) -> bytes:
+        """Send one maintainer raw command and return undecoded response body bytes."""
 
         with self._lock:
             response = self._exchange(self._build_command(body))
+            return response.rstrip(b"\r\n")
+
+    def _send_decoded(self, body: str, decoder: Callable[[bytes], str] = decode_response) -> str:
+        with self._lock:
+            return self._send_decoded_unlocked(body, decoder)
+
+    def _send_decoded_unlocked(self, body: str, decoder: Callable[[bytes], str] = decode_response) -> str:
+        response = self._exchange(self._build_command(body))
+        try:
             return self._process_response(response, decoder=decoder)
+        except HostLinkProtocolError:
+            self._close_unlocked()
+            raise
+
+    def _send_parsed(self, body: str, parser: Callable[[str], T]) -> T:
+        with self._lock:
+            response = self._send_decoded_unlocked(body)
+            try:
+                return parser(response)
+            except HostLinkProtocolError:
+                self._close_unlocked()
+                raise
 
     def _expect_ok(self, body: str) -> None:
-        response = self.send_raw(body)
+        with self._lock:
+            self._expect_ok_unlocked(body)
+
+    def _expect_ok_unlocked(self, body: str) -> None:
+        response = self._send_decoded_unlocked(body)
         if response != "OK":
+            self._close_unlocked()
             raise HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
 
     def _exchange(self, payload: bytes) -> bytes:
         # Note: This is called within self._lock in send_raw
         if self._sock is None:
-            sock_type = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
-            sock = socket.socket(socket.AF_INET, sock_type)
-            sock.settimeout(self.timeout)
-            if self.transport == "tcp":
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            try:
-                sock.connect((self.host, self.port))
-            except OSError as exc:
-                sock.close()
-                raise HostLinkConnectionError(f"Failed to connect to {self.host}:{self.port}") from exc
-            self._sock = sock
-            self._rx_buffer = b""
+            raise HostLinkConnectionError("Client is not connected; call connect() before sending a command")
 
         exchange_complete = False
         try:
@@ -555,6 +637,9 @@ class HostLinkClient(HostLinkBase):
             self._sock.sendall(payload)
             if self.transport == "udp":
                 response = self._sock.recv(UDP_RECEIVE_BUFFER_SIZE)
+                self._validate_response_cap(response)
+                if not response or response[-1] not in (10, 13):
+                    raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
             else:
                 response = self._recv_tcp_line()
             exchange_complete = True
@@ -584,9 +669,9 @@ class HostLinkClient(HostLinkBase):
             idx_list = [idx for idx in (idx_cr, idx_lf) if idx >= 0]
             if idx_list:
                 idx = min(idx_list)
-                if idx > self.buffer_size:
+                if idx > ABSOLUTE_RESPONSE_CAP:
                     self._close_unlocked()
-                    raise HostLinkProtocolError(f"Response line exceeds {self.buffer_size} bytes")
+                    raise HostLinkProtocolError(f"Response line exceeds {ABSOLUTE_RESPONSE_CAP} bytes")
                 line = self._rx_buffer[:idx]
                 skip = idx
                 while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
@@ -594,7 +679,7 @@ class HostLinkClient(HostLinkBase):
                 self._rx_buffer = self._rx_buffer[skip:]
                 return line
 
-            chunk = self._sock.recv(self.buffer_size)
+            chunk = self._sock.recv(8192)
             if not chunk:
                 message = (
                     "Connection closed by PLC before the response terminator"
@@ -604,12 +689,12 @@ class HostLinkClient(HostLinkBase):
                 raise HostLinkConnectionError(message)
             self._rx_buffer += chunk
             if (
-                len(self._rx_buffer) > self.buffer_size
+                len(self._rx_buffer) > ABSOLUTE_RESPONSE_CAP
                 and b"\r" not in self._rx_buffer
                 and b"\n" not in self._rx_buffer
             ):
                 self._close_unlocked()
-                raise HostLinkProtocolError(f"Response line exceeds {self.buffer_size} bytes")
+                raise HostLinkProtocolError(f"Response line exceeds {ABSOLUTE_RESPONSE_CAP} bytes")
 
     # --- Commands ---
 
@@ -626,22 +711,22 @@ class HostLinkClient(HostLinkBase):
     def check_error_no(self) -> str:
         """Read the current PLC error number as raw response text."""
 
-        return self.send_raw(self._build_check_error_no_command())
+        return self._send_decoded(self._build_check_error_no_command())
 
     def query_model(self) -> ModelInfo:
         """Query the PLC model code and mapped model name."""
 
-        response = self.send_raw(self._build_query_model_command())
-        return self._decode_query_model_response(response)
+        return self._send_parsed(self._build_query_model_command(), self._decode_query_model_response)
 
     def confirm_operating_mode(self) -> int:
         """Return the current PLC operating mode code."""
 
-        response = self.send_raw(self._build_confirm_operating_mode_command())
-        return self._decode_confirm_operating_mode_response(response)
+        return self._send_parsed(
+            self._build_confirm_operating_mode_command(), self._decode_confirm_operating_mode_response
+        )
 
-    def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
-        """Set the PLC clock from ``value`` or from the current system time."""
+    def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int]) -> None:
+        """Set the PLC clock from an explicit value."""
 
         self._expect_ok(self._build_set_time_command(value))
 
@@ -669,27 +754,55 @@ class HostLinkClient(HostLinkBase):
         """Read one device with the Host Link ``RD`` command."""
 
         body, suffix = self._build_read_command(device, data_format)
-        response = self.send_raw(body)
-        return self._decode_read_response(response, suffix)
+        return self._send_parsed(
+            body,
+            lambda response: self._decode_read_response(
+                response, suffix, self._read_response_token_count(device, suffix)
+            ),
+        )
 
     def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
         """Read consecutive devices with the Host Link ``RDS`` command."""
 
         body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
-        response = self.send_raw(body)
-        return self._decode_data_response(response, suffix)
+        return self._send_parsed(body, lambda response: self._decode_data_response(response, suffix, count))
 
     def read_consecutive_legacy(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
         """Read consecutive devices with the legacy Host Link ``RDE`` command."""
 
         body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
-        response = self.send_raw(body)
-        return self._decode_data_response(response, suffix)
+        return self._send_parsed(body, lambda response: self._decode_data_response(response, suffix, count))
 
     def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
         """Write one device with the Host Link ``WR`` command."""
 
         self._expect_ok(self._build_write_command(device, value, data_format))
+
+    def write_bit_in_word(self, device: str, bit_index: int, value: bool) -> None:
+        """Set or clear one word bit while holding this client's request lock."""
+
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index}")
+        if not isinstance(value, bool):
+            raise TypeError("value must be bool")
+        read_body, suffix = self._build_read_command(device, ".U")
+        with self._lock:
+            response = self._send_decoded_unlocked(read_body)
+            try:
+                result = self._decode_read_response(response, suffix)
+                values = result if isinstance(result, list) else [result]
+                if len(values) != 1 or type(values[0]) is not int or not 0 <= values[0] <= 0xFFFF:
+                    raise HostLinkProtocolError(f"Bit-in-word read for {device!r} did not return one unsigned word")
+            except HostLinkProtocolError:
+                self._close_unlocked()
+                raise
+            current = values[0]
+            next_value = current | (1 << bit_index) if value else current & ~(1 << bit_index)
+            write_body = self._build_write_command(device, next_value, ".U")
+            write_response = self._send_decoded_unlocked(write_body)
+            if write_response != "OK":
+                self._close_unlocked()
+                raise HostLinkProtocolError(f"Expected 'OK' but received {write_response!r} for command {write_body!r}")
 
     def write_consecutive(
         self,
@@ -732,30 +845,35 @@ class HostLinkClient(HostLinkBase):
     def register_monitor_bits(self, *devices: str) -> None:
         """Register bit devices for later monitor reads."""
 
-        self._expect_ok(self._build_register_monitor_bits_command(devices))
+        body = self._build_register_monitor_bits_command(devices)
+        count = len(self._flatten_devices(devices))
+        with self._lock:
+            self._expect_ok_unlocked(body)
+            self._monitor_bit_count = count
 
-    def register_monitor_words(self, *devices: str) -> None:
+    def register_monitor_words(self, entries: Sequence[str | tuple[str, str]]) -> None:
         """Register word devices for later monitor reads."""
 
-        self._expect_ok(self._build_register_monitor_words_command(devices))
+        body = self._build_register_monitor_words_command(entries)
+        with self._lock:
+            self._expect_ok_unlocked(body)
+            self._monitor_word_count = len(entries)
 
     def read_monitor_bits(self) -> list[int | str]:
         """Read the currently registered bit monitor values."""
 
-        response = self.send_raw("MBR")
-        return self._decode_monitor_bits_response(response)
+        return self._send_parsed("MBR", self._decode_monitor_bits_response)
 
     def read_monitor_words(self) -> list[str]:
         """Read the currently registered word monitor values."""
 
-        response = self.send_raw("MWR")
-        return self._decode_monitor_words_response(response)
+        return self._send_parsed("MWR", self._decode_monitor_words_response)
 
-    def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
+    def read_comments(self, device: str) -> str:
         """Read the PLC comment text for one supported device."""
 
-        response = self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
-        return self._decode_read_comments_response(response, strip_padding=strip_padding)
+        response = self._send_decoded(self._build_read_comments_command(device), decode_comment_response)
+        return self._decode_read_comments_response(response)
 
     def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""
@@ -763,13 +881,14 @@ class HostLinkClient(HostLinkBase):
         self._expect_ok(self._build_switch_bank_command(bank_no))
 
     def read_expansion_unit_buffer(
-        self, unit_no: int, address: int, count: int, *, data_format: str = ""
+        self, unit_no: int, address: int, count: int, *, data_format: str
     ) -> list[int | str]:
         """Read an expansion unit buffer range with ``URD``."""
 
         body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
-        response = self.send_raw(body)
-        return self._decode_expansion_unit_buffer_response(response, suffix)
+        return self._send_parsed(
+            body, lambda response: self._decode_expansion_unit_buffer_response(response, suffix, count)
+        )
 
     def write_expansion_unit_buffer(
         self,
@@ -777,7 +896,7 @@ class HostLinkClient(HostLinkBase):
         address: int,
         values: Sequence[int | str],
         *,
-        data_format: str = "",
+        data_format: str,
     ) -> None:
         """Write an expansion unit buffer range with ``UWR``."""
 
@@ -791,34 +910,29 @@ class AsyncHostLinkClient(HostLinkBase):
         self,
         host: str,
         *,
-        port: int = 8501,
-        transport: str = "tcp",
+        port: int,
+        transport: str,
         timeout: float = 3.0,
-        plc_profile: str | None = None,
-        buffer_size: int = 8192,
-        append_lf_on_send: bool = False,
-        auto_connect: bool = True,
-        trace_hook: Callable[[HostLinkTraceFrame], None] | None = None,
-        _allow_manual_profile: bool = False,
+        plc_profile: str,
     ) -> None:
         super().__init__(
             host,
             port,
             transport,
-            append_lf_on_send,
-            trace_hook,
             plc_profile=plc_profile,
-            _allow_manual_profile=_allow_manual_profile,
         )
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ValueError("timeout must be a positive finite number")
         self.timeout = timeout
-        if buffer_size <= 0:
-            raise ValueError("buffer_size must be positive")
-        self.buffer_size = buffer_size
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._udp_transport: asyncio.DatagramTransport | None = None
         self._udp_protocol: _HostLinkUDPProtocol | None = None
-        self._auto_connect = auto_connect
         self._lock = asyncio.Lock()
 
     async def __aenter__(self) -> AsyncHostLinkClient:
@@ -868,6 +982,8 @@ class AsyncHostLinkClient(HostLinkBase):
             await self._close_unlocked()
 
     async def _close_unlocked(self) -> None:
+        self._monitor_bit_count = 0
+        self._monitor_word_count = 0
         writer = self._writer
         self._writer = None
         self._reader = None
@@ -887,25 +1003,48 @@ class AsyncHostLinkClient(HostLinkBase):
             except Exception:
                 pass
 
-    async def send_raw(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
-        """Send one raw Host Link command body and return the decoded response text."""
+    async def send_raw(self, body: str) -> bytes:
+        """Send one maintainer raw command and return undecoded response body bytes."""
 
         async with self._lock:
-            return await self._send_raw_unlocked(body, decoder=decoder)
+            response = await self._exchange(self._build_command(body))
+            return response.rstrip(b"\r\n")
 
-    async def _send_raw_unlocked(self, body: str, *, decoder: Callable[[bytes], str] = decode_response) -> str:
+    async def _send_decoded(self, body: str, decoder: Callable[[bytes], str] = decode_response) -> str:
+        async with self._lock:
+            return await self._send_decoded_unlocked(body, decoder)
+
+    async def _send_decoded_unlocked(self, body: str, decoder: Callable[[bytes], str] = decode_response) -> str:
         response = await self._exchange(self._build_command(body))
-        return self._process_response(response, decoder=decoder)
+        try:
+            return self._process_response(response, decoder=decoder)
+        except HostLinkProtocolError:
+            await self._close_unlocked()
+            raise
+
+    async def _send_parsed(self, body: str, parser: Callable[[str], T]) -> T:
+        async with self._lock:
+            response = await self._send_decoded_unlocked(body)
+            try:
+                return parser(response)
+            except HostLinkProtocolError:
+                await self._close_unlocked()
+                raise
 
     async def _expect_ok(self, body: str) -> None:
-        response = await self.send_raw(body)
+        async with self._lock:
+            await self._expect_ok_unlocked(body)
+
+    async def _expect_ok_unlocked(self, body: str) -> None:
+        response = await self._send_decoded_unlocked(body)
         if response != "OK":
+            await self._close_unlocked()
             raise HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
 
     async def _exchange(self, payload: bytes) -> bytes:
         # Note: This is called within self._lock in send_raw
         if self._reader is None and self._udp_transport is None:
-            await self._connect_unlocked()
+            raise HostLinkConnectionError("Client is not connected; call connect() before sending a command")
 
         exchange_complete = False
         try:
@@ -930,6 +1069,9 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
                 response = await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=self.timeout)
+                self._validate_response_cap(response)
+                if not response or response[-1] not in (10, 13):
+                    raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
@@ -963,9 +1105,9 @@ class AsyncHostLinkClient(HostLinkBase):
                 # terminator split across TCP reads.
                 continue
             line.extend(byte)
-            if len(line) > self.buffer_size:
+            if len(line) > ABSOLUTE_RESPONSE_CAP:
                 await self._close_unlocked()
-                raise HostLinkProtocolError(f"Response line exceeds {self.buffer_size} bytes")
+                raise HostLinkProtocolError(f"Response line exceeds {ABSOLUTE_RESPONSE_CAP} bytes")
 
     # --- Async Commands ---
 
@@ -982,22 +1124,22 @@ class AsyncHostLinkClient(HostLinkBase):
     async def check_error_no(self) -> str:
         """Read the current PLC error number as raw response text."""
 
-        return await self.send_raw(self._build_check_error_no_command())
+        return await self._send_decoded(self._build_check_error_no_command())
 
     async def query_model(self) -> ModelInfo:
         """Query the PLC model code and mapped model name."""
 
-        response = await self.send_raw(self._build_query_model_command())
-        return self._decode_query_model_response(response)
+        return await self._send_parsed(self._build_query_model_command(), self._decode_query_model_response)
 
     async def confirm_operating_mode(self) -> int:
         """Return the current PLC operating mode code."""
 
-        response = await self.send_raw(self._build_confirm_operating_mode_command())
-        return self._decode_confirm_operating_mode_response(response)
+        return await self._send_parsed(
+            self._build_confirm_operating_mode_command(), self._decode_confirm_operating_mode_response
+        )
 
-    async def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int] | None = None) -> None:
-        """Set the PLC clock from ``value`` or from the current system time."""
+    async def set_time(self, value: datetime | tuple[int, int, int, int, int, int, int]) -> None:
+        """Set the PLC clock from an explicit value."""
 
         await self._expect_ok(self._build_set_time_command(value))
 
@@ -1025,15 +1167,18 @@ class AsyncHostLinkClient(HostLinkBase):
         """Read one device with the Host Link ``RD`` command."""
 
         body, suffix = self._build_read_command(device, data_format)
-        response = await self.send_raw(body)
-        return self._decode_read_response(response, suffix)
+        return await self._send_parsed(
+            body,
+            lambda response: self._decode_read_response(
+                response, suffix, self._read_response_token_count(device, suffix)
+            ),
+        )
 
     async def read_consecutive(self, device: str, count: int, *, data_format: str | None = None) -> list[int | str]:
         """Read consecutive devices with the Host Link ``RDS`` command."""
 
         body, suffix = self._build_read_consecutive_command("RDS", device, count, data_format)
-        response = await self.send_raw(body)
-        return self._decode_data_response(response, suffix)
+        return await self._send_parsed(body, lambda response: self._decode_data_response(response, suffix, count))
 
     async def read_consecutive_legacy(
         self, device: str, count: int, *, data_format: str | None = None
@@ -1041,8 +1186,7 @@ class AsyncHostLinkClient(HostLinkBase):
         """Read consecutive devices with the legacy Host Link ``RDE`` command."""
 
         body, suffix = self._build_read_consecutive_command("RDE", device, count, data_format)
-        response = await self.send_raw(body)
-        return self._decode_data_response(response, suffix)
+        return await self._send_parsed(body, lambda response: self._decode_data_response(response, suffix, count))
 
     async def write(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
         """Write one device with the Host Link ``WR`` command."""
@@ -1058,25 +1202,32 @@ class AsyncHostLinkClient(HostLinkBase):
         the two Host Link commands.
         """
 
-        if not 0 <= bit_index <= 15:
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
             raise ValueError(f"bit_index must be 0-15, got {bit_index}")
         if not isinstance(value, bool):
             raise TypeError("value must be bool")
 
         read_body, suffix = self._build_read_command(device, ".U")
         async with self._lock:
-            response = await self._send_raw_unlocked(read_body)
-            result = self._decode_read_response(response, suffix)
-            values = result if isinstance(result, list) else [result]
-            current = int(values[0])
+            response = await self._send_decoded_unlocked(read_body)
+            try:
+                result = self._decode_read_response(response, suffix)
+                values = result if isinstance(result, list) else [result]
+                if len(values) != 1 or type(values[0]) is not int or not 0 <= values[0] <= 0xFFFF:
+                    raise HostLinkProtocolError(f"Bit-in-word read for {device!r} did not return one unsigned word")
+            except HostLinkProtocolError:
+                await self._close_unlocked()
+                raise
+            current = values[0]
             if value:
                 current |= 1 << bit_index
             else:
                 current &= ~(1 << bit_index)
 
-            write_body = self._build_write_command(device, current & 0xFFFF, ".U")
-            write_response = await self._send_raw_unlocked(write_body)
+            write_body = self._build_write_command(device, current, ".U")
+            write_response = await self._send_decoded_unlocked(write_body)
             if write_response != "OK":
+                await self._close_unlocked()
                 raise HostLinkProtocolError(f"Expected 'OK' but received {write_response!r} for command {write_body!r}")
 
     async def write_consecutive(
@@ -1120,30 +1271,35 @@ class AsyncHostLinkClient(HostLinkBase):
     async def register_monitor_bits(self, *devices: str) -> None:
         """Register bit devices for later monitor reads."""
 
-        await self._expect_ok(self._build_register_monitor_bits_command(devices))
+        body = self._build_register_monitor_bits_command(devices)
+        count = len(self._flatten_devices(devices))
+        async with self._lock:
+            await self._expect_ok_unlocked(body)
+            self._monitor_bit_count = count
 
-    async def register_monitor_words(self, *devices: str) -> None:
+    async def register_monitor_words(self, entries: Sequence[str | tuple[str, str]]) -> None:
         """Register word devices for later monitor reads."""
 
-        await self._expect_ok(self._build_register_monitor_words_command(devices))
+        body = self._build_register_monitor_words_command(entries)
+        async with self._lock:
+            await self._expect_ok_unlocked(body)
+            self._monitor_word_count = len(entries)
 
     async def read_monitor_bits(self) -> list[int | str]:
         """Read the currently registered bit monitor values."""
 
-        response = await self.send_raw("MBR")
-        return self._decode_monitor_bits_response(response)
+        return await self._send_parsed("MBR", self._decode_monitor_bits_response)
 
     async def read_monitor_words(self) -> list[str]:
         """Read the currently registered word monitor values."""
 
-        response = await self.send_raw("MWR")
-        return self._decode_monitor_words_response(response)
+        return await self._send_parsed("MWR", self._decode_monitor_words_response)
 
-    async def read_comments(self, device: str, *, strip_padding: bool = True) -> str:
+    async def read_comments(self, device: str) -> str:
         """Read the PLC comment text for one supported device."""
 
-        response = await self.send_raw(self._build_read_comments_command(device), decoder=decode_comment_response)
-        return self._decode_read_comments_response(response, strip_padding=strip_padding)
+        response = await self._send_decoded(self._build_read_comments_command(device), decode_comment_response)
+        return self._decode_read_comments_response(response)
 
     async def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""
@@ -1151,13 +1307,14 @@ class AsyncHostLinkClient(HostLinkBase):
         await self._expect_ok(self._build_switch_bank_command(bank_no))
 
     async def read_expansion_unit_buffer(
-        self, unit_no: int, address: int, count: int, *, data_format: str = ""
+        self, unit_no: int, address: int, count: int, *, data_format: str
     ) -> list[int | str]:
         """Read an expansion unit buffer range with ``URD``."""
 
         body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, count, data_format)
-        response = await self.send_raw(body)
-        return self._decode_expansion_unit_buffer_response(response, suffix)
+        return await self._send_parsed(
+            body, lambda response: self._decode_expansion_unit_buffer_response(response, suffix, count)
+        )
 
     async def write_expansion_unit_buffer(
         self,
@@ -1165,7 +1322,7 @@ class AsyncHostLinkClient(HostLinkBase):
         address: int,
         values: Sequence[int | str],
         *,
-        data_format: str = "",
+        data_format: str,
     ) -> None:
         """Write an expansion unit buffer range with ``UWR``."""
 
@@ -1182,7 +1339,7 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: tuple[str | Any, int]) -> None:
         if self._future and not self._future.done():
-            self._future.set_result(data.rstrip(b"\r\n"))
+            self._future.set_result(data)
 
     def error_received(self, exc: Exception) -> None:
         if self._future and not self._future.done():

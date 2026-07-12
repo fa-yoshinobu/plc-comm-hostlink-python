@@ -14,7 +14,7 @@ from hostlink.errors import HostLinkProtocolError
 
 class FakeHostLinkClient(HostLinkClient):
     def __init__(self) -> None:
-        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", auto_connect=False)
+        super().__init__("127.0.0.1", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
         self.sent_frames: list[bytes] = []
         self.queued_responses: list[bytes] = []
 
@@ -47,7 +47,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_tm_32bit_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.read_consecutive("TM0.D", 257)
+            plc.read_consecutive("TM0", 257, data_format=".D")
 
     def test_tc_group_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
@@ -73,19 +73,19 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_mws_rejects_bit_only_timer_type(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.register_monitor_words("T0")
+            plc.register_monitor_words(["T0"])
 
     def test_mws_accepts_xym_word_alias_device_types_supported_by_kv_x500(self) -> None:
         plc = FakeHostLinkClient()
-        plc.register_monitor_words("D100.U", "E100.U", "F100.U", "MR100", "LR100")
+        plc.register_monitor_words([("D100", ".U"), ("E100", ".U"), ("F100", ".U"), "MR100", "LR100"])
         self.assertEqual(plc.sent_frames[-1], b"MWS D100.U E100.U F100.U MR100 LR100\r")
 
     def test_mws_rejects_m_l_aliases_rejected_by_kv_x500(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.register_monitor_words("M100")
+            plc.register_monitor_words(["M100"])
         with self.assertRaises(HostLinkProtocolError):
-            plc.register_monitor_words("L100")
+            plc.register_monitor_words(["L100"])
         self.assertEqual(plc.sent_frames, [])
 
     def test_rdc_rejects_unsupported_device_type(self) -> None:
@@ -166,11 +166,11 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_at_uses_explicit_32bit_format(self) -> None:
         plc = FakeHostLinkClient()
         plc.queue("0000000000")
-        plc.read("AT7.D")
+        plc.read("AT7", data_format=".D")
         self.assertEqual(plc.sent_frames[-1], b"RD AT7.D\r")
 
         plc.queue("0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000 0000000000")
-        plc.read_consecutive("AT0.D", 8)
+        plc.read_consecutive("AT0", 8, data_format=".D")
         self.assertEqual(plc.sent_frames[-1], b"RDS AT0.D 8\r")
 
     def test_at_write_is_rejected_before_send(self) -> None:
@@ -188,12 +188,12 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_read_rejects_32bit_device_end_crossing(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.read("DM65534.D")
+            plc.read("DM65534", data_format=".D")
         self.assertEqual(plc.sent_frames, [])
 
     def test_write_set_value_accepts_native_32bit_device_end(self) -> None:
         plc = FakeHostLinkClient()
-        plc.write_set_value("T3999.D", 100)
+        plc.write_set_value("T3999", 100, data_format=".D")
         self.assertEqual(plc.sent_frames[-1], b"WS T3999.D 100\r")
 
     def test_forced_commands_use_manual_device_sets_and_xym_aliases(self) -> None:

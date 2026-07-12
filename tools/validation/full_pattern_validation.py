@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from datetime import datetime
 
 from hostlink import AsyncHostLinkClient
 from hostlink.errors import HostLinkError
@@ -17,7 +18,7 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         print(f"  ?M (Mode): {mode}")
         err = await plc.check_error_no()
         print(f"  ?E (Error): {err}")
-        await plc.set_time()  # Current time
+        await plc.set_time(datetime.now())  # Current time
         print("  WRT (Time): OK")
 
         # 2. Basic Read/Write with All Suffixes
@@ -28,7 +29,7 @@ async def validate_all_patterns(host, plc_profile, port, transport):
             ("DM4", ".D", 70000),
             ("DM6", ".L", -70000),
             ("DM8", ".H", 0xABCD),
-            ("DM10", "", 5555),
+            ("DM10", ".U", 5555),
         ]
         for dev, fmt, val in formats:
             await plc.write(dev, val, data_format=fmt)
@@ -65,8 +66,8 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         print("\n[Group 5: Timer/Counter Set Values]")
         # Note: Writing to T/C set values (WS)
         try:
-            await plc.write_set_value("T0", 500)
-            await plc.write_set_value_consecutive("T1", [100, 200])
+            await plc.write_set_value("T0", 500, data_format=".D")
+            await plc.write_set_value_consecutive("T1", [100, 200], data_format=".D")
             print("  WS/WSS T0-T2: OK")
         except HostLinkError as e:
             print(f"  WS/WSS: SKIPPED or Error (Check if T0 exists/writable): {e}")
@@ -77,7 +78,7 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         bits = await plc.read_monitor_bits()
         print(f"  MBR (Bits): {bits}")
 
-        await plc.register_monitor_words("DM0.U", "DM1.S")
+        await plc.register_monitor_words([("DM0", ".U"), ("DM1", ".S")])
         words = await plc.read_monitor_words()
         print(f"  MWR (Words): {words}")
 
@@ -106,11 +107,11 @@ async def validate_all_patterns(host, plc_profile, port, transport):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python full_pattern_validation.py <host> <plc-profile> [port] [transport]")
+    if len(sys.argv) < 5:
+        print("Usage: python full_pattern_validation.py <host> <plc-profile> <port> <transport>")
         sys.exit(1)
     host = sys.argv[1]
     plc_profile = sys.argv[2]
-    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
-    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    port = int(sys.argv[3])
+    transport = sys.argv[4]
     asyncio.run(validate_all_patterns(host, plc_profile, port, transport))

@@ -9,6 +9,8 @@ documentation.
 from __future__ import annotations
 
 import asyncio
+import math
+import re
 import struct
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import KW_ONLY, dataclass
@@ -78,7 +80,7 @@ class HostLinkConnectionOptions:
     """Stable connection settings for one Host Link session.
 
     The dataclass is the preferred input for :func:`open_and_connect` because
-    it keeps transport, timeout, and framing options together in one explicit
+    it keeps endpoint and timeout options together in one explicit
     object.
 
     Attributes:
@@ -87,17 +89,14 @@ class HostLinkConnectionOptions:
         port: Host Link port number.
         transport: Transport name such as ``"tcp"`` or ``"udp"``.
         timeout: Socket timeout in seconds.
-        append_lf_on_send: Whether an LF byte is appended after the trailing
-            CR on transmitted commands.
     """
 
     host: str
     _: KW_ONLY
     plc_profile: str
-    port: int = 8501
-    transport: str = "tcp"
+    port: int
+    transport: str
     timeout: float = 3.0
-    append_lf_on_send: bool = False
 
     def __post_init__(self) -> None:
         from .plc_profiles import normalize_plc_profile
@@ -108,6 +107,21 @@ class HostLinkConnectionOptions:
             )
 
         object.__setattr__(self, "plc_profile", normalize_plc_profile(self.plc_profile))
+        if not isinstance(self.host, str) or not self.host.strip():
+            raise ValueError("host is required and must be a non-empty string")
+        if isinstance(self.port, bool) or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
+            raise ValueError("port is required and must be an integer in the range 1..65535")
+        if not isinstance(self.transport, str) or self.transport.strip().lower() not in {"tcp", "udp"}:
+            raise ValueError("transport must be 'tcp' or 'udp'")
+        if (
+            isinstance(self.timeout, bool)
+            or not isinstance(self.timeout, (int, float))
+            or not math.isfinite(self.timeout)
+            or self.timeout <= 0
+        ):
+            raise ValueError("timeout must be a positive finite number")
+        object.__setattr__(self, "host", self.host.strip())
+        object.__setattr__(self, "transport", self.transport.strip().lower())
 
 
 @dataclass(frozen=True)
@@ -150,7 +164,7 @@ class TimerCounterValue:
     preset: int
 
 
-def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
+def parse_address(address: str) -> HostLinkAddress:
     """Parse a public Host Link helper address.
 
     This is the public companion to :func:`normalize_address`. It keeps UI and
@@ -161,8 +175,6 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
         address: User-facing address such as ``"dm100:u"``, ``"dm100:f"``, or
             ``"dm100.a"``. Bare base-device addresses are rejected because the
             data type must be explicit.
-        default_suffix: Deprecated compatibility parameter. Supplying it now
-            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         A :class:`HostLinkAddress` with canonical text and parsed metadata.
@@ -175,7 +187,6 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
             assert parsed.bit_index == 10
     """
 
-    _reject_default_suffix(default_suffix)
     base_raw, dtype, bit_index = _parse_address(address)
     base_device = parse_device_text(base_raw)
     if dtype == "BIT_IN_WORD":
@@ -188,31 +199,27 @@ def parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress:
     return HostLinkAddress(canonical, base_device, dtype, bit_index)
 
 
-def try_parse_address(address: str, *, default_suffix: str = "") -> HostLinkAddress | None:
+def try_parse_address(address: str) -> HostLinkAddress | None:
     """Try to parse a public Host Link helper address.
 
     Args:
         address: User-facing address text.
-        default_suffix: Deprecated compatibility parameter. Supplying it now
-            makes the parse fail; put the data type in ``address`` instead.
 
     Returns:
         A parsed :class:`HostLinkAddress`, or ``None`` if validation fails.
     """
 
     try:
-        return parse_address(address, default_suffix=default_suffix)
+        return parse_address(address)
     except (HostLinkProtocolError, ValueError):
         return None
 
 
-def format_address(address: HostLinkAddress | str, *, default_suffix: str = "") -> str:
+def format_address(address: HostLinkAddress | str) -> str:
     """Return canonical Host Link helper address text.
 
     Args:
         address: A parsed :class:`HostLinkAddress` or raw address string.
-        default_suffix: Deprecated compatibility parameter. Supplying it now
-            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         Canonical address text.
@@ -220,7 +227,7 @@ def format_address(address: HostLinkAddress | str, *, default_suffix: str = "") 
 
     if isinstance(address, HostLinkAddress):
         return address.text
-    return normalize_address(address, default_suffix=default_suffix)
+    return normalize_address(address)
 
 
 async def read_typed(
@@ -343,22 +350,18 @@ async def read_counter(client: AsyncHostLinkClient, device: str) -> TimerCounter
 async def read_comments(
     client: AsyncHostLinkClient,
     device: str,
-    *,
-    strip_padding: bool = True,
 ) -> str:
     """Read one PLC comment string through the high-level helper API.
 
     Args:
         client: Connected asynchronous Host Link client.
         device: Base device address such as ``"DM100"``.
-        strip_padding: Whether to trim trailing spaces from the fixed-width
-            Host Link ``RDC`` response.
 
     Returns:
         The PLC comment text for ``device``.
     """
 
-    return await client.read_comments(device, strip_padding=strip_padding)
+    return await client.read_comments(device)
 
 
 async def write_typed(
@@ -394,17 +397,24 @@ async def write_typed(
         raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', 'H', or 'BIT'.")
 
     if key == "F":
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError(f"Float value must be finite, got {value!r}.")
         lo_word, hi_word = _float32_to_words(float(value))
         await client.write_consecutive(device, [lo_word, hi_word], data_format=".U")
         return
     if key == "BIT":
-        await client.write(device, 1 if _parse_bit_write_value(value) else 0, data_format=None)
+        await client.write(device, _parse_bit_write_value(value), data_format=None)
         return
     fmt = f".{key}"
     if key == "H" and isinstance(value, str):
-        write_val: int | str = value.strip().upper()
+        text = value.strip()
+        if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", text):
+            raise ValueError(f"Invalid H value {value!r}; use 1..4 hexadecimal digits.")
+        write_val: int | str = int(text, 16)
+    elif type(value) is int:
+        write_val = value
     else:
-        write_val = str(value) if isinstance(value, float) else value
+        raise ValueError(f"{key} value must be an integer, got {value!r}.")
     await client.write(device, write_val, data_format=fmt)
 
 
@@ -502,7 +512,7 @@ async def read_named(
             snapshot = await read_named(client, ["DM10:U", "DM20:F", "DM30.A"])
     """
     if not addresses:
-        return {}
+        raise ValueError("read_named addresses must not be empty")
 
     plan = _try_compile_read_named_plan(addresses)
     if plan is not None:
@@ -536,7 +546,9 @@ async def poll(
         async for snapshot in poll(client, ["DM100:U", "DM200:F"], interval=0.5):
             print(snapshot)
     """
-    plan = _try_compile_read_named_plan(addresses) if addresses else None
+    if not addresses:
+        raise ValueError("poll addresses must not be empty")
+    plan = _try_compile_read_named_plan(addresses)
     while True:
         if plan is not None:
             yield await _execute_read_named_plan(client, plan)
@@ -565,11 +577,6 @@ def _parse_address(address: str) -> tuple[str, str, int | None]:
     if parsed.suffix:
         return address.strip(), parsed.suffix.lstrip(".").upper(), None
     raise ValueError(f"Address {address!r} requires an explicit data type such as ':U', ':D', or ':BIT'.")
-
-
-def _reject_default_suffix(default_suffix: str) -> None:
-    if default_suffix:
-        raise ValueError("default_suffix is no longer supported; specify the data type in the address, e.g. 'DM100:U'.")
 
 
 def _normalize_helper_dtype(dtype: str) -> str:
@@ -799,11 +806,19 @@ def _words_to_float32(lo_word: int, hi_word: int) -> float:
 
 
 def _float32_to_words(value: float) -> tuple[int, int]:
-    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    if not math.isfinite(value):
+        raise ValueError(f"Float value must be finite, got {value!r}.")
+    try:
+        packed = struct.pack("<f", value)
+    except OverflowError as exc:
+        raise ValueError(f"Float value is outside the finite float32 range: {value!r}.") from exc
+    if not math.isfinite(struct.unpack("<f", packed)[0]):
+        raise ValueError(f"Float value is outside the finite float32 range: {value!r}.")
+    bits = struct.unpack("<I", packed)[0]
     return bits & 0xFFFF, (bits >> 16) & 0xFFFF
 
 
-def normalize_address(address: str, *, default_suffix: str = "") -> str:
+def normalize_address(address: str) -> str:
     """Return the canonical Host Link device string.
 
     The helper normalizes device-family spelling, trims whitespace, and keeps
@@ -812,14 +827,11 @@ def normalize_address(address: str, *, default_suffix: str = "") -> str:
     Args:
         address: User-facing address such as ``"dm100:u"``, ``"dm100:f"``, or
             ``"DM100.a"``.
-        default_suffix: Deprecated compatibility parameter. Supplying it now
-            raises ``ValueError``; put the data type in ``address`` instead.
 
     Returns:
         Canonical uppercase address text.
     """
 
-    _reject_default_suffix(default_suffix)
     base, dtype, bit_index = _parse_address(address)
     base_text = parse_device_text(base)
     if dtype == "BIT_IN_WORD":
@@ -837,13 +849,11 @@ async def read_words_single_request(
 ) -> list[int]:
     """Read contiguous unsigned words using one PLC request.
 
-    This helper is the explicit atomic path for one consecutive read. If the
-    caller wants multiple protocol requests, use :func:`read_words_chunked`
-    instead.
+    The helper never splits or combines multiple PLC requests.
     """
 
     values = await client.read_consecutive(device, count, data_format=".U")
-    return [int(v) & 0xFFFF for v in values]
+    return [int(v) for v in values]
 
 
 async def read_dwords_single_request(
@@ -868,12 +878,11 @@ async def write_words_single_request(
 ) -> None:
     """Write contiguous unsigned words using one PLC request.
 
-    This helper is intended for ranges that should remain one logical Host
-    Link write. Use :func:`write_words_chunked` only when multiple requests are
-    acceptable to the caller.
+    The helper rejects the entire operation before send if one value is invalid.
     """
 
-    await client.write_consecutive(device, [int(value) & 0xFFFF for value in values], data_format=".U")
+    normalized = [_require_exact_integer(value, 0, 0xFFFF, "word") for value in values]
+    await client.write_consecutive(device, normalized, data_format=".U")
 
 
 async def write_dwords_single_request(
@@ -889,106 +898,15 @@ async def write_dwords_single_request(
 
     words: list[int] = []
     for value in values:
-        words.extend((int(value) & 0xFFFF, (int(value) >> 16) & 0xFFFF))
+        normalized = _require_exact_integer(value, 0, 0xFFFFFFFF, "dword")
+        words.extend((normalized & 0xFFFF, (normalized >> 16) & 0xFFFF))
     await write_words_single_request(client, device, words)
 
 
-async def read_words_chunked(
-    client: AsyncHostLinkClient,
-    device: str,
-    count: int,
-    max_per_request: int = 1000,
-) -> list[int]:
-    """Read contiguous unsigned words across multiple aligned requests.
-
-    Chunking is explicit here. The helper aligns chunk sizes so the related
-    dword helper can reuse the same boundary rules safely.
-    """
-
-    effective_max = max(1, (max_per_request // 2) * 2)
-    start = parse_device(device)
-    result: list[int] = []
-    remaining = count
-    offset = 0
-    while remaining > 0:
-        chunk = min(remaining, effective_max)
-        chunk_device = _offset_device(start, offset)
-        result.extend(await read_words_single_request(client, chunk_device, chunk))
-        offset += chunk
-        remaining -= chunk
-    return result
-
-
-async def read_dwords_chunked(
-    client: AsyncHostLinkClient,
-    device: str,
-    count: int,
-    max_dwords_per_request: int = 500,
-) -> list[int]:
-    """Read contiguous unsigned dwords across multiple aligned requests.
-
-    Chunk boundaries are aligned to full 32-bit values so one dword is never
-    torn across requests.
-    """
-
-    if max_dwords_per_request <= 0:
-        raise ValueError("max_dwords_per_request must be at least 1")
-    start = parse_device(device)
-    result: list[int] = []
-    remaining = count
-    offset = 0
-    while remaining > 0:
-        chunk = min(remaining, max_dwords_per_request)
-        chunk_device = _offset_device(start, offset * 2)
-        result.extend(await read_dwords_single_request(client, chunk_device, chunk))
-        offset += chunk
-        remaining -= chunk
-    return result
-
-
-async def write_words_chunked(
-    client: AsyncHostLinkClient,
-    device: str,
-    values: list[int],
-    max_per_request: int = 1000,
-) -> None:
-    """Write contiguous unsigned words across multiple aligned requests.
-
-    Use this helper only when multi-request write semantics are acceptable to
-    the caller.
-    """
-
-    effective_max = max(1, (max_per_request // 2) * 2)
-    start = parse_device(device)
-    offset = 0
-    while offset < len(values):
-        chunk = min(len(values) - offset, effective_max)
-        chunk_device = _offset_device(start, offset)
-        await write_words_single_request(client, chunk_device, values[offset : offset + chunk])
-        offset += chunk
-
-
-async def write_dwords_chunked(
-    client: AsyncHostLinkClient,
-    device: str,
-    values: list[int],
-    max_dwords_per_request: int = 500,
-) -> None:
-    """Write contiguous unsigned dwords across multiple aligned requests.
-
-    Each chunk boundary is aligned to full dwords so one 32-bit value remains
-    intact inside one request.
-    """
-
-    if max_dwords_per_request <= 0:
-        raise ValueError("max_dwords_per_request must be at least 1")
-    start = parse_device(device)
-    offset = 0
-    while offset < len(values):
-        chunk = min(len(values) - offset, max_dwords_per_request)
-        chunk_device = _offset_device(start, offset * 2)
-        await write_dwords_single_request(client, chunk_device, values[offset : offset + chunk])
-        offset += chunk
+def _require_exact_integer(value: object, minimum: int, maximum: int, label: str) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise ValueError(f"{label} value {value!r} must be an integer in the range {minimum}..{maximum}")
+    return value
 
 
 async def read_expansion_unit_buffer(
@@ -997,7 +915,7 @@ async def read_expansion_unit_buffer(
     address: int,
     count: int,
     *,
-    data_format: str = "",
+    data_format: str,
 ) -> list[int | str]:
     """Read buffer memory in an expansion unit.
 
@@ -1010,7 +928,7 @@ async def read_expansion_unit_buffer(
         unit_no: Expansion unit number, ``0`` to ``48``.
         address: Buffer memory address, ``0`` to ``59999``.
         count: Number of values to read.
-        data_format: Optional Host Link data suffix such as ``"U"``, ``"S"``,
+        data_format: Required Host Link data suffix such as ``"U"``, ``"S"``,
             ``"D"``, ``"L"``, or ``"H"``.
 
     Returns:
@@ -1031,7 +949,7 @@ async def write_expansion_unit_buffer(
     address: int,
     values: Sequence[int | str],
     *,
-    data_format: str = "",
+    data_format: str,
 ) -> None:
     """Write buffer memory in an expansion unit.
 
@@ -1043,7 +961,7 @@ async def write_expansion_unit_buffer(
         unit_no: Expansion unit number, ``0`` to ``48``.
         address: Buffer memory address, ``0`` to ``59999``.
         values: Values to write in one request.
-        data_format: Optional Host Link data suffix such as ``"U"``, ``"S"``,
+        data_format: Required Host Link data suffix such as ``"U"``, ``"S"``,
             ``"D"``, ``"L"``, or ``"H"``.
 
     Examples:
@@ -1098,62 +1016,35 @@ async def read_dwords(
     return await read_dwords_single_request(client, device, count)
 
 
-_MISSING_PLC_PROFILE = object()
-
-
-async def open_and_connect(
-    host: str | HostLinkConnectionOptions,
-    port: int = 8501,
-    transport: str = "tcp",
-    timeout: float = 3.0,
-    append_lf_on_send: bool = False,
-    *,
-    plc_profile: str | object = _MISSING_PLC_PROFILE,
-) -> AsyncHostLinkClient:
+async def open_and_connect(options: HostLinkConnectionOptions) -> AsyncHostLinkClient:
     """
     Create and connect an :class:`AsyncHostLinkClient`.
 
     This is the recommended entry point for user code and examples because it
-    returns a ready-to-use client in one step. It is equivalent to creating a
-    client with ``auto_connect=False`` and then calling ``await client.connect()``.
+    returns a ready-to-use client in one step.
 
     Args:
-        host: PLC IP address, hostname, or a :class:`HostLinkConnectionOptions`
-            instance.
-        plc_profile: Canonical KEYENCE KV PLC profile for the standard
-            high-level route.
-        port: Host Link port. Defaults to ``8501``.
-        transport: Transport string such as ``"tcp"`` or ``"udp"``.
-        timeout: Socket timeout in seconds.
-        append_lf_on_send: Whether an LF byte is appended after the terminating
-            CR when sending commands.
+        options: Fully specified Host Link endpoint and timeout settings.
 
     Returns:
         A connected :class:`AsyncHostLinkClient`.
 
     Usage::
 
-        client = await open_and_connect("192.168.250.100", plc_profile="keyence:kv-8000")
+        options = HostLinkConnectionOptions(
+            "192.168.250.100",
+            port=8501,
+            transport="tcp",
+            plc_profile="keyence:kv-8000",
+        )
+        client = await open_and_connect(options)
         async with client:
             values = await read_words(client, "DM100", 10)
     """
     from .client import AsyncHostLinkClient
 
-    if isinstance(host, HostLinkConnectionOptions):
-        options = host
-    else:
-        if plc_profile is _MISSING_PLC_PROFILE:
-            raise ValueError(
-                "plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'."
-            )
-        options = HostLinkConnectionOptions(
-            host,
-            port=port,
-            transport=transport,
-            timeout=timeout,
-            append_lf_on_send=append_lf_on_send,
-            plc_profile=cast(str, plc_profile),
-        )
+    if not isinstance(options, HostLinkConnectionOptions):
+        raise TypeError("open_and_connect requires HostLinkConnectionOptions")
 
     client = AsyncHostLinkClient(
         options.host,
@@ -1161,8 +1052,6 @@ async def open_and_connect(
         transport=options.transport,
         timeout=options.timeout,
         plc_profile=options.plc_profile,
-        append_lf_on_send=options.append_lf_on_send,
-        auto_connect=False,
     )
     await client.connect()
     return client

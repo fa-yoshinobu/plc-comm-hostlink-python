@@ -41,10 +41,10 @@ def run_exhaustive_test(host, plc_profile, port, transport, start_addr=0, end_ad
         # DM100.D (32bit) = DM100(Low 16) + DM101(High 16)
         test_val_32 = 0x1234ABCD
         try:
-            plc.write("DM100.D", test_val_32)
-            read_back_32 = plc.read("DM100.D")
-            low_word = plc.read("DM100.H")  # Should be ABCD
-            high_word = plc.read("DM101.H")  # Should be 1234
+            plc.write("DM100", test_val_32, data_format=".D")
+            read_back_32 = plc.read("DM100", data_format=".D")
+            low_word = plc.read("DM100", data_format=".H")  # Should be ABCD
+            high_word = plc.read("DM101", data_format=".H")  # Should be 1234
 
             print(f"  DM100.D Write: {hex(test_val_32)}")
             print(f"  DM100.D Read:  {hex(read_back_32)}")
@@ -86,11 +86,11 @@ def run_exhaustive_test(host, plc_profile, port, transport, start_addr=0, end_ad
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python exhaustive_address_test.py <host> <plc-profile> [port] [transport]")
+    if len(sys.argv) < 5:
+        print("Usage: python exhaustive_address_test.py <host> <plc-profile> <port> <transport>")
         sys.exit(1)
     host = sys.argv[1]
     plc_profile = sys.argv[2]
-    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
-    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    port = int(sys.argv[3])
+    transport = sys.argv[4]
     run_exhaustive_test(host, plc_profile, port, transport)

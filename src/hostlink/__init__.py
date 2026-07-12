@@ -19,8 +19,6 @@ from :mod:`hostlink.utils`:
 - :func:`read_comments`
 - :func:`read_words_single_request`
 - :func:`read_dwords_single_request`
-- :func:`read_words_chunked`
-- :func:`read_dwords_chunked`
 - :func:`read_expansion_unit_buffer`
 - :func:`write_expansion_unit_buffer`
 - :func:`write_bit_in_word`
@@ -34,7 +32,7 @@ application code and generated user documentation.
 
 __version__ = "3.1.0"
 
-from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTraceDirection, HostLinkTraceFrame, ModelInfo
+from .client import AsyncHostLinkClient, HostLinkClient, ModelInfo
 from .device_ranges import (
     KvDeviceRangeCatalog,
     KvDeviceRangeCategory,
@@ -71,7 +69,6 @@ from .utils import (
     read_comments,
     read_counter,
     read_dwords,
-    read_dwords_chunked,
     read_dwords_single_request,
     read_expansion_unit_buffer,
     read_named,
@@ -79,15 +76,12 @@ from .utils import (
     read_timer_counter,
     read_typed,
     read_words,
-    read_words_chunked,
     read_words_single_request,
     try_parse_address,
     write_bit_in_word,
-    write_dwords_chunked,
     write_dwords_single_request,
     write_expansion_unit_buffer,
     write_typed,
-    write_words_chunked,
     write_words_single_request,
 )
 
@@ -95,8 +89,6 @@ __all__ = [
     "HostLinkClient",
     "AsyncHostLinkClient",
     "ModelInfo",
-    "HostLinkTraceDirection",
-    "HostLinkTraceFrame",
     "HostLinkBaseError",
     "HostLinkConnectionError",
     "HostLinkError",
@@ -126,22 +118,18 @@ __all__ = [
     "read_comments",
     "read_counter",
     "read_dwords",
-    "read_dwords_chunked",
     "read_dwords_single_request",
     "read_named",
     "read_timer",
     "read_timer_counter",
     "read_typed",
     "read_words",
-    "read_words_chunked",
     "read_words_single_request",
     "read_expansion_unit_buffer",
     "try_parse_address",
     "write_bit_in_word",
-    "write_dwords_chunked",
     "write_dwords_single_request",
     "write_expansion_unit_buffer",
     "write_typed",
-    "write_words_chunked",
     "write_words_single_request",
 ]

@@ -26,11 +26,9 @@ from hostlink import (
     normalize_address,
     open_and_connect,
     poll,
-    read_dwords_chunked,
     read_dwords_single_request,
     read_named,
     read_typed,
-    read_words_chunked,
     read_words_single_request,
     write_bit_in_word,
     write_typed,
@@ -44,12 +42,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
-    parser.add_argument("--port", type=int, default=8501, help="Host Link port (default 8501)")
+    parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
     parser.add_argument(
         "--transport",
         choices=("tcp", "udp"),
-        default="tcp",
-        help="Transport protocol (default tcp)",
+        required=True,
+        help="Required transport protocol",
     )
     parser.add_argument("--timeout", type=float, default=3.0, help="Timeout in seconds (default 3.0)")
     parser.add_argument("--poll-count", type=int, default=3, help="Number of poll snapshots (default 3)")
@@ -60,7 +58,7 @@ async def run(args: argparse.Namespace) -> None:
     print(f"[normalize_address] dm20 -> {normalize_address('dm20')}")
     print(f"[normalize_address] dm20.a -> {normalize_address('dm20.a')}")
 
-    # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
+    # Connect only to the explicitly selected endpoint and transport.
     async with await open_and_connect(
         HostLinkConnectionOptions(
             host=args.host,
@@ -100,12 +98,6 @@ async def run(args: argparse.Namespace) -> None:
             dwords = await read_dwords_single_request(client, "DM30", 3)
             print(f"[read_words_single_request] DM20-DM25 = {words}")
             print(f"[read_dwords_single_request] DM30-DM35 = {dwords}")
-
-            # Read larger areas only when explicit multi-request chunking is acceptable.
-            large_words = await read_words_chunked(client, "DM1000", 1000)
-            large_dwords = await read_dwords_chunked(client, "DM2000", 120)
-            print(f"[read_words_chunked] DM1000-DM1999 = {len(large_words)} words")
-            print(f"[read_dwords_chunked] DM2000-DM2239 = {len(large_dwords)} dwords")
 
             # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
             await write_bit_in_word(client, "DM50", bit_index=0, value=True)

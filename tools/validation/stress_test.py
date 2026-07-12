@@ -15,7 +15,7 @@ def run_sync_stress(host, plc_profile, port, transport, count=500):
             start = time.perf_counter()
             try:
                 # Read DM0
-                plc.read("DM0.U")
+                plc.read("DM0", data_format=".U")
                 end = time.perf_counter()
                 latencies.append((end - start) * 1000)
                 if i % 100 == 0:
@@ -63,14 +63,14 @@ def run_bulk_test(host, plc_profile, port, transport, words=1000):
         try:
             # Test Bulk Read
             start = time.perf_counter()
-            data = plc.read_consecutive("DM1000.U", words)
+            data = plc.read_consecutive("DM1000", words, data_format=".U")
             end = time.perf_counter()
             print(f"Bulk Read {words} words: {(end - start) * 1000:.2f}ms (Size: {len(data)} items)")
 
             # Test Bulk Write
             write_data = [i % 65535 for i in range(words)]
             start = time.perf_counter()
-            plc.write_consecutive("DM1000.U", write_data)
+            plc.write_consecutive("DM1000", write_data, data_format=".U")
             end = time.perf_counter()
             print(f"Bulk Write {words} words: {(end - start) * 1000:.2f}ms")
 
@@ -80,14 +80,14 @@ def run_bulk_test(host, plc_profile, port, transport, words=1000):
 
 
 async def main():
-    if len(sys.argv) < 3:
-        print("Usage: python stress_test.py <host> <plc-profile> [port] [transport]")
+    if len(sys.argv) < 5:
+        print("Usage: python stress_test.py <host> <plc-profile> <port> <transport>")
         return
 
     host = sys.argv[1]
     plc_profile = sys.argv[2]
-    port = int(sys.argv[3]) if len(sys.argv) > 3 else 8501
-    transport = sys.argv[4] if len(sys.argv) > 4 else "tcp"
+    port = int(sys.argv[3])
+    transport = sys.argv[4]
 
     print(f"STARTING STRESS TEST ON {host}:{port} ({transport}, {plc_profile})")
 
