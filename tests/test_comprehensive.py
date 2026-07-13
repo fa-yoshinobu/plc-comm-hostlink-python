@@ -10,6 +10,7 @@ from hostlink import (
     HostLinkClient,
     HostLinkError,
     HostLinkProtocolError,
+    HostLinkTrafficStats,
     device_range_catalog_for_plc_profile,
     poll,
     read_comments,
@@ -140,15 +141,29 @@ class TestComprehensiveSync(unittest.TestCase):
             port=server.port,
             transport="udp",
         )
+        self.assertEqual(client.traffic_stats().request_count, 0)
         client.connect()
         try:
             large_response = "7" * 9000
             server.responses["LARGE"] = large_response
 
             self.assertEqual(client.send_raw("LARGE"), large_response.encode("ascii"))
+            self.assertEqual(
+                client.traffic_stats(),
+                HostLinkTrafficStats(
+                    request_count=1,
+                    tx_bytes=len(b"LARGE\r"),
+                    rx_bytes=len(large_response.encode("ascii")) + len(b"\r\n"),
+                ),
+            )
+            server.responses["ERROR"] = "E1"
+            self.assertEqual(client.send_raw("ERROR"), b"E1")
+            self.assertEqual(client.traffic_stats().request_count, 2)
+            self.assertEqual(client.traffic_stats().rx_bytes, len(large_response) + 6)
         finally:
             client.close()
             server.stop()
+        self.assertEqual(client.traffic_stats().request_count, 2)
 
     def test_set_time(self):
         dt = datetime(2026, 3, 18, 15, 30, 45)

@@ -75,10 +75,15 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
             client.send_raw("FIRST")
         assert client._sock is None
+        assert client.traffic_stats().request_count == 1
+        assert client.traffic_stats().tx_bytes == len(b"FIRST\r")
+        assert client.traffic_stats().rx_bytes == 0
 
         client.timeout = 1.0
         client.connect()
         assert client.send_raw("SECOND") == b"SECOND"
+        assert client.traffic_stats().request_count == 2
+        assert client.traffic_stats().rx_bytes == len(b"SECOND\r")
     finally:
         client.close()
         thread.join(timeout=3.0)
@@ -110,6 +115,8 @@ def test_sync_udp_missing_terminator_invalidates_transport() -> None:
         with pytest.raises(HostLinkProtocolError, match="terminator"):
             client.send_raw("READ")
         assert client._sock is None
+        assert client.traffic_stats().request_count == 1
+        assert client.traffic_stats().rx_bytes == 0
     finally:
         client.close()
         thread.join(timeout=3.0)

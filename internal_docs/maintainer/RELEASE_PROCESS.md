@@ -54,3 +54,10 @@ Then:
 - let the tag workflow create the GitHub release entry, or manually dispatch it
   with the version of an existing `v*` tag
 - upload `dist/` artifacts if distributing release packages outside the repository
+
+## 7. Final Publication Integrity Gate
+
+- enumerate every unchecked repository TODO and maintainer checkbox; pass it, mark it explicitly not required, or record an item-by-item release disposition
+- build the shared docs site in a fresh virtual environment using the registry package and require the version/symbol check plus `mkdocs build --strict`
+- compare the published PyPI wheel and sdist byte-for-byte with the inspected GitHub Release assets
+- verify the immutable tag target, final Release state/assets, docs deployment, open release PR count, and clean working tree

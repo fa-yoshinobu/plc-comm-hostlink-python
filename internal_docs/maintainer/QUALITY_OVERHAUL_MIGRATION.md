@@ -410,3 +410,16 @@ Use `send_raw` only for maintainer investigation. It now returns response-body `
 - Type checking: `python -m mypy src/hostlink` passed; Ruff, docs/sample checks, build, Twine, wheel, and sdist checks passed.
 - Claude: the user ran the authorized HostLink batch outside Codex; its result and Codex disposition are preserved in the workspace review record.
 - Live PLC: on 2026-07-12, the public async high-level API connected to KEYENCE KV-X500 profile `keyence:kv-x500` at `192.168.250.100:8501` over TCP and read one unsigned word from `DM0`; the result was `5878`. No write, retry, or fallback was performed. This evidence is limited to that endpoint, profile, device, transport, and operation.
+
+## NR-007: Lifetime traffic statistics
+
+Approved next-release contract: `traffic_stats()` returns immutable lifetime counters; only complete
+sends and complete response lines/datagrams count, pre-send and partial failures do not, and
+close/reconnect does not reset. Implementation and deterministic tests are required; live PLC
+verification is unnecessary. Claude review and final packaging remain pending explicit authorization.
+
+- [x] Public API and transport-boundary implementation completed.
+- [x] Deterministic tests, documentation, changelog, and package gate completed.
+- [x] Codex final self-review completed.
+- [ ] Claude review completed and findings dispositioned.
+- [ ] Next-release package acceptance completed.

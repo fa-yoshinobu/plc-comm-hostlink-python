@@ -97,6 +97,15 @@ class ModelInfo:
 T = TypeVar("T")
 
 
+@dataclass(frozen=True)
+class HostLinkTrafficStats:
+    """Immutable lifetime traffic counters for one client."""
+
+    request_count: int
+    tx_bytes: int
+    rx_bytes: int
+
+
 def _normalize_connection_plc_profile(plc_profile: str | None) -> str:
     if plc_profile is None:
         raise ValueError("plc_profile is required. Use an explicit canonical PLC profile such as 'keyence:kv-8000'.")
@@ -544,6 +553,15 @@ class HostLinkClient(HostLinkBase):
         self._sock: socket.socket | None = None
         self._rx_buffer = b""
         self._lock = threading.Lock()
+        self._request_count = 0
+        self._tx_bytes = 0
+        self._rx_bytes = 0
+        self._last_rx_frame_length = 0
+
+    def traffic_stats(self) -> HostLinkTrafficStats:
+        """Return an immutable lifetime traffic-counter snapshot."""
+        with self._lock:
+            return HostLinkTrafficStats(self._request_count, self._tx_bytes, self._rx_bytes)
 
     def __enter__(self) -> HostLinkClient:
         self.connect()
@@ -635,13 +653,17 @@ class HostLinkClient(HostLinkBase):
         try:
             self._fire_trace(HostLinkTraceDirection.SEND, payload)
             self._sock.sendall(payload)
+            self._request_count += 1
+            self._tx_bytes += len(payload)
             if self.transport == "udp":
                 response = self._sock.recv(UDP_RECEIVE_BUFFER_SIZE)
                 self._validate_response_cap(response)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
+                self._rx_bytes += len(response)
             else:
                 response = self._recv_tcp_line()
+                self._rx_bytes += self._last_rx_frame_length
             exchange_complete = True
             self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
             return response
@@ -677,6 +699,7 @@ class HostLinkClient(HostLinkBase):
                 while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
                     skip += 1
                 self._rx_buffer = self._rx_buffer[skip:]
+                self._last_rx_frame_length = skip
                 return line
 
             chunk = self._sock.recv(8192)
@@ -934,6 +957,14 @@ class AsyncHostLinkClient(HostLinkBase):
         self._udp_transport: asyncio.DatagramTransport | None = None
         self._udp_protocol: _HostLinkUDPProtocol | None = None
         self._lock = asyncio.Lock()
+        self._request_count = 0
+        self._tx_bytes = 0
+        self._rx_bytes = 0
+        self._last_rx_frame_length = 0
+
+    def traffic_stats(self) -> HostLinkTrafficStats:
+        """Return an immutable lifetime traffic-counter snapshot."""
+        return HostLinkTrafficStats(self._request_count, self._tx_bytes, self._rx_bytes)
 
     async def __aenter__(self) -> AsyncHostLinkClient:
         await self.connect()
@@ -1056,7 +1087,10 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._writer.write(payload)
                 await self._writer.drain()
+                self._request_count += 1
+                self._tx_bytes += len(payload)
                 response = await asyncio.wait_for(self._recv_tcp_line(), timeout=self.timeout)
+                self._rx_bytes += self._last_rx_frame_length
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
@@ -1068,10 +1102,13 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._udp_protocol.prepare_response()
                 self._udp_transport.sendto(payload)
+                self._request_count += 1
+                self._tx_bytes += len(payload)
                 response = await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=self.timeout)
                 self._validate_response_cap(response)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
+                self._rx_bytes += len(response)
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
@@ -1100,6 +1137,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 raise HostLinkConnectionError(message)
             if byte[0] in (10, 13):
                 if line:
+                    self._last_rx_frame_length = len(line) + 1
                     return bytes(line)
                 # Discard CR/LF left by the previous response, including a
                 # terminator split across TCP reads.

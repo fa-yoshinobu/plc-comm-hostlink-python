@@ -32,7 +32,7 @@ application code and generated user documentation.
 
 __version__ = "3.1.0"
 
-from .client import AsyncHostLinkClient, HostLinkClient, ModelInfo
+from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTrafficStats, ModelInfo
 from .device_ranges import (
     KvDeviceRangeCatalog,
     KvDeviceRangeCategory,
@@ -89,6 +89,7 @@ __all__ = [
     "HostLinkClient",
     "AsyncHostLinkClient",
     "ModelInfo",
+    "HostLinkTrafficStats",
     "HostLinkBaseError",
     "HostLinkConnectionError",
     "HostLinkError",
