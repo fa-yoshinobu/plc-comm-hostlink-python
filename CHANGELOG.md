@@ -17,8 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [3.1.0] - 2026-07-13
 
+### Added
+- Library: Added `KvHostLinkPlcProfileDescriptor` and `plc_profile_descriptors()` for canonical Host Link profile metadata.
+
+### Changed
 - Library: Require explicit `port`, `transport`, and canonical `plc_profile` connection settings while retaining the common 3-second timeout default.
 - Library: Constructors now perform local initialization only; commands require an explicit successful `connect()` and never reconnect or retry implicitly after transport failure.
 - Library: Fix normal command framing to CR, make PLC clock values and expansion-buffer formats mandatory, and strictly validate typed write values and response tokens without masking or fallback conversion.
@@ -28,13 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: Document the explicit connection lifecycle, base-device plus separate-format low-level contract, and single-request timing boundary.
 - Samples/Tooling: Require an explicit destination port for every runnable single-PLC, multi-PLC, configuration-driven, and validation entry point. Multi-PLC inputs may inherit only an explicitly supplied common port; no `8501` runtime fallback remains.
 
-### Removed
+- Release: Bumped package metadata and `hostlink.__version__` to `3.1.0`.
 
+### Removed
 - Library: Breaking: Remove `auto_connect`, `append_lf_on_send`, public receive-buffer sizing, public trace exports/options, comment padding switches, default address suffixes, and public automatic word/dword chunking helpers.
 - Library: Breaking: Reject suffix-bearing numeric low-level devices such as `DM0.U`; pass `device="DM0"` and `data_format=".U"` separately.
 
-### Fixed
+### Deprecated
+- Library: Deprecated the ineffective `allow_omitted_type` parser argument; device types remain explicit.
 
+### Fixed
 - Library: Reject missing or contradictory numeric formats before communication, eliminating the conflicting low-level `DM100.D` dword and high-level `DM100.D` bit-13 interpretations.
 - Library: Preserve raw PLC error and non-ASCII response bytes, reject invalid calendar/weekday combinations, and discard transports after response overflow or incomplete exchanges.
 - Library: Require exact command-derived response token counts, strict documented `0`/`1`/`ON`/`OFF` direct-bit tokens, and CR/LF-terminated UDP datagrams; malformed UDP framing invalidates the transport.
@@ -44,24 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tooling: Update the E2E smoke script to require `plc_profile`, remove the deleted LF option, and verify raw `b"E1"` behavior.
 - Tests: Remove library-local cross-implementation frame vectors; cross-language verification is maintained as a separate repository and test concern.
 
-## [3.1.0] - 2026-07-10
 
-### Added
-- Library: Added `KvHostLinkPlcProfileDescriptor` and `plc_profile_descriptors()` for canonical Host Link profile metadata.
-
-### Changed
-- Release: Bumped package metadata and `hostlink.__version__` to `3.1.0`.
-
-### Fixed
 - Library: Corrected ten KV device range cells against live PLC hardware and the KEYENCE simulator, and pinned the canonical profile source to `plc-comm-hostlink-profiles` `v1.2.0`. `VM` widens to `VM0-9999` on KV-NANO and `VM0-59999` on KV-3000/KV-5000; `Z` widens to `Z1-23` on KV-8000. `CTH` narrows to `CTH0-1` on the KV-3000 and KV-5000 XYM profiles, matching their base profiles: `CTH2` and `CTH3` were previously accepted there and are now rejected.
 - Library: Discard sync and async TCP/UDP transports after timeout, cancellation, partial response, or socket failure.
 - Library: Parse BIT writes from explicit boolean tokens and reject ambiguous values before communication.
 - Library: Serialize bit-in-word read-modify-write pairs across the full compound operation.
 - CI: Require exact-tag checkout and verify tag, manifest, runtime, and distribution versions before a GitHub Release upload.
 - Docs: Correct the supported-profile scope, `CTH`/`CTC` parser behavior, optional YAML dependency, and maintainer commands.
-
-### Deprecated
-- Library: Deprecated the ineffective `allow_omitted_type` parser argument; device types remain explicit.
 
 ## [3.0.0] - 2026-07-10
 
