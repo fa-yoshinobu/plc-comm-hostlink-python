@@ -400,3 +400,5 @@ Each script accepts `--host` and `--port` arguments.
 ## Traffic statistics
 
 Call `client.traffic_stats()` for cumulative request, transmitted-byte, and received-byte counts.
+For TCP, a received line counts its body plus the first CR/LF terminator; extra CR/LF separators
+are consumed but not counted. For UDP, the complete response datagram is counted.

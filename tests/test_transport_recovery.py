@@ -9,7 +9,96 @@ from typing import Any
 import pytest
 
 from hostlink import AsyncHostLinkClient, HostLinkClient, write_bit_in_word
-from hostlink.errors import HostLinkConnectionError, HostLinkProtocolError
+from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
+
+
+@pytest.mark.parametrize("split_lf", [False, True])
+def test_sync_tcp_traffic_stats_are_independent_of_crlf_segmentation(split_lf: bool) -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+    server_error: list[BaseException] = []
+
+    def receive_request(connection: socket.socket) -> bytes:
+        request = bytearray()
+        while not request.endswith(b"\r"):
+            chunk = connection.recv(4096)
+            if not chunk:
+                raise ConnectionError("client closed before request terminator")
+            request.extend(chunk)
+        return bytes(request)
+
+    def serve() -> None:
+        try:
+            connection, _ = server.accept()
+            with connection:
+                assert receive_request(connection) == b"FIRST\r"
+                connection.sendall(b"FIRST\r" if split_lf else b"FIRST\r\n")
+                assert receive_request(connection) == b"SECOND\r"
+                connection.sendall((b"\n" if split_lf else b"") + b"SECOND\n\r")
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            server_error.append(exc)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        assert client.send_raw("FIRST") == b"FIRST"
+        assert client.send_raw("SECOND") == b"SECOND"
+        assert client.traffic_stats().rx_bytes == len(b"FIRST\r") + len(b"SECOND\n")
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+    assert not thread.is_alive()
+    assert server_error == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("split_lf", [False, True])
+async def test_async_tcp_traffic_stats_are_independent_of_crlf_segmentation(split_lf: bool) -> None:
+    completed = asyncio.Event()
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            assert await reader.readuntil(b"\r") == b"FIRST\r"
+            writer.write(b"FIRST\r" if split_lf else b"FIRST\r\n")
+            await writer.drain()
+            assert await reader.readuntil(b"\r") == b"SECOND\r"
+            writer.write((b"\n" if split_lf else b"") + b"SECOND\n\r")
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            completed.set()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        assert await client.send_raw("FIRST") == b"FIRST"
+        assert await client.send_raw("SECOND") == b"SECOND"
+        assert client.traffic_stats().rx_bytes == len(b"FIRST\r") + len(b"SECOND\n")
+        await asyncio.wait_for(completed.wait(), timeout=1.0)
+    finally:
+        await client.close()
+        server.close()
+        await server.wait_closed()
 
 
 def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:
@@ -37,7 +126,104 @@ def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:
         client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
             client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
         assert client._sock is None
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+
+def test_sync_tcp_timeout_does_not_count_partial_response() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        connection, _ = server.accept()
+        with connection:
+            connection.recv(4096)
+            time.sleep(0.2)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=0.05,
+    )
+    try:
+        client.connect()
+        with pytest.raises(HostLinkConnectionError, match="Timeout"):
+            client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+
+def test_sync_complete_plc_error_line_is_counted_before_semantic_failure() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        connection, _ = server.accept()
+        with connection:
+            connection.recv(4096)
+            connection.sendall(b"E1\r")
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        with pytest.raises(HostLinkError, match="E1"):
+            client.clear_error()
+        assert client.traffic_stats().rx_bytes == 3
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+
+def test_sync_tcp_oversize_partial_response_does_not_count_receive_bytes() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        connection, _ = server.accept()
+        with connection:
+            connection.recv(4096)
+            connection.sendall(b"A" * 65_537)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        with pytest.raises(HostLinkProtocolError, match="exceeds"):
+            client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
     finally:
         client.close()
         thread.join(timeout=3.0)
@@ -298,7 +484,94 @@ async def test_async_tcp_eof_before_terminator_rejects_partial_response() -> Non
         await client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
             await client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
         assert client._writer is None
+    finally:
+        await client.close()
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_timeout_does_not_count_partial_response() -> None:
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r")
+        await asyncio.sleep(0.2)
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=0.05,
+    )
+    try:
+        await client.connect()
+        with pytest.raises(HostLinkConnectionError, match="Timeout"):
+            await client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
+    finally:
+        await client.close()
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_async_complete_plc_error_line_is_counted_before_semantic_failure() -> None:
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r")
+        writer.write(b"E1\r")
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        with pytest.raises(HostLinkError, match="E1"):
+            await client.clear_error()
+        assert client.traffic_stats().rx_bytes == 3
+    finally:
+        await client.close()
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_oversize_partial_response_does_not_count_receive_bytes() -> None:
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.readuntil(b"\r")
+        writer.write(b"A" * 65_537)
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        with pytest.raises(HostLinkProtocolError, match="exceeds"):
+            await client.send_raw("READ")
+        assert client.traffic_stats().rx_bytes == 0
     finally:
         await client.close()
         server.close()

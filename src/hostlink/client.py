@@ -99,7 +99,12 @@ T = TypeVar("T")
 
 @dataclass(frozen=True)
 class HostLinkTrafficStats:
-    """Immutable lifetime traffic counters for one client."""
+    """Immutable lifetime traffic counters for one client.
+
+    TCP receive bytes include the response body and its first CR/LF terminator;
+    extra separator bytes are consumed but excluded. UDP receive bytes include
+    the complete datagram.
+    """
 
     request_count: int
     tx_bytes: int
@@ -699,7 +704,10 @@ class HostLinkClient(HostLinkBase):
                 while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
                     skip += 1
                 self._rx_buffer = self._rx_buffer[skip:]
-                self._last_rx_frame_length = skip
+                # A TCP response line ends at the first CR/LF.  Consume any
+                # adjacent separator padding, but do not let TCP chunking
+                # change the traffic counter.
+                self._last_rx_frame_length = idx + 1
                 return line
 
             chunk = self._sock.recv(8192)

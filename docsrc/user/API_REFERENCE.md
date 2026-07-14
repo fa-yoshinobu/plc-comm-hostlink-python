@@ -106,3 +106,5 @@ reference.
 ## Traffic statistics
 
 `HostLinkClient.traffic_stats()` and `AsyncHostLinkClient.traffic_stats()` return `HostLinkTrafficStats` snapshots.
+TCP receive bytes count the body plus the first CR/LF terminator, independent of separator
+segmentation; UDP receive bytes count the complete datagram.
