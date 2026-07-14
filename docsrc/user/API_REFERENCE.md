@@ -102,3 +102,9 @@ The package exports these public names from `hostlink.__all__`:
 The docs site renders the installed package with mkdocstrings so class,
 function, dataclass, and enum signatures are searchable from the site API
 reference.
+
+## Traffic statistics
+
+`HostLinkClient.traffic_stats()` and `AsyncHostLinkClient.traffic_stats()` return `HostLinkTrafficStats` snapshots.
+TCP receive bytes count the body plus the first CR/LF terminator, independent of separator
+segmentation; UDP receive bytes count the complete datagram.

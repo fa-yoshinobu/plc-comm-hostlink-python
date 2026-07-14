@@ -396,3 +396,9 @@ Each script accepts `--host` and `--port` arguments.
 | `samples/config_polling.py` | Read-only polling from a JSON or YAML configuration file, with a `--dry-run` validation mode. |
 | `samples/named_snapshot.py` | Mixed snapshot with `read_named`. |
 | `samples/polling_monitor.py` | Repeated snapshot loop with `poll`. |
+
+## Traffic statistics
+
+Call `client.traffic_stats()` for cumulative request, transmitted-byte, and received-byte counts.
+For TCP, a received line counts its body plus the first CR/LF terminator; extra CR/LF separators
+are consumed but not counted. For UDP, the complete response datagram is counted.
