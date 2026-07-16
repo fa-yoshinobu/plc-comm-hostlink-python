@@ -20,6 +20,10 @@ jobs:
         shell: pwsh
         run: ./scripts/check_no_auto_publish.ps1
 
+      - name: Check GitHub source archive contents
+        shell: pwsh
+        run: ./scripts/check_source_archive.ps1
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
