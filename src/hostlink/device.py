@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import warnings
 from dataclasses import dataclass
 
 from .errors import HostLinkProtocolError
@@ -220,19 +219,8 @@ def normalize_suffix(suffix: str | None) -> str:
     return s
 
 
-def parse_device(text: str, *, allow_omitted_type: bool | None = None) -> DeviceAddress:
-    """Parse and validate one Host Link device token.
-
-    Device types are always explicit. ``allow_omitted_type`` is retained for
-    source compatibility, is deprecated, and has no effect.
-    """
-
-    if allow_omitted_type is not None:
-        warnings.warn(
-            "allow_omitted_type is deprecated; Host Link device types are always explicit",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+def parse_device(text: str) -> DeviceAddress:
+    """Parse and validate one Host Link device token."""
 
     raw = text.strip().upper()
     match = DEVICE_RE.match(raw)

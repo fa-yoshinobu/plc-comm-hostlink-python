@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from hostlink import write_typed
-from hostlink.device import parse_device
 from hostlink.errors import HostLinkProtocolError
 
 
@@ -38,11 +37,3 @@ async def test_write_typed_bit_rejects_ambiguous_values(value: int | float | str
     with pytest.raises(HostLinkProtocolError, match="BIT write value|direct bit"):
         await write_typed(client, "R0", "BIT", value)
     client.write.assert_not_awaited()
-
-
-def test_allow_omitted_type_argument_is_deprecated_and_never_omits_type() -> None:
-    with pytest.warns(DeprecationWarning, match="always explicit"):
-        assert parse_device("DM0", allow_omitted_type=True).device_type == "DM"
-    with pytest.warns(DeprecationWarning, match="always explicit"):
-        with pytest.raises(HostLinkProtocolError, match="requires an explicit device type"):
-            parse_device("0", allow_omitted_type=True)

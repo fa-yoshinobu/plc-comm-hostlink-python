@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING
+- Library: Removed the deprecated, ineffective `allow_omitted_type` keyword from the internal device parser. Device tokens must continue to include an explicit device type.
+
+### Migration
+- Replace `parse_device(text, allow_omitted_type=...)` with `parse_device(text)`; the removed keyword never enabled omitted device types.
+
 ## [3.2.0] - 2026-07-17
 
 - Release: Bumped package metadata and `hostlink.__version__` to `3.2.0`.
