@@ -166,6 +166,46 @@ def test_sync_tcp_timeout_does_not_count_partial_response() -> None:
         server.close()
 
 
+def test_sync_tcp_timeout_is_one_deadline_for_a_trickled_response() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        connection, _ = server.accept()
+        with connection:
+            connection.recv(4096)
+            try:
+                for _ in range(5):
+                    time.sleep(0.03)
+                    connection.sendall(b"A")
+            except OSError:
+                pass
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=0.08,
+    )
+    try:
+        client.connect()
+        started = time.monotonic()
+        with pytest.raises(HostLinkConnectionError, match="Timeout"):
+            client.send_raw("READ")
+        elapsed = time.monotonic() - started
+        assert elapsed < 0.2
+        assert client._sock is None
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+
 def test_sync_complete_plc_error_line_is_counted_before_semantic_failure() -> None:
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("127.0.0.1", 0))
@@ -518,6 +558,48 @@ async def test_async_tcp_timeout_does_not_count_partial_response() -> None:
         await client.close()
         server.close()
         await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_timeout_includes_writer_drain() -> None:
+    class SlowWriter:
+        def write(self, _payload: bytes) -> None:
+            return None
+
+        async def drain(self) -> None:
+            await asyncio.sleep(0.04)
+
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            return None
+
+    class SlowReader:
+        def __init__(self) -> None:
+            self.responses = iter((b"O", b"\r"))
+
+        async def read(self, _count: int) -> bytes:
+            await asyncio.sleep(0.02)
+            return next(self.responses)
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=8501,
+        transport="tcp",
+        timeout=0.05,
+    )
+    client._reader = SlowReader()  # type: ignore[assignment]
+    client._writer = SlowWriter()  # type: ignore[assignment]
+
+    started = asyncio.get_running_loop().time()
+    with pytest.raises(HostLinkConnectionError, match="Timeout"):
+        await client.send_raw("READ")
+    elapsed = asyncio.get_running_loop().time() - started
+    assert elapsed < 0.12
+    assert client._reader is None
+    assert client._writer is None
 
 
 @pytest.mark.asyncio
