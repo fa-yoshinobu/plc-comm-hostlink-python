@@ -6,6 +6,7 @@ import asyncio
 import math
 import socket
 import threading
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,6 +46,13 @@ from .protocol import (
 
 ABSOLUTE_RESPONSE_CAP = 65_536
 UDP_RECEIVE_BUFFER_SIZE = ABSOLUTE_RESPONSE_CAP + 2
+
+
+def _remaining_timeout(deadline: float, *, clock: Callable[[], float]) -> float:
+    remaining = deadline - clock()
+    if remaining <= 0:
+        raise TimeoutError
+    return remaining
 
 
 class HostLinkTraceDirection(Enum):
@@ -655,19 +663,22 @@ class HostLinkClient(HostLinkBase):
             raise HostLinkConnectionError("Client is not connected; call connect() before sending a command")
 
         exchange_complete = False
+        deadline = time.monotonic() + self.timeout
         try:
             self._fire_trace(HostLinkTraceDirection.SEND, payload)
+            self._sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
             self._sock.sendall(payload)
             self._request_count += 1
             self._tx_bytes += len(payload)
             if self.transport == "udp":
+                self._sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
                 response = self._sock.recv(UDP_RECEIVE_BUFFER_SIZE)
                 self._validate_response_cap(response)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
                 self._rx_bytes += len(response)
             else:
-                response = self._recv_tcp_line()
+                response = self._recv_tcp_line(deadline=deadline)
                 self._rx_bytes += self._last_rx_frame_length
             exchange_complete = True
             self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
@@ -685,9 +696,11 @@ class HostLinkClient(HostLinkBase):
                 # next request, including when the transport is UDP.
                 self._close_unlocked()
 
-    def _recv_tcp_line(self) -> bytes:
+    def _recv_tcp_line(self, *, deadline: float | None = None) -> bytes:
         if self._sock is None:
             raise HostLinkConnectionError("Not connected")
+        if deadline is None:
+            deadline = time.monotonic() + self.timeout
         while True:
             while self._rx_buffer and self._rx_buffer[0] in (10, 13):
                 self._rx_buffer = self._rx_buffer[1:]
@@ -710,6 +723,7 @@ class HostLinkClient(HostLinkBase):
                 self._last_rx_frame_length = idx + 1
                 return line
 
+            self._sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
             chunk = self._sock.recv(8192)
             if not chunk:
                 message = (
@@ -1086,6 +1100,8 @@ class AsyncHostLinkClient(HostLinkBase):
             raise HostLinkConnectionError("Client is not connected; call connect() before sending a command")
 
         exchange_complete = False
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.timeout
         try:
             if self.transport == "tcp":
                 if self._writer is None:
@@ -1094,10 +1110,16 @@ class AsyncHostLinkClient(HostLinkBase):
                     raise HostLinkConnectionError("Not connected")
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 self._writer.write(payload)
-                await self._writer.drain()
+                await asyncio.wait_for(
+                    self._writer.drain(),
+                    timeout=_remaining_timeout(deadline, clock=loop.time),
+                )
                 self._request_count += 1
                 self._tx_bytes += len(payload)
-                response = await asyncio.wait_for(self._recv_tcp_line(), timeout=self.timeout)
+                response = await asyncio.wait_for(
+                    self._recv_tcp_line(),
+                    timeout=_remaining_timeout(deadline, clock=loop.time),
+                )
                 self._rx_bytes += self._last_rx_frame_length
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
@@ -1112,7 +1134,10 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._udp_transport.sendto(payload)
                 self._request_count += 1
                 self._tx_bytes += len(payload)
-                response = await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=self.timeout)
+                response = await asyncio.wait_for(
+                    self._udp_protocol.wait_response(),
+                    timeout=_remaining_timeout(deadline, clock=loop.time),
+                )
                 self._validate_response_cap(response)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
@@ -1120,7 +1145,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
-        except asyncio.TimeoutError as exc:
+        except (TimeoutError, asyncio.TimeoutError) as exc:
             raise HostLinkConnectionError("Timeout while waiting response from PLC") from exc
         except HostLinkConnectionError:
             raise

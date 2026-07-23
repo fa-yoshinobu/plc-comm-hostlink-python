@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 - Replace `parse_device(text, allow_omitted_type=...)` with `parse_device(text)`; the removed keyword never enabled omitted device types.
 
+### Fixed
+- Library: Synchronous and asynchronous TCP/UDP exchanges now use one absolute request deadline across send, drain, and complete response assembly. Repeated partial data can no longer restart the timeout; an incomplete timed-out exchange still invalidates its transport.
+
+### Tests
+- Tests: Added trickle-response and send-delay coverage proving that the configured timeout bounds the complete request rather than each individual I/O wait.
+
 ## [3.2.0] - 2026-07-17
 
 - Release: Bumped package metadata and `hostlink.__version__` to `3.2.0`.

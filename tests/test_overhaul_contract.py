@@ -65,6 +65,9 @@ class _FakeSocket:
     def sendall(self, _payload: bytes) -> None:
         return None
 
+    def settimeout(self, _timeout: float) -> None:
+        return None
+
     def close(self) -> None:
         self.closed = True
 
