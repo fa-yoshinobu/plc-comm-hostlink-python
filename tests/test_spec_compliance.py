@@ -122,26 +122,21 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             parse_device("100")
 
-    def test_validate_device_span_rejects_32bit_end_crossing(self) -> None:
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("DM", 65534, ".D", 1)
+    def test_validate_device_span_does_not_enforce_catalog_upper_bound(self) -> None:
+        validate_device_span("DM", 65534, ".D", 1)
 
     def test_validate_device_span_uses_bit_width_for_typed_bit_devices(self) -> None:
         validate_device_span("R", 199900, "", 16)
         validate_device_span("R", 199900, ".U", 1)
         validate_device_span("R", 199800, ".D", 1)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("R", 199900, ".U", 2)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("R", 199900, ".D", 1)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("CR", 7900, ".U", 2)
+        validate_device_span("R", 199900, ".U", 2)
+        validate_device_span("R", 199900, ".D", 1)
+        validate_device_span("CR", 7900, ".U", 2)
 
     def test_validate_device_span_treats_at_32bit_as_device_points(self) -> None:
         validate_device_span("AT", 7, ".D", 1)
         validate_device_span("AT", 0, ".D", 8)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("AT", 1, ".D", 8)
+        validate_device_span("AT", 1, ".D", 8)
 
     def test_validate_device_span_treats_native_32bit_devices_as_device_points(self) -> None:
         for device_type, last_number in (
@@ -158,10 +153,8 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
         validate_device_span("T", 3880, ".D", 120)
         validate_device_span("Z", 1, ".D", 12)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("T", 3881, ".D", 120)
-        with self.assertRaises(HostLinkProtocolError):
-            validate_device_span("Z", 2, ".D", 12)
+        validate_device_span("T", 3881, ".D", 120)
+        validate_device_span("Z", 2, ".D", 12)
 
     def test_at_uses_explicit_32bit_format(self) -> None:
         plc = FakeHostLinkClient()
@@ -185,11 +178,11 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         with self.assertRaises(HostLinkProtocolError):
             validate_expansion_buffer_span(59999, ".D", 1)
 
-    def test_read_rejects_32bit_device_end_crossing(self) -> None:
+    def test_read_sends_32bit_device_at_catalog_upper_boundary(self) -> None:
         plc = FakeHostLinkClient()
-        with self.assertRaises(HostLinkProtocolError):
-            plc.read("DM65534", data_format=".D")
-        self.assertEqual(plc.sent_frames, [])
+        plc.queue("1")
+        self.assertEqual(plc.read("DM65534", data_format=".D"), 1)
+        self.assertEqual(plc.sent_frames, [b"RD DM65534.D\r"])
 
     def test_write_set_value_accepts_native_32bit_device_end(self) -> None:
         plc = FakeHostLinkClient()
@@ -209,8 +202,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
     def test_parse_device_accepts_high_xym_m_addresses(self) -> None:
         self.assertEqual(parse_device("M63872").to_text(), "M63872")
-        with self.assertRaises(HostLinkProtocolError):
-            parse_device("M64000")
+        self.assertEqual(parse_device("M64000").to_text(), "M64000")
 
     def test_parse_device_uses_bit_bank_format_for_keyence_bit_devices(self) -> None:
         self.assertEqual(parse_device("R0").to_text(), "R000")

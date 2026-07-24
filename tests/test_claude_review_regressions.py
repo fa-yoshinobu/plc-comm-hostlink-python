@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from hostlink import AsyncHostLinkClient, HostLinkClient, poll, read_named, write_typed
+from hostlink import AsyncHostLinkClient, HostLinkClient, poll, read_named, read_typed, write_typed
 from hostlink.errors import HostLinkProtocolError
 from hostlink.protocol import build_frame, parse_scalar_token
 
@@ -62,6 +62,44 @@ class _NoSendAsyncClient(AsyncHostLinkClient):
     async def _exchange(self, payload: bytes) -> bytes:
         self.exchange_count += 1
         raise AssertionError(f"unexpected send: {payload!r}")
+
+
+class _ChunkingAsyncClient(AsyncHostLinkClient):
+    def __init__(self) -> None:
+        super().__init__(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=8501,
+            transport="tcp",
+        )
+        self.commands: list[str] = []
+
+    async def _exchange(self, payload: bytes) -> bytes:
+        command = payload.rstrip(b"\r").decode("ascii")
+        self.commands.append(command)
+        prefix, _, count_text = command.split()
+        assert prefix == "RDS"
+        return (" ".join("7" for _ in range(int(count_text))) + "\r").encode("ascii")
+
+
+class _DirectBitAsyncClient(AsyncHostLinkClient):
+    def __init__(self) -> None:
+        super().__init__(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=8501,
+            transport="tcp",
+        )
+        self.commands: list[str] = []
+
+    async def _exchange(self, payload: bytes) -> bytes:
+        command = payload.rstrip(b"\r").decode("ascii")
+        self.commands.append(command)
+        if command == "RD R000.U":
+            return (" ".join("1" if bit in {0, 3, 15} else "0" for bit in range(16)) + "\r").encode()
+        if command in {"WR R000.U 32777", "WR R000.U 32769"}:
+            return b"OK\r"
+        raise AssertionError(f"unexpected command: {command}")
 
 
 class _FakeSocket:
@@ -161,12 +199,31 @@ async def test_named_operations_reject_empty_work() -> None:
 
 
 @pytest.mark.asyncio
-async def test_read_named_over_single_request_limit_rejects_without_hidden_split() -> None:
-    client = _NoSendAsyncClient()
-    addresses = [f"DM{index}:U" for index in range(1001)]
-    with pytest.raises(HostLinkProtocolError, match="count out of range: 1001"):
-        await read_named(client, addresses)
-    assert client.exchange_count == 0
+async def test_read_named_splits_merged_ranges_at_command_limit() -> None:
+    client = _ChunkingAsyncClient()
+    addresses = [f"DM{index}:U" for index in range(2001)]
+    result = await read_named(client, addresses)
+    assert result == dict.fromkeys(addresses, 7)
+    assert client.commands == ["RDS DM0.U 1000", "RDS DM1000.U 1000", "RDS DM2000.U 1"]
+
+
+@pytest.mark.asyncio
+async def test_direct_bit_word_helpers_pack_tokens_and_preserve_other_bits() -> None:
+    client = _DirectBitAsyncClient()
+    assert await read_typed(client, "R0", "U") == 0x8009
+    assert await read_named(client, ["R0.0", "R0.3", "R0.F"]) == {
+        "R0.0": True,
+        "R0.3": True,
+        "R0.F": True,
+    }
+    await client.write_bit_in_word("R0", 3, True)
+    await client.write_bit_in_word("R0", 3, False)
+    assert client.commands[-4:] == [
+        "RD R000.U",
+        "WR R000.U 32777",
+        "RD R000.U",
+        "WR R000.U 32769",
+    ]
 
 
 def test_e2e_smoke_uses_current_public_constructor_and_raw_contract() -> None:
