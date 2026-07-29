@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace `parse_device(text, allow_omitted_type=...)` with `parse_device(text)`; the removed keyword never enabled omitted device types.
 
 ### Fixed
+- Library: Parse hexadecimal profile range endpoints such as `VB0-F9FF` without discarding valid leading hexadecimal letters.
 - Library: Synchronous and asynchronous TCP/UDP exchanges now use one absolute request deadline across send, drain, and complete response assembly. Repeated partial data can no longer restart the timeout; an incomplete timed-out exchange still invalidates its transport.
 - Library: Direct-bit numeric and bit-in-word reads/writes now pack or preserve complete 16-/32-bit values, and ordinary disconnects retain the public connection-error classification.
 - Library: Consecutive RDS requests split at command limits, while profile/device catalog upper bounds no longer reject sends; the internal parser table now stores number bases only.

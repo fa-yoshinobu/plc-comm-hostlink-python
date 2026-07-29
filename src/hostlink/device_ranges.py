@@ -253,7 +253,6 @@ def _parse_segment_number(
     normalized = text.strip()
     if normalized.startswith(default_device):
         normalized = normalized[len(default_device) :]
-    normalized = _trim_leading_ascii_letters(normalized)
     if not normalized:
         return None
     if default_device in {"X", "Y"}:
@@ -277,13 +276,6 @@ def _parse_xym_segment_number(text: str) -> int | None:
 
     bank = int(bank_text, 10) if bank_text else 0
     return bank * 16 + bit
-
-
-def _trim_leading_ascii_letters(value: str) -> str:
-    index = 0
-    while index < len(value) and value[index].isascii() and value[index].isalpha():
-        index += 1
-    return value[index:]
 
 
 def _device_metadata(device_type: str) -> tuple[KvDeviceRangeCategory, bool]:

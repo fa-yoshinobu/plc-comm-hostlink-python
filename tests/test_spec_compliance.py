@@ -292,6 +292,10 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         kvx = device_range_catalog_for_plc_profile("keyence:kv-x500")
         self.assertEqual(kvx.entry("Z").address_range, "Z1-10")
 
+        kv8000 = device_range_catalog_for_plc_profile("keyence:kv-8000")
+        self.assertEqual(kv8000.entry("VB").address_range, "VB0-F9FF")
+        self.assertEqual(kv8000.entry("VB").upper_bound, 0xF9FF)
+
     def test_device_range_catalog_rejects_invalid_segment_numbers(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid device range start"):
             _parse_segment_bounds("DMX-DM10", KvDeviceRangeNotation.DECIMAL, "DM")
