@@ -13,39 +13,40 @@ XYM_BIT_DEVICE_TYPES = {"X", "Y"}
 DIRECT_BIT_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "VB", "X", "Y", "M", "L"}
 NATIVE_32BIT_DEVICE_TYPES = {"T", "TC", "TS", "C", "CC", "CS", "CTH", "CTC", "Z", "AT"}
 
-# KEYENCE expression + XYM expression
-DEVICE_RANGES = {
-    "R": (0, 199915, 10),
-    "B": (0, 0x7FFF, 16),
-    "MR": (0, 399915, 10),
-    "LR": (0, 99915, 10),
-    "CR": (0, 7915, 10),
-    "VB": (0, 0xF9FF, 16),
-    "DM": (0, 65534, 10),
-    "EM": (0, 65534, 10),
-    "FM": (0, 32767, 10),
-    "ZF": (0, 524287, 10),
-    "W": (0, 0x7FFF, 16),
-    "TM": (0, 511, 10),
-    "Z": (1, 12, 10),
-    "T": (0, 3999, 10),
-    "TC": (0, 3999, 10),
-    "TS": (0, 3999, 10),
-    "C": (0, 3999, 10),
-    "CC": (0, 3999, 10),
-    "CS": (0, 3999, 10),
-    "CTH": (0, 3, 10),
-    "CTC": (0, 7, 10),
-    "AT": (0, 7, 10),
-    "CM": (0, 7599, 10),
-    "VM": (0, 589823, 10),
-    "X": (0, 1999 * 16 + 15, 10),
-    "Y": (0, 1999 * 16 + 15, 10),
-    "M": (0, 63999, 10),
-    "L": (0, 15999, 10),
-    "D": (0, 65534, 10),
-    "E": (0, 65534, 10),
-    "F": (0, 32767, 10),
+# Syntax-level number bases only. PLC/profile address ranges belong to the public
+# device-range catalog and must never be reused as transport send guards.
+DEVICE_NUMBER_BASES = {
+    "R": 10,
+    "B": 16,
+    "MR": 10,
+    "LR": 10,
+    "CR": 10,
+    "VB": 16,
+    "DM": 10,
+    "EM": 10,
+    "FM": 10,
+    "ZF": 10,
+    "W": 16,
+    "TM": 10,
+    "Z": 10,
+    "T": 10,
+    "TC": 10,
+    "TS": 10,
+    "C": 10,
+    "CC": 10,
+    "CS": 10,
+    "CTH": 10,
+    "CTC": 10,
+    "AT": 10,
+    "CM": 10,
+    "VM": 10,
+    "X": 10,
+    "Y": 10,
+    "M": 10,
+    "L": 10,
+    "D": 10,
+    "E": 10,
+    "F": 10,
 }
 
 FORCE_SINGLE_DEVICE_TYPES = {"R", "B", "MR", "LR", "CR", "T", "C", "CTH", "CTC", "VB", "X", "Y", "M", "L"}
@@ -103,7 +104,7 @@ RDC_DEVICE_TYPES = {
     "F",
 }
 WS_DEVICE_TYPES = {"T", "C", "CTH", "CTC"}
-WR_DEVICE_TYPES = set(DEVICE_RANGES) - {"AT"}
+WR_DEVICE_TYPES = set(DEVICE_NUMBER_BASES) - {"AT"}
 
 DEFAULT_FORMAT_BY_DEVICE_TYPE = {
     "R": "",
@@ -179,7 +180,7 @@ _COUNT_CATEGORY_BY_DEVICE_TYPE = {
     "CTC": "t_c",
 }
 
-TYPE_PATTERN = "|".join(sorted(DEVICE_RANGES.keys(), key=len, reverse=True))
+TYPE_PATTERN = "|".join(sorted(DEVICE_NUMBER_BASES.keys(), key=len, reverse=True))
 DEVICE_RE = re.compile(rf"^(?P<type>{TYPE_PATTERN})?(?P<number>[0-9A-F]+)(?P<suffix>\.[USDLH])?$")
 
 
@@ -194,7 +195,7 @@ class DeviceAddress:
     def to_text(self) -> str:
         """Return the canonical Host Link device token text."""
 
-        _, _, base = DEVICE_RANGES[self.device_type]
+        base = DEVICE_NUMBER_BASES[self.device_type]
         if self.device_type in BIT_BANK_DEVICE_TYPES:
             number = _format_bit_bank_number(self.number)
         elif self.device_type in XYM_BIT_DEVICE_TYPES:
@@ -225,19 +226,19 @@ def parse_device(text: str) -> DeviceAddress:
     raw = text.strip().upper()
     match = DEVICE_RE.match(raw)
     if not match:
-        valid_types = ", ".join(sorted(DEVICE_RANGES.keys()))
+        valid_types = ", ".join(sorted(DEVICE_NUMBER_BASES.keys()))
         raise HostLinkProtocolError(f"Invalid device string {text!r}. Valid device types: {valid_types}")
 
     device_type = match.group("type")
     if not device_type:
-        valid_types = ", ".join(sorted(DEVICE_RANGES.keys()))
+        valid_types = ", ".join(sorted(DEVICE_NUMBER_BASES.keys()))
         raise HostLinkProtocolError(
             f"Device string {text!r} requires an explicit device type. Valid device types: {valid_types}"
         )
     number_text = match.group("number")
     suffix = normalize_suffix(match.group("suffix"))
 
-    lo, hi, base = DEVICE_RANGES[device_type]
+    base = DEVICE_NUMBER_BASES[device_type]
     try:
         number = (
             _parse_xym_bit_number(device_type, number_text)
@@ -248,11 +249,11 @@ def parse_device(text: str) -> DeviceAddress:
         raise
     except ValueError as exc:
         raise HostLinkProtocolError(f"Invalid device number for {device_type}: {number_text!r}") from exc
-    if number < lo or number > hi:
-        raise HostLinkProtocolError(
-            f"Device number out of range: {device_type}{number_text} "
-            f"(allowed: {_format_device_number(device_type, lo)}..{_format_device_number(device_type, hi)})"
-        )
+    # PROFILE_RANGE_NOT_A_TRANSPORT_GUARD: catalog/profile upper bounds belong to
+    # application policy. The transport validates syntax, family, non-negative
+    # addresses, and the selected wire/text representation, but does not block sends by catalog range.
+    if number < 0:
+        raise HostLinkProtocolError(f"Device number must not be negative: {device_type}{number_text}")
     if device_type in BIT_BANK_DEVICE_TYPES and number % 100 > 15:
         raise HostLinkProtocolError(
             f"Invalid bit-bank device number: {device_type}{number_text} (lower two digits must be 00..15)"
@@ -295,7 +296,7 @@ def _format_device_number(device_type: str, number: int) -> str:
     if device_type in XYM_BIT_DEVICE_TYPES:
         return _format_xym_bit_number(number)
 
-    _, _, base = DEVICE_RANGES[device_type]
+    base = DEVICE_NUMBER_BASES[device_type]
     return format(number, "X") if base == 16 else str(number)
 
 
@@ -375,26 +376,44 @@ def validate_device_count(device_type: str, effective_format: str, count: int) -
 
 
 def validate_device_span(device_type: str, start_number: int, effective_format: str, count: int = 1) -> None:
-    """Validate that a device span stays inside the maintained address range."""
+    """Validate span arithmetic without enforcing catalog/profile address bounds."""
 
-    lo, hi, _ = DEVICE_RANGES[device_type]
+    if device_type not in DEVICE_NUMBER_BASES:
+        raise HostLinkProtocolError(f"Unsupported device type: {device_type}")
     if count < 1:
         raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
+    if start_number < 0:
+        raise HostLinkProtocolError(f"Device number must not be negative: {device_type}{start_number}")
 
     device_width = _device_span_width(device_type, effective_format)
     start_span_number = bit_bank_logical_number(start_number) if device_type in BIT_BANK_DEVICE_TYPES else start_number
-    hi_span_number = bit_bank_logical_number(hi) if device_type in BIT_BANK_DEVICE_TYPES else hi
-    end_span_number = start_span_number + (count * device_width) - 1
-    if start_number < lo or start_number > hi or end_span_number > hi_span_number:
-        start_text = _format_device_number(device_type, start_number)
-        end_number = (
-            bit_bank_number_from_logical(end_span_number) if device_type in BIT_BANK_DEVICE_TYPES else end_span_number
-        )
-        end_text = _format_device_number(device_type, end_number)
+    _ = start_span_number + (count * device_width) - 1
+
+
+def pack_direct_bit_tokens(tokens: list[int | str], expected_count: int, context: str) -> int:
+    """Pack direct-bit response tokens with the first token as bit zero."""
+
+    if len(tokens) != expected_count:
         raise HostLinkProtocolError(
-            f"Device span out of range: {device_type}{start_text}..{device_type}{end_text} "
-            f"with format '{effective_format}'"
+            f"Direct-bit word response for {context!r} contained {len(tokens)} tokens; expected {expected_count}"
         )
+    result = 0
+    for bit, token in enumerate(tokens):
+        if isinstance(token, str):
+            normalized = token.strip().upper()
+            if normalized in {"1", "ON"}:
+                enabled = True
+            elif normalized in {"0", "OFF"}:
+                enabled = False
+            else:
+                raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
+        elif type(token) is int and token in {0, 1}:
+            enabled = token == 1
+        else:
+            raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
+        if enabled:
+            result |= 1 << bit
+    return result
 
 
 def _device_span_width(device_type: str, effective_format: str) -> int:

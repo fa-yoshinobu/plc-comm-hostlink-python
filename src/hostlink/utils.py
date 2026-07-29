@@ -24,6 +24,7 @@ from .device import (
     bit_bank_logical_number,
     bit_bank_number_from_logical,
     normalize_suffix,
+    pack_direct_bit_tokens,
     parse_device,
     parse_device_text,
 )
@@ -286,7 +287,12 @@ async def read_typed(
             raise HostLinkProtocolError(f"No value returned for {device!r}")
         return _parse_bool_token(values[0])
 
+    addr = parse_device(device)
+    direct_bit_device = addr.device_type in _DIRECT_BIT_DEVICE_TYPES
+
     if key == "F":
+        if direct_bit_device:
+            raise HostLinkProtocolError("Float reads are not defined for direct bit devices.")
         lo_word, hi_word = await read_words(client, device, 2)
         return _words_to_float32(lo_word, hi_word)
 
@@ -295,7 +301,18 @@ async def read_typed(
     values = result if isinstance(result, list) else [result]
     if not values:
         raise HostLinkProtocolError(f"No value returned for {device!r}")
-    addr = parse_device(device)
+    if direct_bit_device:
+        packed = pack_direct_bit_tokens(values, 32 if key in {"D", "L"} else 16, device)
+        if key == "S":
+            return packed if packed < 0x8000 else packed - 0x10000
+        if key == "L":
+            return packed if packed < 0x80000000 else packed - 0x100000000
+        if key == "H":
+            return f"{packed:04X}"
+        if key in {"U", "D"}:
+            return packed
+        raise HostLinkProtocolError(f"Unsupported direct-bit word dtype {dtype!r}.")
+
     if addr.device_type in {"T", "C"} and key in {"U", "S", "D", "L", "H"}:
         raw = values[-1]
         if key == "H":
@@ -607,7 +624,12 @@ async def _read_named_sequential(
             bit_index = _require_bit_in_word_index(address, bit_idx)
             raw = await client.read(base, data_format=".U")
             values = raw if isinstance(raw, list) else [raw]
-            word = int(values[0]) if isinstance(values[0], str) else int(values[0])
+            parsed = parse_device(base)
+            word = (
+                pack_direct_bit_tokens(values, 16, base)
+                if parsed.device_type in _DIRECT_BIT_DEVICE_TYPES
+                else int(values[0])
+            )
             result[address] = bool((word >> bit_index) & 1)
         elif dtype == "COMMENT":
             result[address] = await read_comments(client, base)
@@ -645,8 +667,17 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
             request_start = _read_plan_number(request)
             request_end_exclusive = request_start + _get_word_width(request.kind)
             request_mode = "DIRECT_BITS" if request.kind == "DIRECT_BIT" else "WORDS"
+            segment_limit = _read_plan_segment_limit(request.base_address.device_type, request_mode)
+            exceeds_segment_limit = (
+                current_start is not None and request_end_exclusive - current_start_number > segment_limit
+            )
 
-            if current_start is None or request_start > current_end_exclusive or current_mode != request_mode:
+            if (
+                current_start is None
+                or request_start > current_end_exclusive
+                or current_mode != request_mode
+                or exceeds_segment_limit
+            ):
                 if current_start is not None:
                     segments.append(
                         _ReadPlanSegment(
@@ -776,6 +807,16 @@ def _resolve_direct_bit_value(tokens: list[int | str], offset: int) -> bool:
         return _parse_bool_token(tokens[offset])
     except IndexError as exc:
         raise HostLinkProtocolError("Batched direct bit response was too short") from exc
+
+
+def _read_plan_segment_limit(device_type: str, mode: str) -> int:
+    if mode == "DIRECT_BITS":
+        return 1000
+    if device_type == "TM":
+        return 512
+    if device_type == "Z":
+        return 12
+    return 1000
 
 
 def _get_word_width(kind: str) -> int:

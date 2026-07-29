@@ -215,8 +215,12 @@ class TestComprehensiveSync(unittest.TestCase):
             parse_device("X3F0")
         with self.assertRaisesRegex(HostLinkProtocolError, "bank digits must be decimal"):
             parse_device("Y19A0")
-        with self.assertRaisesRegex(HostLinkProtocolError, "out of range"):
-            parse_device("Y20000")
+        self.assertEqual(parse_device("Y20000").to_text(), "Y20000")
+
+    def test_catalog_upper_bounds_do_not_block_transport_addresses(self):
+        self.assertEqual(parse_device("CR8000").to_text(), "CR8000")
+        self.assertEqual(parse_device("CM7600").to_text(), "CM7600")
+        self.assertEqual(parse_device("Z13").to_text(), "Z13")
 
     def test_expansion_unit(self):
         self.server.responses["URD 01 100.U 2"] = "123 456"

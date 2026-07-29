@@ -24,6 +24,7 @@ from .device import (
     WS_DEVICE_TYPES,
     DeviceAddress,
     normalize_suffix,
+    pack_direct_bit_tokens,
     parse_device,
     require_explicit_format,
     resolve_effective_format,
@@ -830,18 +831,23 @@ class HostLinkClient(HostLinkBase):
             raise ValueError(f"bit_index must be 0-15, got {bit_index}")
         if not isinstance(value, bool):
             raise TypeError("value must be bool")
+        addr = parse_device(device)
         read_body, suffix = self._build_read_command(device, ".U")
         with self._lock:
             response = self._send_decoded_unlocked(read_body)
             try:
-                result = self._decode_read_response(response, suffix)
+                expected_count = self._read_response_token_count(device, suffix)
+                result = self._decode_read_response(response, suffix, expected_count)
                 values = result if isinstance(result, list) else [result]
-                if len(values) != 1 or type(values[0]) is not int or not 0 <= values[0] <= 0xFFFF:
+                if addr.device_type in DIRECT_BIT_DEVICE_TYPES:
+                    current = pack_direct_bit_tokens(values, 16, device)
+                elif len(values) == 1 and type(values[0]) is int and 0 <= values[0] <= 0xFFFF:
+                    current = values[0]
+                else:
                     raise HostLinkProtocolError(f"Bit-in-word read for {device!r} did not return one unsigned word")
             except HostLinkProtocolError:
                 self._close_unlocked()
                 raise
-            current = values[0]
             next_value = current | (1 << bit_index) if value else current & ~(1 << bit_index)
             write_body = self._build_write_command(device, next_value, ".U")
             write_response = self._send_decoded_unlocked(write_body)
@@ -1278,18 +1284,23 @@ class AsyncHostLinkClient(HostLinkBase):
         if not isinstance(value, bool):
             raise TypeError("value must be bool")
 
+        addr = parse_device(device)
         read_body, suffix = self._build_read_command(device, ".U")
         async with self._lock:
             response = await self._send_decoded_unlocked(read_body)
             try:
-                result = self._decode_read_response(response, suffix)
+                expected_count = self._read_response_token_count(device, suffix)
+                result = self._decode_read_response(response, suffix, expected_count)
                 values = result if isinstance(result, list) else [result]
-                if len(values) != 1 or type(values[0]) is not int or not 0 <= values[0] <= 0xFFFF:
+                if addr.device_type in DIRECT_BIT_DEVICE_TYPES:
+                    current = pack_direct_bit_tokens(values, 16, device)
+                elif len(values) == 1 and type(values[0]) is int and 0 <= values[0] <= 0xFFFF:
+                    current = values[0]
+                else:
                     raise HostLinkProtocolError(f"Bit-in-word read for {device!r} did not return one unsigned word")
             except HostLinkProtocolError:
                 await self._close_unlocked()
                 raise
-            current = values[0]
             if value:
                 current |= 1 << bit_index
             else:
