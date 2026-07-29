@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-07-29
+
+- Release: Bumped package metadata and `hostlink.__version__` to `3.2.1`.
+- Release: GitHub Release drafts now prepend this version's changelog section to generated notes and repair a missing section on workflow reruns.
+
 ### BREAKING
 - Library: Removed the deprecated, ineffective `allow_omitted_type` keyword from the internal device parser. Device tokens must continue to include an explicit device type.
 
