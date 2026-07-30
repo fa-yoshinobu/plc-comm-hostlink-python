@@ -13,7 +13,7 @@ dependencies = []
 readme = "README.md"
 
 license-files = ["LICENSE"]
-keywords = ["plc-comm", "keyence", "kv", "hostlink", "upper-link", "plc", "tcp", "udp"]
+keywords = ["plc-comm", "keyence", "keyence-plc", "kv", "hostlink", "upper-link", "plc", "industrial-automation", "tcp", "udp"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -31,6 +31,7 @@ classifiers = [
 Homepage = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
 Repository = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
 Issues = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python/issues"
+Documentation = "https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/GETTING_STARTED/"
 
 [project.optional-dependencies]
 dev = [
