@@ -21,7 +21,6 @@ from :mod:`hostlink.utils`:
 - :func:`read_dwords_single_request`
 - :func:`read_expansion_unit_buffer`
 - :func:`write_expansion_unit_buffer`
-- :func:`write_bit_in_word`
 - :func:`read_named`
 - :func:`poll`
 
@@ -43,9 +42,16 @@ from .device_ranges import (
 )
 from .errors import (
     HostLinkBaseError,
+    HostLinkCancelledError,
+    HostLinkClosedError,
     HostLinkConnectionError,
     HostLinkError,
+    HostLinkFailureReason,
+    HostLinkNotConnectedError,
+    HostLinkOutcomeUnknownError,
     HostLinkProtocolError,
+    HostLinkTimeoutError,
+    HostLinkTransportError,
     decode_error_code,
 )
 from .plc_profiles import (
@@ -78,7 +84,6 @@ from .utils import (
     read_words,
     read_words_single_request,
     try_parse_address,
-    write_bit_in_word,
     write_dwords_single_request,
     write_expansion_unit_buffer,
     write_typed,
@@ -92,6 +97,13 @@ __all__ = [
     "HostLinkTrafficStats",
     "HostLinkBaseError",
     "HostLinkConnectionError",
+    "HostLinkTimeoutError",
+    "HostLinkCancelledError",
+    "HostLinkClosedError",
+    "HostLinkNotConnectedError",
+    "HostLinkTransportError",
+    "HostLinkFailureReason",
+    "HostLinkOutcomeUnknownError",
     "HostLinkError",
     "HostLinkProtocolError",
     "decode_error_code",
@@ -128,7 +140,6 @@ __all__ = [
     "read_words_single_request",
     "read_expansion_unit_buffer",
     "try_parse_address",
-    "write_bit_in_word",
     "write_dwords_single_request",
     "write_expansion_unit_buffer",
     "write_typed",

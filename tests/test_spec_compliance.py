@@ -21,7 +21,7 @@ class FakeHostLinkClient(HostLinkClient):
     def queue(self, text: str) -> None:
         self.queued_responses.append(text.encode("ascii") + b"\r\n")
 
-    def _exchange(self, payload: bytes) -> bytes:
+    def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.sent_frames.append(payload)
         if self.queued_responses:
             return self.queued_responses.pop(0)

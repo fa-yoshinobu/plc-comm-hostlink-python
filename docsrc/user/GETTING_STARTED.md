@@ -12,6 +12,10 @@ This page gets you from an empty Python project to your first KEYENCE KV Host Li
 | PLC network | Your KV PLC must be reachable from your PC. |
 | Host Link port | Use port `8501` for TCP or UDP unless your PLC connection node is configured differently. |
 
+The library intentionally supports IPv4 endpoints only. KEYENCE targets in
+this contract do not support IPv6, so IPv6 literals and IPv6 transport are not
+accepted.
+
 ## Install
 
 ```bash

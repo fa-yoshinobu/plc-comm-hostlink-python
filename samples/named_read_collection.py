@@ -1,5 +1,5 @@
 # ruff: noqa: E402
-"""Mixed snapshot example using the high-level read_named helper."""
+"""Mixed named-read collection example using the high-level read_named helper."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProt
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Host Link mixed snapshot example")
+    parser = argparse.ArgumentParser(description="Host Link mixed named-read collection example")
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
@@ -28,13 +28,13 @@ async def run(args: argparse.Namespace) -> None:
     options = HostLinkConnectionOptions(host=args.host, plc_profile=args.plc_profile, port=args.port, transport="tcp")
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
-        # Read a mixed snapshot containing word values and bit-in-word values.
+        # Read a mixed collection containing word values and bit-in-word values.
         # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
-        snapshot = await read_named(
+        read_result = await read_named(
             client,
             ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.0", "DM10.A"],
         )
-        for address, value in snapshot.items():
+        for address, value in read_result.items():
             print(f"{address} = {value}")
 
 

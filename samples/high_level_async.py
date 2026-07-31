@@ -6,7 +6,7 @@ Demonstrates the core high-level *async* utility helpers shipped with the
 hostlink package (HostLinkConnectionOptions, open_and_connect,
 parse_address, format_address, normalize_address, read_typed, write_typed, read_named,
 read_words_single_request, read_dwords_single_request,
-write_bit_in_word, poll).
+poll).
 
 Usage
 -----
@@ -35,7 +35,6 @@ from hostlink import (
     read_named,
     read_typed,
     read_words_single_request,
-    write_bit_in_word,
     write_typed,
 )
 from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
@@ -69,7 +68,7 @@ def parse_args() -> argparse.Namespace:
         "--poll-count",
         type=positive_int,
         default=3,
-        help="Number of poll snapshots to capture (default 3)",
+        help="Number of poll results to capture (default 3)",
     )
     return p.parse_args()
 
@@ -161,30 +160,6 @@ async def demo_array_reads(client) -> None:
     print(f"[read_dwords_single_request] DM0-DM7 (as 4 x uint32) = {dwords}")
 
 
-async def demo_bit_in_word(client) -> None:
-    """
-    write_bit_in_word - set/clear one bit inside a word device.
-
-    Performs a read-modify-write: reads the word, flips bit_index, writes back.
-    bit_index 0 = LSB, 15 = MSB.
-
-    Use case: toggling an individual control flag in a shared status register
-              without corrupting the other 15 bits - common when the PLC
-              uses each bit for a different axis or function.
-    """
-    # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
-    original = await read_named(client, ["DM50.4"])
-    original_bit4 = bool(original["DM50.4"])
-    try:
-        await write_bit_in_word(client, "DM50", bit_index=4, value=True)
-        print("[write_bit_in_word] Set   bit 4 of DM50")
-        await write_bit_in_word(client, "DM50", bit_index=4, value=False)
-        print("[write_bit_in_word] Clear bit 4 of DM50")
-    finally:
-        await write_bit_in_word(client, "DM50", bit_index=4, value=original_bit4)
-        print("[write_bit_in_word] Restored bit 4 of DM50")
-
-
 async def demo_read_named(client) -> None:
     """
     read_named - read multiple devices with mixed types in one call.
@@ -200,8 +175,8 @@ async def demo_read_named(client) -> None:
     Use case: reading a heterogeneous parameter block in a single asyncio call -
               saves multiple round-trips when monitoring several device types.
     """
-    # Read a named mixed-type snapshot.
-    snapshot = await read_named(
+    # Read a named mixed-type collection.
+    read_result = await read_named(
         client,
         [
             "DM100:U",
@@ -210,20 +185,20 @@ async def demo_read_named(client) -> None:
             "DM50.A",
         ],
     )
-    for addr, value in snapshot.items():
+    for addr, value in read_result.items():
         print(f"[read_named] {addr} = {value!r}")
 
 
 async def demo_poll(client, count: int) -> None:
     """
-    poll - async generator that yields a snapshot dict every *interval* seconds.
+    poll - async generator that yields a read-result dict every *interval* seconds.
 
     Use case: asyncio-based monitoring loop that feeds PLC data to a
               dashboard or historian while the event loop handles other tasks.
     """
-    print(f"\nPolling {count} snapshots:")
+    print(f"\nPolling {count} read results:")
     i = 0
-    # Poll a repeated named snapshot until this sample has printed enough rows.
+    # Poll repeated named read results until this sample has printed enough rows.
     async for snap in poll(client, ["DM100:U", "DM200:L", "DM50.3"], interval=1.0):
         print(f"  [{i + 1}] {snap}")
         i += 1
@@ -250,7 +225,6 @@ async def run(args: argparse.Namespace) -> None:
     try:
         await demo_typed_rw(client)
         await demo_array_reads(client)
-        await demo_bit_in_word(client)
         await demo_read_named(client)
         await demo_poll(client, args.poll_count)
     finally:

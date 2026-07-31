@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import inspect
 import math
-import threading
-import time
 from unittest.mock import patch
 
 import pytest
@@ -36,7 +34,7 @@ class _RecordingClient(HostLinkClient):
         self.frames: list[bytes] = []
         self.responses = list(responses or [])
 
-    def _exchange(self, payload: bytes) -> bytes:
+    def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.frames.append(payload)
         return self.responses.pop(0) if self.responses else b"OK\r"
 
@@ -52,7 +50,7 @@ class _AsyncRecordingClient(AsyncHostLinkClient):
         self.frames: list[bytes] = []
         self.responses = list(responses or [])
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.frames.append(payload)
         return self.responses.pop(0) if self.responses else b"OK\r"
 
@@ -117,7 +115,14 @@ def test_timeout_defaults_to_three_seconds_and_preserves_valid_explicit_value() 
     assert HostLinkClient(**common).timeout == 3.0  # type: ignore[arg-type]
     assert AsyncHostLinkClient(**common).timeout == 3.0  # type: ignore[arg-type]
     assert HostLinkConnectionOptions(**common).timeout == 3.0  # type: ignore[arg-type]
+    assert HostLinkClient(**common).connect_timeout == 3.0  # type: ignore[arg-type]
+    assert AsyncHostLinkClient(**common).connect_timeout == 3.0  # type: ignore[arg-type]
+    assert HostLinkConnectionOptions(**common).connect_timeout == 3.0  # type: ignore[arg-type]
     assert HostLinkClient(**common, timeout=1.25).timeout == 1.25  # type: ignore[arg-type]
+    assert HostLinkClient(**common, connect_timeout=1.5).connect_timeout == 1.5  # type: ignore[arg-type]
+    for invalid in (True, 0, -1, float("inf"), float("nan"), "1"):
+        with pytest.raises(ValueError, match="connect_timeout"):
+            HostLinkConnectionOptions(**common, connect_timeout=invalid)  # type: ignore[arg-type]
 
 
 def test_constructor_and_unconnected_command_do_not_create_a_socket() -> None:
@@ -170,8 +175,8 @@ def test_maintainer_trace_is_opt_in_ordered_and_cannot_change_command_result() -
     )
     client._maintainer_trace_hook = trace
     client._sock = _FakeSocket([b"OK\r"])  # type: ignore[assignment]
-    assert client.send_raw("READ") == b"OK"
-    assert observed == [("send", b"READ\r"), ("receive", b"OK")]
+    assert client.send_raw("RD DM0.U") == b"OK"
+    assert observed == [("send", b"RD DM0.U\r"), ("receive", b"OK")]
 
     def broken_trace(_frame: object) -> None:
         raise RuntimeError("diagnostic failure")
@@ -184,7 +189,7 @@ def test_maintainer_trace_is_opt_in_ordered_and_cannot_change_command_result() -
     )
     client._maintainer_trace_hook = broken_trace
     client._sock = _FakeSocket([b"OK\r"])  # type: ignore[assignment]
-    assert client.send_raw("READ") == b"OK"
+    assert client.send_raw("RD DM0.U") == b"OK"
 
 
 def test_low_level_numeric_devices_require_separate_explicit_format() -> None:
@@ -324,36 +329,9 @@ def test_udp_response_cap_rejects_one_byte_more_and_invalidates_socket() -> None
     overflow_socket = _FakeSocket([b"A" * (ABSOLUTE_RESPONSE_CAP + 1) + b"\r"])
     client._sock = overflow_socket  # type: ignore[assignment]
     with pytest.raises(HostLinkProtocolError, match="exceeds"):
-        client.send_raw("READ")
+        client.send_raw("RD DM0.U")
     assert overflow_socket.closed
     assert client._sock is None
-
-
-class _AtomicSyncClient(_RecordingClient):
-    def __init__(self) -> None:
-        super().__init__()
-        self.word = 0
-
-    def _exchange(self, payload: bytes) -> bytes:
-        command = payload.decode("ascii").strip()
-        if command == "RD DM0.U":
-            time.sleep(0.01)
-            return f"{self.word}\r".encode("ascii")
-        if command.startswith("WR DM0.U "):
-            self.word = int(command.rsplit(" ", 1)[1])
-            return b"OK\r"
-        raise AssertionError(command)
-
-
-def test_sync_bit_in_word_holds_lock_across_read_modify_write() -> None:
-    client = _AtomicSyncClient()
-    threads = [threading.Thread(target=client.write_bit_in_word, args=("DM0", bit, True)) for bit in (0, 1)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=1.0)
-        assert not thread.is_alive()
-    assert client.word == 3
 
 
 def test_removed_public_options_helpers_and_trace_types_are_absent() -> None:
@@ -375,6 +353,7 @@ def test_removed_public_options_helpers_and_trace_types_are_absent() -> None:
         "write_dwords_chunked",
         "HostLinkTraceDirection",
         "HostLinkTraceFrame",
+        "write_bit_in_word",
     ):
         assert not hasattr(hostlink, name)
 

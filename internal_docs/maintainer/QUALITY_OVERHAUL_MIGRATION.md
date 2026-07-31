@@ -298,7 +298,10 @@ Acceptance criteria:
 
 Scope: package exports, helpers, samples, and documentation.
 
-Target contract: only single-request word/dword operations remain; the application owns any multi-request loop and its timing/partial-success semantics.
+Target contract: public block read/write helpers remain single-request. The sole
+automatic multi-request exception is the approved read-only `read_named`/`poll`
+aggregate, which preserves caller order, keeps entries indivisible, owns one
+FIFO turn, documents non-atomic timing, and returns no partial result.
 
 Compatibility impact: all public `*chunked` helpers are removed without aliases.
 
@@ -306,7 +309,8 @@ Acceptance criteria:
 
 1. Chunk helpers are absent from package exports and generated API documentation.
 2. Samples do not use a hidden range-splitting helper. `read_named`/`poll` explicitly document that mixed logical results may require sequential requests and are not atomic snapshots.
-3. single-request helpers reject protocol limits instead of splitting.
+3. single-request helpers reject protocol limits instead of splitting;
+   `read_named`/`poll` may split only necessary read-only aggregate work.
 
 - [x] Implementation completed for HostLink Python.
 - [x] Tests added or updated for every criterion.
@@ -359,8 +363,9 @@ repository, not this library.
 
 Compatibility impact: malformed-but-previously-accepted responses, empty named
 operations, raw control characters, out-of-century datetimes, and Float32
-overflow now fail. A `read_named` group beyond a single Host Link range limit
-continues to fail before transport; it is intentionally not hidden-split.
+overflow now fail. The later approved FIFO aggregate contract supersedes the
+former `read_named` no-split rule: oversized read-only groups may now split at
+entry boundaries after complete preflight.
 
 Acceptance criteria:
 
@@ -452,4 +457,46 @@ Acceptance criteria:
 - [x] Codex resolved or dispositioned every applicable Claude finding and reran affected checks.
 - [x] Live PLC verification is not required for this deterministic local framing and counter contract.
 - [x] Documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+## HLPY-ARTIFACT-001 — Installable consumer and complete worktree source archive
+
+Implementation scope: wheel/sdist contract checker, isolated consumer import,
+source-archive worktree mode, extracted non-hardware checks, and CI/release
+artifact evidence.
+
+Target contract: the wheel gate installs the exact built wheel into a new
+virtual environment with no checkout or `PYTHONPATH`, then verifies public
+imports, `__all__`, callable signatures, docstrings, version identity, and the
+installed module location. Worktree source archives are created from a
+synthetic Git tree that includes every modified and untracked non-ignored file
+and every tracked deletion, then the extracted archive alone passes the full
+non-hardware gate and the same isolated package-consumer gate.
+
+Compatibility impact: none; this strengthens artifact verification without
+changing runtime behavior or the public Python API.
+
+Acceptance criteria:
+
+1. Wheel and sdist content rules still reject repository-only files and require
+   metadata, license, README, and `py.typed`.
+2. The exact wheel installs into a fresh venv, imports only from that venv, and
+   exposes eight representative documented public entry points.
+3. Worktree mode includes modifications, untracked files, and deletions in one
+   synthetic archive; the deleted `samples/named_snapshot.py` remains absent
+   while its replacement and new tests are included.
+4. The extracted archive passes Ruff, formatting, mypy, documentation/sample/
+   workflow checks, 253 tests, package rebuild, and isolated wheel consumption
+   without referring to the checkout.
+
+Self-review finding disposition: accepted. The former package checker inspected
+filenames only, while the former worktree option archived `HEAD` and therefore
+could not represent the current deleted and untracked paths.
+
+- [x] Implementation completed in this repository.
+- [x] Consumer and synthetic-worktree regression behavior added to permanent gates.
+- [x] Full non-hardware, package, isolated-consumer, and extracted-source checks passed.
+- [x] Codex self-review completed against archive completeness and checkout-independent import requirements.
+- [x] Live PLC verification is not required; artifact construction and import behavior are deterministic.
+- [x] Maintainer record and changelog agree with the implemented gates.
 - [x] Final acceptance criteria verified and the item marked complete.

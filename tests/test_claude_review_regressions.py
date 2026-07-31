@@ -59,7 +59,7 @@ class _NoSendAsyncClient(AsyncHostLinkClient):
         )
         self.exchange_count = 0
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.exchange_count += 1
         raise AssertionError(f"unexpected send: {payload!r}")
 
@@ -74,12 +74,14 @@ class _ChunkingAsyncClient(AsyncHostLinkClient):
         )
         self.commands: list[str] = []
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         command = payload.rstrip(b"\r").decode("ascii")
         self.commands.append(command)
-        prefix, _, count_text = command.split()
-        assert prefix == "RDS"
-        return (" ".join("7" for _ in range(int(count_text))) + "\r").encode("ascii")
+        parts = command.split()
+        if parts[0] == "RD":
+            return b"7\r"
+        assert parts[0] == "RDS"
+        return (" ".join("7" for _ in range(int(parts[2]))) + "\r").encode("ascii")
 
 
 class _DirectBitAsyncClient(AsyncHostLinkClient):
@@ -92,7 +94,7 @@ class _DirectBitAsyncClient(AsyncHostLinkClient):
         )
         self.commands: list[str] = []
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         command = payload.rstrip(b"\r").decode("ascii")
         self.commands.append(command)
         if command == "RD R000.U":
@@ -121,7 +123,7 @@ class _MalformedSyncClient(HostLinkClient):
         self.fake_socket = _FakeSocket()
         self._sock = self.fake_socket  # type: ignore[assignment]
 
-    def _exchange(self, payload: bytes) -> bytes:
+    def _exchange(self, payload: bytes, **_: object) -> bytes:
         return b"1 2\r"
 
 
@@ -135,7 +137,7 @@ class _MalformedAsyncClient(AsyncHostLinkClient):
         )
         self._reader = object()  # type: ignore[assignment]
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         return b"1 2\r"
 
 
@@ -149,7 +151,7 @@ class _ScriptedSyncClient(HostLinkClient):
         )
         self._sock = _FakeSocket()  # type: ignore[assignment]
 
-    def _exchange(self, payload: bytes) -> bytes:
+    def _exchange(self, payload: bytes, **_: object) -> bytes:
         command = payload.rstrip(b"\r").decode("ascii")
         counts = {"RD R000.U": 16, "RD R000.D": 32, "RD DM0.U": 1}
         return (" ".join("0" for _ in range(counts[command])) + "\r").encode("ascii")
@@ -204,11 +206,11 @@ async def test_read_named_splits_merged_ranges_at_command_limit() -> None:
     addresses = [f"DM{index}:U" for index in range(2001)]
     result = await read_named(client, addresses)
     assert result == dict.fromkeys(addresses, 7)
-    assert client.commands == ["RDS DM0.U 1000", "RDS DM1000.U 1000", "RDS DM2000.U 1"]
+    assert client.commands == ["RDS DM0.U 1000", "RDS DM1000.U 1000", "RD DM2000.U"]
 
 
 @pytest.mark.asyncio
-async def test_direct_bit_word_helpers_pack_tokens_and_preserve_other_bits() -> None:
+async def test_direct_bit_word_helpers_pack_tokens() -> None:
     client = _DirectBitAsyncClient()
     assert await read_typed(client, "R0", "U") == 0x8009
     assert await read_named(client, ["R0.0", "R0.3", "R0.F"]) == {
@@ -216,14 +218,7 @@ async def test_direct_bit_word_helpers_pack_tokens_and_preserve_other_bits() -> 
         "R0.3": True,
         "R0.F": True,
     }
-    await client.write_bit_in_word("R0", 3, True)
-    await client.write_bit_in_word("R0", 3, False)
-    assert client.commands[-4:] == [
-        "RD R000.U",
-        "WR R000.U 32777",
-        "RD R000.U",
-        "WR R000.U 32769",
-    ]
+    assert not hasattr(client, "write_bit_in_word")
 
 
 def test_e2e_smoke_uses_current_public_constructor_and_raw_contract() -> None:

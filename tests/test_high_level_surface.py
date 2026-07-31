@@ -94,6 +94,7 @@ class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
             port=8501,
             transport="tcp",
             timeout=3.0,
+            connect_timeout=3.0,
             plc_profile="keyence:kv-8000",
         )
         inner.connect.assert_awaited_once()

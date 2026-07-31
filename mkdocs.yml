@@ -19,3 +19,4 @@ nav:
   - Usage Guide: user/USAGE_GUIDE.md
   - PLC Profiles: user/PROFILES.md
   - Gotchas: user/GOTCHAS.md
+  - API Reference: user/API_REFERENCE.md

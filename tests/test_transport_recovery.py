@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from hostlink import AsyncHostLinkClient, HostLinkClient, write_bit_in_word
-from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
+from hostlink import AsyncHostLinkClient, HostLinkClient
+from hostlink.errors import HostLinkCancelledError, HostLinkConnectionError, HostLinkError, HostLinkProtocolError
 
 
 @pytest.mark.parametrize("split_lf", [False, True])
@@ -125,7 +125,7 @@ def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:
     try:
         client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
-            client.send_raw("READ")
+            client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
         assert client._sock is None
     finally:
@@ -158,7 +158,7 @@ def test_sync_tcp_timeout_does_not_count_partial_response() -> None:
     try:
         client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
-            client.send_raw("READ")
+            client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
     finally:
         client.close()
@@ -196,7 +196,7 @@ def test_sync_tcp_timeout_is_one_deadline_for_a_trickled_response() -> None:
         client.connect()
         started = time.monotonic()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
-            client.send_raw("READ")
+            client.send_raw("RD DM0.U")
         elapsed = time.monotonic() - started
         assert elapsed < 0.2
         assert client._sock is None
@@ -262,7 +262,7 @@ def test_sync_tcp_oversize_partial_response_does_not_count_receive_bytes() -> No
     try:
         client.connect()
         with pytest.raises(HostLinkProtocolError, match="exceeds"):
-            client.send_raw("READ")
+            client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
     finally:
         client.close()
@@ -299,15 +299,15 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
     try:
         client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
-            client.send_raw("FIRST")
+            client.send_raw("RD DM0.U")
         assert client._sock is None
         assert client.traffic_stats().request_count == 1
-        assert client.traffic_stats().tx_bytes == len(b"FIRST\r")
+        assert client.traffic_stats().tx_bytes == len(b"RD DM0.U\r")
         assert client.traffic_stats().rx_bytes == 0
 
         client.timeout = 1.0
         client.connect()
-        assert client.send_raw("SECOND") == b"SECOND"
+        assert client.send_raw("RD DM1.U") == b"SECOND"
         assert client.traffic_stats().request_count == 2
         assert client.traffic_stats().rx_bytes == len(b"SECOND\r")
     finally:
@@ -339,7 +339,7 @@ def test_sync_udp_missing_terminator_invalidates_transport() -> None:
     try:
         client.connect()
         with pytest.raises(HostLinkProtocolError, match="terminator"):
-            client.send_raw("READ")
+            client.send_raw("RD DM0.U")
         assert client._sock is None
         assert client.traffic_stats().request_count == 1
         assert client.traffic_stats().rx_bytes == 0
@@ -399,12 +399,12 @@ async def test_async_udp_timeout_discards_delayed_response() -> None:
     try:
         await client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
-            await client.send_raw("FIRST")
+            await client.send_raw("RD DM0.U")
         assert client._udp_transport is None
 
         client.timeout = 1.0
         await client.connect()
-        assert await client.send_raw("SECOND") == b"SECOND"
+        assert await client.send_raw("RD DM1.U") == b"SECOND"
         assert protocol.count == 2
     finally:
         await client.close()
@@ -429,7 +429,7 @@ async def test_async_udp_missing_terminator_invalidates_transport() -> None:
     try:
         await client.connect()
         with pytest.raises(HostLinkProtocolError, match="terminator"):
-            await client.send_raw("READ")
+            await client.send_raw("RD DM0.U")
         assert client._udp_transport is None
         assert client._udp_protocol is None
     finally:
@@ -483,16 +483,16 @@ async def test_async_tcp_cancellation_discards_delayed_response() -> None:
     )
     try:
         await client.connect()
-        first_request = asyncio.create_task(client.send_raw("FIRST"))
+        first_request = asyncio.create_task(client.send_raw("RD DM0.U"))
         await asyncio.wait_for(first_seen.wait(), timeout=1.0)
         first_request.cancel()
-        with pytest.raises(asyncio.CancelledError):
+        with pytest.raises(HostLinkCancelledError):
             await first_request
         assert client._writer is None
 
         release_first.set()
         await client.connect()
-        assert await client.send_raw("SECOND") == b"SECOND"
+        assert await client.send_raw("RD DM1.U") == b"SECOND"
     finally:
         release_first.set()
         await client.close()
@@ -523,7 +523,7 @@ async def test_async_tcp_eof_before_terminator_rejects_partial_response() -> Non
     try:
         await client.connect()
         with pytest.raises(HostLinkConnectionError, match="before the response terminator"):
-            await client.send_raw("READ")
+            await client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
         assert client._writer is None
     finally:
@@ -552,7 +552,7 @@ async def test_async_tcp_timeout_does_not_count_partial_response() -> None:
     try:
         await client.connect()
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
-            await client.send_raw("READ")
+            await client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
     finally:
         await client.close()
@@ -595,7 +595,7 @@ async def test_async_tcp_timeout_includes_writer_drain() -> None:
 
     started = asyncio.get_running_loop().time()
     with pytest.raises(HostLinkConnectionError, match="Timeout"):
-        await client.send_raw("READ")
+        await client.send_raw("RD DM0.U")
     elapsed = asyncio.get_running_loop().time() - started
     assert elapsed < 0.12
     assert client._reader is None
@@ -652,41 +652,9 @@ async def test_async_tcp_oversize_partial_response_does_not_count_receive_bytes(
     try:
         await client.connect()
         with pytest.raises(HostLinkProtocolError, match="exceeds"):
-            await client.send_raw("READ")
+            await client.send_raw("RD DM0.U")
         assert client.traffic_stats().rx_bytes == 0
     finally:
         await client.close()
         server.close()
         await server.wait_closed()
-
-
-class _AtomicWordClient(AsyncHostLinkClient):
-    def __init__(self) -> None:
-        super().__init__(
-            "127.0.0.1",
-            plc_profile="keyence:kv-8000",
-            port=8501,
-            transport="tcp",
-        )
-        self.word = 0
-
-    async def _exchange(self, payload: bytes) -> bytes:
-        command = payload.decode("ascii").strip()
-        if command == "RD DM0.U":
-            await asyncio.sleep(0.01)
-            return f"{self.word}\r".encode("ascii")
-        if command.startswith("WR DM0.U "):
-            await asyncio.sleep(0)
-            self.word = int(command.rsplit(" ", 1)[1])
-            return b"OK\r"
-        raise AssertionError(f"unexpected command: {command}")
-
-
-@pytest.mark.asyncio
-async def test_write_bit_in_word_holds_lock_across_read_modify_write() -> None:
-    client = _AtomicWordClient()
-    await asyncio.gather(
-        write_bit_in_word(client, "DM0", 0, True),
-        write_bit_in_word(client, "DM0", 1, True),
-    )
-    assert client.word == 3

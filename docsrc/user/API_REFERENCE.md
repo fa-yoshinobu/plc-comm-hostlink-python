@@ -5,10 +5,8 @@ Use the usage guide for examples, and this page when you need to find the
 operation name for a specific Host Link workflow.
 
 The sync `HostLinkClient` and async `AsyncHostLinkClient` expose the same
-low-level operation names unless noted otherwise. The atomic
-`write_bit_in_word` compound operation is available on both clients. For
-normal application code, prefer `open_and_connect` plus the high-level helper
-functions.
+low-level operation names unless noted otherwise. For normal application code,
+prefer `open_and_connect` plus the high-level helper functions.
 
 ## Connection And PLC Control
 
@@ -19,6 +17,15 @@ functions.
 | PLC mode and error control | `change_mode`, `clear_error`, `check_error_no`, `confirm_operating_mode` |
 | PLC model and clock | `query_model`, `set_time`, `ModelInfo` |
 | Connection lifecycle | `connect`, `close` |
+
+Both clients are IPv4-only. `connect_timeout` governs connection establishment;
+`timeout` is one absolute deadline from immediately before first send/write
+through transmission, receive, and decoding. Normal operations use arrival
+FIFO admission. Waiting cancellation sends nothing, and `close()` immediately
+rejects active and queued work. No request is retried or resent automatically.
+For a state-changing request that may have been sent, timeout, cancellation,
+close, transport failure, or malformed confirmation raises
+`HostLinkOutcomeUnknownError` with a machine-readable `HostLinkFailureReason`.
 
 ## Device Operations
 
@@ -62,16 +69,16 @@ session before another request.
 | Address parsing and formatting | `HostLinkAddress`, `parse_address`, `try_parse_address`, `format_address`, `normalize_address` |
 | Typed values | `read_typed`, `write_typed` |
 | Timer/counter composite reads | `TimerCounterValue`, `read_timer_counter`, `read_timer`, `read_counter` |
-| Named snapshots and polling | `read_named`, `poll` |
+| Named read collections and polling | `read_named`, `poll` |
 | Word/dword reads | `read_words`, `read_dwords` |
 | Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
-| Bit-in-word write | `write_bit_in_word` |
 
-`read_named` and `poll` require at least one address. A named snapshot may use
-multiple sequential PLC requests for mixed or non-contiguous addresses and is
-therefore a logical dictionary, not an atomic PLC-time snapshot. Contiguous
-single-request size limits are rejected rather than silently split. Poll
-intervals must be positive finite numbers and cannot be booleans.
+`read_named` and `poll` require at least one address. They validate the complete
+input before send, preserve caller request order, keep each entry indivisible,
+and may split only necessary read-only work during one FIFO turn. Such a result
+is a logical dictionary, not an atomic PLC-time snapshot; failure returns no
+partial dictionary. Poll intervals must be positive finite numbers and cannot
+be booleans. The removed `write_bit_in_word` RMW API has no alias.
 
 Float32 reads and writes are defined only for word devices. An `F` write to a
 direct bit device such as `Y0` or `R0` raises `ValueError` before any command is
@@ -84,7 +91,7 @@ sent.
 | Device range catalog | `KvDeviceRangeCatalog`, `KvDeviceRangeEntry`, `KvDeviceRangeSegment`, `KvDeviceRangeCategory`, `KvDeviceRangeNotation` |
 | Profile lookup | `KvHostLinkPlcProfile`, `KvHostLinkPlcProfileDescriptor`, `available_plc_profiles`, `plc_profile_descriptors`, `normalize_plc_profile`, `profile_from_name`, `display_name` |
 | Device range catalog lookup | `device_range_catalog_for_plc_profile` |
-| Error handling | `HostLinkBaseError`, `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError`, `decode_error_code` |
+| Error handling | `HostLinkError`, `HostLinkProtocolError`, `HostLinkTimeoutError`, `HostLinkCancelledError`, `HostLinkClosedError`, `HostLinkNotConnectedError`, `HostLinkTransportError`, `HostLinkOutcomeUnknownError`, `HostLinkFailureReason`, `decode_error_code` |
 
 For banked bit families `R`, `MR`, `LR`, and `CR`, numeric catalog bounds and
 point counts use `bank * 16 + bit`; `address_range` continues to display PLC
@@ -96,8 +103,11 @@ guards.
 The package exports these public names from `hostlink.__all__`:
 
 `AsyncHostLinkClient`, `HostLinkAddress`, `HostLinkBaseError`,
-`HostLinkClient`, `HostLinkConnectionError`, `HostLinkConnectionOptions`,
-`HostLinkError`, `HostLinkProtocolError`, `KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
+`HostLinkCancelledError`, `HostLinkClient`, `HostLinkClosedError`,
+`HostLinkConnectionError`, `HostLinkConnectionOptions`, `HostLinkError`,
+`HostLinkFailureReason`, `HostLinkNotConnectedError`, `HostLinkOutcomeUnknownError`,
+`HostLinkProtocolError`, `HostLinkTimeoutError`, `HostLinkTransportError`,
+`KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
 `KvDeviceRangeEntry`, `KvDeviceRangeNotation`, `KvDeviceRangeSegment`,
 `KvHostLinkPlcProfile`, `KvHostLinkPlcProfileDescriptor`, `ModelInfo`, `TimerCounterValue`,
 `available_plc_profiles`, `decode_error_code`,
@@ -108,7 +118,7 @@ The package exports these public names from `hostlink.__all__`:
 `read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,
 `read_timer_counter`, `read_typed`, `read_words`,
-`read_words_single_request`, `try_parse_address`, `write_bit_in_word`,
+`read_words_single_request`, `try_parse_address`,
 `write_dwords_single_request`,
 `write_expansion_unit_buffer`, `write_typed`,
 `write_words_single_request`.

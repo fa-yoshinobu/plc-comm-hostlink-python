@@ -19,13 +19,16 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || github.ref }}
           fetch-depth: 0
 
-      - name: Check GitHub source archive contents
-        shell: pwsh
-        run: ./scripts/check_source_archive.ps1
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with: { python-version: "3.11" }
+      - name: Install release verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Check GitHub source archive contents and extracted consumers
+        shell: pwsh
+        run: ./scripts/check_source_archive.ps1
       - name: Verify release identity
         env:
           DISPATCH_VERSION: ${{ inputs.version }}

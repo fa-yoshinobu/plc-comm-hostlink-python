@@ -14,11 +14,10 @@
 | `normalize_address` | Normalize helper-layer address text. |
 | `read_typed` | Read one typed value. |
 | `write_typed` | Write one typed value. |
-| `read_named` | Read a mixed snapshot by address strings. |
-| `poll` | Read repeated snapshots on a fixed interval. |
+| `read_named` | Read a mixed named collection by address strings. |
+| `poll` | Read repeated named results on a fixed interval. |
 | `read_words_single_request` | Read contiguous 16-bit words in one PLC request. |
 | `read_dwords_single_request` | Read contiguous 32-bit values in one PLC request. |
-| `write_bit_in_word` | Set or clear one bit inside a word device. |
 | `read_timer_counter` | Read timer or counter status, current value, and preset. |
 | `read_timer` | Read a timer as status, current value, and preset. |
 | `read_counter` | Read a counter as status, current value, and preset. |
@@ -49,9 +48,15 @@ from hostlink import (
 )
 from hostlink.errors import (
     HostLinkBaseError,
+    HostLinkCancelledError,
+    HostLinkClosedError,
     HostLinkConnectionError,
     HostLinkError,
+    HostLinkNotConnectedError,
+    HostLinkOutcomeUnknownError,
     HostLinkProtocolError,
+    HostLinkTimeoutError,
+    HostLinkTransportError,
 )
 ```
 
@@ -60,7 +65,12 @@ from hostlink.errors import (
 | `HostLinkBaseError` | Base type for library exceptions. |
 | `HostLinkError` | PLC returned an error response such as `E0`, `E1`, or `E6`. |
 | `HostLinkProtocolError` | Invalid address, invalid dtype, malformed response, or local validation failure. |
-| `HostLinkConnectionError` | Connect, disconnect, socket, or timeout failure. |
+| `HostLinkTimeoutError` | The connect deadline or one absolute transaction deadline expired. |
+| `HostLinkCancelledError` | An async operation was cancelled. |
+| `HostLinkClosedError` | `close()` rejected active or queued work. |
+| `HostLinkNotConnectedError` | A command was attempted without a connected transport. |
+| `HostLinkTransportError` | A non-timeout transport failure occurred. |
+| `HostLinkOutcomeUnknownError` | A state-changing request may have reached the PLC; inspect `reason` and `detail`. |
 
 ## Connection
 
@@ -76,6 +86,7 @@ async def main() -> None:
         port=8501,
         transport="tcp",
         timeout=3.0,
+        connect_timeout=3.0,
     )
     async with await open_and_connect(options) as client:
         print("Connected")
@@ -85,9 +96,11 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`host`, `port`, `transport`, and `plc_profile` are required. The timeout may be
-omitted and defaults to 3 seconds. Frames always end in CR as required by this
-library contract.
+`host`, `port`, `transport`, and `plc_profile` are required. `connect_timeout`
+is a separate connection-establishment deadline. `timeout` is one absolute
+deadline from immediately before the first send/write through send/drain,
+receive, and decoding. Both default to 3 seconds. The clients are IPv4-only;
+IPv6 addresses and transports are not supported. Frames always end in CR.
 
 ## Performance notes
 
@@ -104,8 +117,11 @@ one request.
 ## Connection reuse and concurrent requests
 
 Keep one connected `AsyncHostLinkClient` open for repeated reads, writes, and
-polling. Requests on the same async client are serialized by the client lock, so
-overlapping awaits do not interleave Host Link frames on one connection.
+polling. Normal sync and async clients admit operations in arrival FIFO order.
+An async operation cancelled while waiting sends nothing. `close()` immediately
+retires active and already queued work without waiting behind a command. A
+failed or cancelled exchange closes the transport, and the library never
+reconnects, retries, or resends automatically.
 
 Use `close()` and `connect()` for an intentional reconnect. After a persistent
 connection failure, create a new client with the same `HostLinkConnectionOptions`.
@@ -167,7 +183,7 @@ if __name__ == "__main__":
 
 This is a matched read/write/readback pattern. Keep it on a test address until you know the register is safe for your machine.
 
-## Named snapshot
+## Named read collection
 
 ```python
 import asyncio
@@ -178,8 +194,8 @@ async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         addresses = ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.A", "DM0:COMMENT"]
-        snapshot = await read_named(client, addresses)
-        for address, value in snapshot.items():
+        read_result = await read_named(client, addresses)
+        for address, value in read_result.items():
             print(f"{address} = {value}")
 
 
@@ -188,11 +204,13 @@ if __name__ == "__main__":
 ```
 
 Use `read_named` when one application result groups unsigned words, signed
-words, double words, floats, comments, and bit-in-word values. Mixed or
-non-contiguous addresses can require multiple sequential PLC requests, so the
-returned dictionary is not guaranteed to represent one instant in PLC time.
-The address list must not be empty. A contiguous group that exceeds one Host
-Link request is rejected rather than automatically split.
+words, double words, floats, comments, and bit-in-word values. Mixed,
+non-contiguous, or oversized sets can require multiple sequential read-only PLC
+requests, so the returned dictionary is not one instant in PLC time. Every
+entry is validated before the first send, individual entries are never split,
+requests retain caller declaration order, and the aggregate holds one FIFO
+turn. Failure returns no partial dictionary. This automatic splitting applies
+only to `read_named`/`poll`; state-changing multi-request work is not synthesized.
 
 ## Block reads
 
@@ -225,29 +243,11 @@ request observes the PLC at a different time.
 
 ## Bit in word
 
-```python
-import asyncio
-from hostlink import HostLinkConnectionOptions, open_and_connect, read_named, write_bit_in_word
-
-
-async def main() -> None:
-    options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
-    async with await open_and_connect(options) as client:
-        await write_bit_in_word(client, "DM50", bit_index=10, value=True)
-        snapshot = await read_named(client, ["DM50.A"])
-        print(f"DM50.A = {snapshot['DM50.A']}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-The `.n` notation uses hexadecimal bit indexes from `0` through `F`; `.A` means bit 10.
-
-Calls on the same `AsyncHostLinkClient` hold its request lock across the full
-read-modify-write pair, so concurrent bit updates through that client do not
-overwrite one another. Separate PLC connections cannot share that lock; the
-application must coordinate them when they can update the same word.
+The `.n` notation used by `read_named` reads hexadecimal bit indexes from `0`
+through `F`; `.A` means bit 10. The former public read-modify-write
+`write_bit_in_word` API was removed because it could lose concurrent PLC or
+multi-client updates. Use a PLC-side atomic bit operation or redesign word
+ownership; the library does not provide a compatibility alias.
 
 ## Polling
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
 each interval until cancellation or until your loop exits. The same
 non-atomic, potentially multi-request behavior as `read_named` applies. The
 interval must be a positive finite number; zero, negative values, infinities,
-NaN, booleans, and strings are rejected before the first snapshot or PLC
+NaN, booleans, and strings are rejected before the first read result or PLC
 request.
 
 ## Operational recipes
@@ -392,13 +392,13 @@ Each script accepts `--host` and `--port` arguments.
 
 | Script | What it demonstrates |
 |---|---|
-| `samples/high_level_async.py` | Async typed reads/writes, block reads, bit-in-word, named snapshots, and polling. |
+| `samples/high_level_async.py` | Async typed reads/writes, block reads, bit-in-word, named read collections, and polling. |
 | `samples/high_level_sync.py` | Synchronous CLI wrapper that runs the async workflow with `asyncio.run`. |
 | `samples/basic_high_level_rw.py` | Compact typed read/write for unsigned, signed, double-word, and float values. |
 | `samples/multi_plc_monitor.py` | Read-only multi-PLC polling with reconnect state transitions and long-form CSV output. |
 | `samples/config_polling.py` | Read-only polling from a JSON or YAML configuration file, with a `--dry-run` validation mode. |
-| `samples/named_snapshot.py` | Mixed snapshot with `read_named`. |
-| `samples/polling_monitor.py` | Repeated snapshot loop with `poll`. |
+| `samples/named_read_collection.py` | Mixed named collection with `read_named`. |
+| `samples/polling_monitor.py` | Repeated read-result loop with `poll`. |
 
 ## Traffic statistics
 

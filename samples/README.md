@@ -33,7 +33,7 @@ python samples/config_polling.py --config samples/config_polling.example.json --
 ```
 
 ```bash
-python samples/named_snapshot.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
+python samples/named_read_collection.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
 ```
 
 ```bash
@@ -48,14 +48,14 @@ python samples/basic_test.py --host 192.168.250.100 --plc-profile keyence:kv-800
 
 | Project | What it demonstrates |
 |---|---|
-| `high_level_async.py` | Async connection setup, typed reads/writes, block reads, bit-in-word updates, named snapshots, and polling. |
+| `high_level_async.py` | Async connection setup, typed reads/writes, block reads, bit-in-word updates, named read collections, and polling. |
 | `high_level_sync.py` | A synchronous CLI entrypoint that runs the same high-level async workflow with `asyncio.run`. |
 | `basic_high_level_rw.py` | A compact typed read/write example for unsigned, signed, double-word, and float values. |
 | `polling_reconnect.py` | Read-only polling loop with automatic reconnect and backoff after transport loss. |
 | `multi_plc_monitor.py` | Read-only multi-PLC polling with `connected`/`lost`/`reconnecting`/`recovered` states and long-form CSV output. |
 | `config_polling.py` | Read-only polling from JSON or YAML configuration, with `--dry-run` validation before connection. |
-| `named_snapshot.py` | A focused mixed snapshot using `read_named`. |
-| `polling_monitor.py` | A repeated snapshot loop using `poll`. |
+| `named_read_collection.py` | A focused mixed named collection using `read_named`. |
+| `polling_monitor.py` | A repeated read-result loop using `poll`. |
 | `basic_test.py` | Read-only low-level model, mode, and signed-word validation, with an explicit controlled write-test option. |
 
 `basic_test.py` does not write by default. Its `--write-test-device` option is

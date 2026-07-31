@@ -89,7 +89,8 @@ class HostLinkConnectionOptions:
         plc_profile: Canonical KEYENCE KV PLC profile for the session.
         port: Host Link port number.
         transport: Transport name such as ``"tcp"`` or ``"udp"``.
-        timeout: Socket timeout in seconds.
+        timeout: Absolute per-request transaction deadline in seconds.
+        connect_timeout: Separate connection-establishment deadline in seconds.
     """
 
     host: str
@@ -98,6 +99,7 @@ class HostLinkConnectionOptions:
     port: int
     transport: str
     timeout: float = 3.0
+    connect_timeout: float = 3.0
 
     def __post_init__(self) -> None:
         from .plc_profiles import normalize_plc_profile
@@ -121,6 +123,13 @@ class HostLinkConnectionOptions:
             or self.timeout <= 0
         ):
             raise ValueError("timeout must be a positive finite number")
+        if (
+            isinstance(self.connect_timeout, bool)
+            or not isinstance(self.connect_timeout, (int, float))
+            or not math.isfinite(self.connect_timeout)
+            or self.connect_timeout <= 0
+        ):
+            raise ValueError("connect_timeout must be a positive finite number")
         object.__setattr__(self, "host", self.host.strip())
         object.__setattr__(self, "transport", self.transport.strip().lower())
 
@@ -459,35 +468,6 @@ def _parse_bit_write_value(value: int | float | bool | str) -> bool:
     raise HostLinkProtocolError(f"Invalid BIT write value: {value!r}. Use bool, 0/1, OFF/ON, or FALSE/TRUE.")
 
 
-async def write_bit_in_word(
-    client: AsyncHostLinkClient,
-    device: str,
-    bit_index: int,
-    value: bool,
-) -> None:
-    """Set or clear a single bit inside a word device.
-
-    This helper performs a read-modify-write cycle against a word-oriented
-    device such as ``DM``, rather than issuing a force-set or force-reset
-    command against a bit device family.
-
-    Args:
-        client: Connected asynchronous Host Link client.
-        device: Base word device address such as ``"DM100"``.
-        bit_index: Bit position within the word, in the range ``0`` to ``15``.
-        value: New bit state.
-
-    Raises:
-        ValueError: If ``bit_index`` is outside ``0`` to ``15``.
-
-    Examples:
-        Set bit 3 in ``DM100``::
-
-            await write_bit_in_word(client, "DM100", 3, True)
-    """
-    await client.write_bit_in_word(device, bit_index, value)
-
-
 async def read_named(
     client: AsyncHostLinkClient,
     addresses: list[str],
@@ -514,14 +494,15 @@ async def read_named(
     format. Bits 0-9 can be written as decimal digits; bits 10-15 must be written as
     ``A``-``F``. For example, bit 12 is ``"DM100.C"``, not ``"DM100.12"``.
 
-    When all requested addresses are compatible with helper-layer batching, this
-    function automatically merges contiguous reads into one or more ``RDS``
-    requests. Mixed or non-optimizable address sets fall back to sequential
-    helper reads with the same return shape.
+    The entire input is validated before admission. Compatible adjacent entries
+    are merged, while necessary read-only requests are split without splitting
+    an individual entry. All requests run in caller order during one FIFO turn.
+    A multi-request result is not one atomic PLC-time observation, and an error returns
+    no partial dictionary.
 
     Args:
         client: Connected asynchronous Host Link client.
-        addresses: Address strings to read in one logical snapshot.
+        addresses: Address strings to read as one logical collection result.
 
     Returns:
         Dictionary mapping each original address string to its decoded value.
@@ -529,16 +510,14 @@ async def read_named(
     Examples:
         Read mixed integer, float, and bit-in-word values::
 
-            snapshot = await read_named(client, ["DM10:U", "DM20:F", "DM30.A"])
+            read_result = await read_named(client, ["DM10:U", "DM20:F", "DM30.A"])
     """
     if not addresses:
         raise ValueError("read_named addresses must not be empty")
 
-    plan = _try_compile_read_named_plan(addresses)
-    if plan is not None:
-        return await _execute_read_named_plan(client, plan)
-
-    return await _read_named_sequential(client, addresses)
+    plan = _compile_read_named_plan(addresses)
+    _preflight_read_named_plan(client, plan)
+    return await _execute_read_named_plan(client, plan)
 
 
 async def poll(
@@ -546,7 +525,7 @@ async def poll(
     addresses: list[str],
     interval: float,
 ) -> AsyncIterator[dict[str, int | float | bool | str]]:
-    """Continuously yield snapshots for the specified addresses.
+    """Continuously yield read results for the specified addresses.
 
     Address parsing and return values follow the same rules as
     :func:`read_named`. If the address set can be batched, the compiled read
@@ -555,7 +534,7 @@ async def poll(
     Args:
         client: Connected asynchronous Host Link client.
         addresses: Address strings in :func:`read_named` format.
-        interval: Delay in seconds between snapshots.
+        interval: Delay in seconds between read results.
 
     Yields:
         A dictionary for each polling cycle, keyed by the original address
@@ -563,8 +542,8 @@ async def poll(
 
     Usage::
 
-        async for snapshot in poll(client, ["DM100:U", "DM200:F"], interval=0.5):
-            print(snapshot)
+        async for read_result in poll(client, ["DM100:U", "DM200:F"], interval=0.5):
+            print(read_result)
     """
     if not addresses:
         raise ValueError("poll addresses must not be empty")
@@ -575,12 +554,10 @@ async def poll(
         or interval <= 0
     ):
         raise ValueError(f"interval must be a positive finite number, got {interval!r}")
-    plan = _try_compile_read_named_plan(addresses)
+    plan = _compile_read_named_plan(addresses)
+    _preflight_read_named_plan(client, plan)
     while True:
-        if plan is not None:
-            yield await _execute_read_named_plan(client, plan)
-        else:
-            yield await _read_named_sequential(client, addresses)
+        yield await _execute_read_named_plan(client, plan)
         await asyncio.sleep(interval)
 
 
@@ -623,92 +600,20 @@ def _require_bit_in_word_index(address: str, bit_index: int | None) -> int:
     return bit_index
 
 
-async def _read_named_sequential(
-    client: AsyncHostLinkClient,
-    addresses: list[str],
-) -> dict[str, int | float | bool | str]:
-    result: dict[str, int | float | bool | str] = {}
-    for address in addresses:
-        base, dtype, bit_idx = _parse_address(address)
-        if dtype == "BIT_IN_WORD":
-            bit_index = _require_bit_in_word_index(address, bit_idx)
-            raw = await client.read(base, data_format=".U")
-            values = raw if isinstance(raw, list) else [raw]
-            parsed = parse_device(base)
-            word = (
-                pack_direct_bit_tokens(values, 16, base)
-                if parsed.device_type in _DIRECT_BIT_DEVICE_TYPES
-                else int(values[0])
-            )
-            result[address] = bool((word >> bit_index) & 1)
-        elif dtype == "COMMENT":
-            result[address] = await read_comments(client, base)
-        else:
-            result[address] = await read_typed(client, base, dtype)
-    return result
-
-
-def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan | None:
+def _compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan:
     requests_in_input_order: list[_ReadPlanRequest] = []
-    requests_by_device_type: dict[str, list[_ReadPlanRequest]] = {}
-
     for index, address in enumerate(addresses):
-        request = _try_parse_optimizable_read_named_request(address, index)
-        if request is None:
-            return None
-
-        requests_in_input_order.append(request)
-        requests_by_device_type.setdefault(request.base_address.device_type, []).append(request)
+        requests_in_input_order.append(_parse_read_named_request(address, index))
 
     segments: list[_ReadPlanSegment] = []
-    for bucket in requests_by_device_type.values():
-        sorted_requests = sorted(
-            bucket,
-            key=lambda req: (_read_plan_number(req), -_get_word_width(req.kind)),
-        )
+    pending: list[_ReadPlanRequest] = []
+    current_start: DeviceAddress | None = None
+    current_start_number = 0
+    current_end_exclusive = 0
+    current_mode = ""
 
-        pending: list[_ReadPlanRequest] = []
-        current_start: DeviceAddress | None = None
-        current_start_number = 0
-        current_end_exclusive = 0
-        current_mode = "WORDS"
-
-        for request in sorted_requests:
-            request_start = _read_plan_number(request)
-            request_end_exclusive = request_start + _get_word_width(request.kind)
-            request_mode = "DIRECT_BITS" if request.kind == "DIRECT_BIT" else "WORDS"
-            segment_limit = _read_plan_segment_limit(request.base_address.device_type, request_mode)
-            exceeds_segment_limit = (
-                current_start is not None and request_end_exclusive - current_start_number > segment_limit
-            )
-
-            if (
-                current_start is None
-                or request_start > current_end_exclusive
-                or current_mode != request_mode
-                or exceeds_segment_limit
-            ):
-                if current_start is not None:
-                    segments.append(
-                        _ReadPlanSegment(
-                            start_address=current_start,
-                            start_number=current_start_number,
-                            count=current_end_exclusive - current_start_number,
-                            mode=current_mode,
-                            requests=tuple(pending),
-                        )
-                    )
-                    pending.clear()
-
-                current_start = DeviceAddress(request.base_address.device_type, request.base_address.number, "")
-                current_start_number = request_start
-                current_end_exclusive = request_end_exclusive
-                current_mode = request_mode
-            elif request_end_exclusive > current_end_exclusive:
-                current_end_exclusive = request_end_exclusive
-
-            pending.append(request)
-
+    def flush() -> None:
+        nonlocal pending, current_start, current_start_number, current_end_exclusive, current_mode
         if current_start is not None:
             segments.append(
                 _ReadPlanSegment(
@@ -719,6 +624,38 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
                     requests=tuple(pending),
                 )
             )
+        pending = []
+        current_start = None
+        current_start_number = 0
+        current_end_exclusive = 0
+        current_mode = ""
+
+    for request in requests_in_input_order:
+        request_mode = _read_plan_mode(request)
+        request_start = _read_plan_number(request)
+        request_end_exclusive = request_start + _get_word_width(request.kind)
+        mergeable = request_mode in {"WORDS", "DIRECT_BITS"}
+        segment_limit = _read_plan_segment_limit(request.base_address.device_type, request_mode)
+        can_append = (
+            mergeable
+            and current_start is not None
+            and current_mode == request_mode
+            and current_start.device_type == request.base_address.device_type
+            and current_start_number <= request_start <= current_end_exclusive
+            and request_end_exclusive - current_start_number <= segment_limit
+        )
+        if not can_append:
+            flush()
+            current_start = DeviceAddress(request.base_address.device_type, request.base_address.number, "")
+            current_start_number = request_start
+            current_end_exclusive = request_end_exclusive
+            current_mode = request_mode
+        elif request_end_exclusive > current_end_exclusive:
+            current_end_exclusive = request_end_exclusive
+        pending.append(request)
+        if not mergeable:
+            flush()
+    flush()
 
     return _CompiledReadNamedPlan(
         requests_in_input_order=tuple(requests_in_input_order),
@@ -726,12 +663,10 @@ def _try_compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan
     )
 
 
-def _try_parse_optimizable_read_named_request(address: str, index: int) -> _ReadPlanRequest | None:
+def _parse_read_named_request(address: str, index: int) -> _ReadPlanRequest:
     base_addr, dtype, bit_idx = _parse_address(address)
     parsed = parse_device(base_addr)
 
-    if parsed.suffix:
-        return None
     if dtype == "BIT" and parsed.device_type in _DIRECT_BIT_DEVICE_TYPES:
         return _ReadPlanRequest(
             index=index,
@@ -739,23 +674,27 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
             base_address=parsed,
             kind="DIRECT_BIT",
         )
-    if parsed.device_type not in _OPTIMIZABLE_READ_NAMED_DEVICE_TYPES:
-        return None
-
     if dtype == "BIT_IN_WORD":
         bit_index = _require_bit_in_word_index(address, bit_idx)
+        kind = "BIT_IN_WORD" if parsed.device_type in _OPTIMIZABLE_READ_NAMED_DEVICE_TYPES else "SINGLE_BIT_IN_WORD"
         return _ReadPlanRequest(
             index=index,
             address=address,
             base_address=parsed,
-            kind="BIT_IN_WORD",
+            kind=kind,
             bit_index=bit_index,
         )
 
-    if dtype not in {"U", "S", "D", "L", "F"}:
-        return None
-    if parsed.device_type in NATIVE_32BIT_DEVICE_TYPES and dtype in {"D", "L"}:
-        return None
+    if dtype == "COMMENT":
+        return _ReadPlanRequest(index=index, address=address, base_address=parsed, kind="COMMENT")
+    if dtype not in {"U", "S", "D", "L", "F", "H", "BIT"}:
+        raise ValueError(f"Unsupported read_named data type {dtype!r} for {address!r}")
+    if (
+        parsed.device_type not in _OPTIMIZABLE_READ_NAMED_DEVICE_TYPES
+        or dtype in {"H", "BIT"}
+        or (parsed.device_type in NATIVE_32BIT_DEVICE_TYPES and dtype in {"D", "L"})
+    ):
+        return _ReadPlanRequest(index=index, address=address, base_address=parsed, kind=f"SINGLE_{dtype}")
 
     return _ReadPlanRequest(
         index=index,
@@ -765,23 +704,106 @@ def _try_parse_optimizable_read_named_request(address: str, index: int) -> _Read
     )
 
 
+def _read_plan_mode(request: _ReadPlanRequest) -> str:
+    if request.kind == "DIRECT_BIT":
+        return "DIRECT_BITS"
+    if request.kind.startswith("SINGLE_"):
+        return "SINGLE"
+    if request.kind == "COMMENT":
+        return "COMMENT"
+    return "WORDS"
+
+
+def _preflight_read_named_plan(client: AsyncHostLinkClient, plan: _CompiledReadNamedPlan) -> None:
+    """Build every planned command before admitting the aggregate to the FIFO."""
+
+    for segment in plan.segments:
+        request = segment.requests[0]
+        base = request.base_address.to_text()
+        if segment.mode == "WORDS":
+            if len(segment.requests) == 1:
+                if request.kind == "BIT_IN_WORD":
+                    client._build_read_command(base, ".U")
+                elif request.kind == "F":
+                    client._build_read_consecutive_command("RDS", base, 2, ".U")
+                else:
+                    client._build_read_command(base, f".{request.kind}")
+            else:
+                client._build_read_consecutive_command("RDS", segment.start_address.to_text(), segment.count, ".U")
+        elif segment.mode == "DIRECT_BITS":
+            if len(segment.requests) == 1:
+                client._build_read_command(base, None)
+            else:
+                client._build_read_consecutive_command("RDS", segment.start_address.to_text(), segment.count, None)
+        elif segment.mode == "COMMENT":
+            client._build_read_comments_command(base)
+        elif request.kind == "SINGLE_BIT_IN_WORD":
+            client._build_read_command(base, ".U")
+        else:
+            dtype = request.kind.removeprefix("SINGLE_")
+            if dtype == "F":
+                if request.base_address.device_type in _DIRECT_BIT_DEVICE_TYPES:
+                    raise HostLinkProtocolError("Float reads are not defined for direct bit devices.")
+                client._build_read_consecutive_command("RDS", base, 2, ".U")
+            elif dtype == "BIT":
+                client._build_read_command(base, None)
+            else:
+                client._build_read_command(base, f".{dtype}")
+
+
 async def _execute_read_named_plan(
     client: AsyncHostLinkClient,
     plan: _CompiledReadNamedPlan,
 ) -> dict[str, int | float | bool | str]:
     resolved: list[int | float | bool | str | None] = [None] * len(plan.requests_in_input_order)
 
-    for segment in plan.segments:
-        if segment.mode == "DIRECT_BITS":
-            tokens = await client.read_consecutive(segment.start_address.to_text(), segment.count, data_format=None)
-            for request in segment.requests:
-                offset = _read_plan_number(request) - segment.start_number
-                resolved[request.index] = _resolve_direct_bit_value(tokens, offset)
-        else:
-            words = await read_words(client, segment.start_address.to_text(), segment.count)
-            for request in segment.requests:
-                offset = _read_plan_number(request) - segment.start_number
-                resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
+    async with client._exclusive_turn():
+        for segment in plan.segments:
+            if segment.mode == "DIRECT_BITS":
+                if len(segment.requests) == 1:
+                    request = segment.requests[0]
+                    resolved[request.index] = await read_typed(client, request.base_address.to_text(), "BIT")
+                else:
+                    tokens = await client.read_consecutive(
+                        segment.start_address.to_text(), segment.count, data_format=None
+                    )
+                    for request in segment.requests:
+                        offset = _read_plan_number(request) - segment.start_number
+                        resolved[request.index] = _resolve_direct_bit_value(tokens, offset)
+            elif segment.mode == "WORDS":
+                if len(segment.requests) == 1:
+                    request = segment.requests[0]
+                    base = request.base_address.to_text()
+                    if request.kind == "BIT_IN_WORD":
+                        raw = await client.read(base, data_format=".U")
+                        values = raw if isinstance(raw, list) else [raw]
+                        resolved[request.index] = bool((int(values[0]) >> request.bit_index) & 1)
+                    else:
+                        resolved[request.index] = await read_typed(client, base, request.kind)
+                else:
+                    words = await read_words(client, segment.start_address.to_text(), segment.count)
+                    for request in segment.requests:
+                        offset = _read_plan_number(request) - segment.start_number
+                        resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
+            else:
+                request = segment.requests[0]
+                base = request.base_address.to_text()
+                if segment.mode == "COMMENT":
+                    resolved[request.index] = await read_comments(client, base)
+                elif request.kind == "SINGLE_BIT_IN_WORD":
+                    bit_index = _require_bit_in_word_index(request.address, request.bit_index)
+                    raw = await client.read(base, data_format=".U")
+                    values = raw if isinstance(raw, list) else [raw]
+                    parsed = parse_device(base)
+                    word = (
+                        pack_direct_bit_tokens(values, 16, base)
+                        if parsed.device_type in _DIRECT_BIT_DEVICE_TYPES
+                        else int(values[0])
+                    )
+                    resolved[request.index] = bool((word >> bit_index) & 1)
+                else:
+                    dtype = request.kind.removeprefix("SINGLE_")
+                    resolved[request.index] = await read_typed(client, base, dtype)
 
     result: dict[str, int | float | bool | str] = {}
     for request in plan.requests_in_input_order:
@@ -830,6 +852,8 @@ def _read_plan_segment_limit(device_type: str, mode: str) -> int:
 
 
 def _get_word_width(kind: str) -> int:
+    if kind.startswith("SINGLE_") or kind == "COMMENT":
+        return 1
     width = _READ_PLAN_WORD_WIDTH.get(kind)
     if width is None:
         raise HostLinkProtocolError(f"Unsupported read plan value kind: {kind}")
@@ -1103,6 +1127,7 @@ async def open_and_connect(options: HostLinkConnectionOptions) -> AsyncHostLinkC
         port=options.port,
         transport=options.transport,
         timeout=options.timeout,
+        connect_timeout=options.connect_timeout,
         plc_profile=options.plc_profile,
     )
     await client.connect()

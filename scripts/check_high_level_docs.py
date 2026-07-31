@@ -16,7 +16,6 @@ REQUIRED_FUNCTIONS = {
     "format_address": ("Args:", "Returns:"),
     "read_typed": ("Args:", "Returns:", "Examples:"),
     "write_typed": ("Args:", "Examples:"),
-    "write_bit_in_word": ("Args:", "Examples:"),
     "read_named": ("Args:", "Returns:", "Examples:"),
     "poll": ("Args:", "Yields:", "Usage::"),
     "read_expansion_unit_buffer": ("Args:", "Returns:", "Examples:"),

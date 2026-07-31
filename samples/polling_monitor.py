@@ -36,7 +36,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
-    parser.add_argument("--poll-count", type=positive_int, default=5, help="Number of snapshots to print (default 5)")
+    parser.add_argument(
+        "--poll-count", type=positive_int, default=5, help="Number of read results to print (default 5)"
+    )
     parser.add_argument(
         "--interval",
         type=positive_float,
@@ -51,11 +53,11 @@ async def run(args: argparse.Namespace) -> None:
     # Connect to the command-line host/port; default examples use 192.168.250.100:8501.
     async with await open_and_connect(options) as client:
         seen = 0
-        # Poll a repeated named snapshot until this sample has printed enough rows.
+        # Poll repeated named read results until this sample has printed enough rows.
         # See docsrc/user/GOTCHAS.md before adapting bit notation for X/Y or relay devices.
-        async for snapshot in poll(client, ["DM0:U", "DM1:S", "DM4:F", "DM10.0"], interval=args.interval):
+        async for read_result in poll(client, ["DM0:U", "DM1:S", "DM4:F", "DM10.0"], interval=args.interval):
             seen += 1
-            print(f"[{seen}] {snapshot}")
+            print(f"[{seen}] {read_result}")
             if seen >= args.poll_count:
                 break
 

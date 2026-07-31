@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 ERROR_CODE_MESSAGES = {
     "E0": "Abnormal device No.",
@@ -39,4 +40,45 @@ class HostLinkProtocolError(HostLinkBaseError, ValueError):
 
 
 class HostLinkConnectionError(HostLinkBaseError, ConnectionError):
-    """Raised when socket communication fails."""
+    """Compatibility base for machine-readable connection failures."""
+
+
+class HostLinkFailureReason(Enum):
+    """Stable reason retained by :class:`HostLinkOutcomeUnknownError`."""
+
+    TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
+    CLOSED = "closed"
+    TRANSPORT = "transport"
+    MALFORMED_RESPONSE = "malformed_response"
+
+
+class HostLinkTimeoutError(HostLinkConnectionError, TimeoutError):
+    """Raised when a configured connect or transaction deadline expires."""
+
+
+class HostLinkClosedError(HostLinkConnectionError):
+    """Raised when local close retires an active or queued transport generation."""
+
+
+class HostLinkNotConnectedError(HostLinkConnectionError):
+    """Raised when an operation is attempted without a connected transport."""
+
+
+class HostLinkTransportError(HostLinkConnectionError):
+    """Raised for non-timeout socket or transport I/O failure."""
+
+
+class HostLinkCancelledError(HostLinkBaseError):
+    """Raised when an asynchronous Host Link operation is cancelled."""
+
+
+@dataclass
+class HostLinkOutcomeUnknownError(HostLinkBaseError):
+    """A state-changing request may have reached the PLC without confirmation."""
+
+    reason: HostLinkFailureReason
+    detail: HostLinkBaseError | HostLinkCancelledError
+
+    def __str__(self) -> str:
+        return f"State-changing Host Link outcome is unknown ({self.reason.value}): {self.detail}"

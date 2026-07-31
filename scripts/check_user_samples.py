@@ -17,7 +17,7 @@ USER_SAMPLES = [
     "samples/basic_high_level_rw.py",
     "samples/config_polling.py",
     "samples/multi_plc_monitor.py",
-    "samples/named_snapshot.py",
+    "samples/named_read_collection.py",
     "samples/polling_monitor.py",
     "samples/polling_reconnect.py",
 ]

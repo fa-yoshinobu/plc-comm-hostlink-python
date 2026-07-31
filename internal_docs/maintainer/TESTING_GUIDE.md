@@ -30,7 +30,7 @@ The test suite covers:
 - Error response parsing (`E1`, `E2`, `E3`)
 - Multi-device read/write round-trips (mock transport)
 - 32-bit value packing (DWord, Float32)
-- Extension utilities: `read_typed`, `write_typed`, `write_bit_in_word`, `poll`
+- Extension utilities: `read_typed`, `write_typed`, `read_named`, `poll`
 
 ## Hardware Checks
 

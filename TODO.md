@@ -4,17 +4,19 @@ Current active TODOs only.
 
 ## Current Status
 
-The eight approved implementation items are complete in the working tree. The
+The thirteen approved implementation items are complete in the working tree,
+including `HL-CONTRACT-001` through `HL-CONTRACT-005`. The
 evidence-dependent comment-encoding decision remains open, and no
 comment-decoder implementation change is authorized until `HL-EVAL-TODO-006`
 is approved.
 
 ### Verification evidence — 2026-08-01
 
-- Current-worktree CI passed 244 pytest cases plus 18 API-reference generator
-  subtests, sample checks, formatting/static checks, build, and package checks.
+- Current-worktree CI passed 253 pytest cases plus 18 API-reference generator
+  subtests, sample checks, formatting/static checks, build, and package checks;
+  Python 3.10 independently passed all 253 tests, Ruff, and mypy.
 - A synthetic current-worktree Git tree produced a self-contained source
-  archive; its clean extracted test/build gate passed with 210 tests.
+  archive; its clean extracted test/build gate passed with 253 tests.
 - The distribution-content guard kept the registry package minimal while the
   GitHub source archive retained tests and fixtures.
 - Codex reviewed the actual diff, public surface, validation order, error and
@@ -88,6 +90,10 @@ Incorrect numeric bounds and point counts change to their logical values. Displa
 - [x] Final acceptance criteria verified and the item marked complete.
 
 ## HL-EVAL-TODO-006 — Determine the Host Link device-comment encoding contract
+
+### User disposition
+
+Deferred by the user on 2026-08-01 for evidence investigation followed by implementation in the next Host Link implementation cycle. The current UTF-8-first/Shift_JIS-fallback behavior is not approved as the final contract. Do not change the decoder in the current implementation batch; investigate the exact profile-specific byte contract first, present the resulting target contract one item at a time, and implement only after explicit approval.
 
 ### Implementation scope
 

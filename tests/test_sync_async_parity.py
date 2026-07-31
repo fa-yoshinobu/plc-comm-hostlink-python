@@ -15,7 +15,7 @@ class _RecordingSyncHostLinkClient(HostLinkClient):
         self.response = response
         self.sent_frames: list[bytes] = []
 
-    def _exchange(self, payload: bytes) -> bytes:
+    def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.sent_frames.append(payload)
         return self.response
 
@@ -26,7 +26,7 @@ class _RecordingAsyncHostLinkClient(AsyncHostLinkClient):
         self.response = response
         self.sent_frames: list[bytes] = []
 
-    async def _exchange(self, payload: bytes) -> bytes:
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.sent_frames.append(payload)
         return self.response
 

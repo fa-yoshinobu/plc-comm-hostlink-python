@@ -17,21 +17,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Release: Aligned artifact roles so the registry package contains consumer runtime, native API metadata, license, README, and ecosystem-native examples where applicable while excluding repository tests and maintainer tooling; the GitHub source archive retains tracked non-hardware validation and maintainer inputs.
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
 
 ### BREAKING
 
 - Library: Integer-only public arguments now require an exact Python `int`; booleans, floats, numeric strings, implicit conversions, and out-of-range values raise `ValueError` before communication.
+- Library: Removed the public sync/async/helper `write_bit_in_word` read-modify-write API without an alias because it could lose updates made by the PLC or another connection.
+- Library: Replaced generic connection failures with machine-readable timeout, cancellation, closed, not-connected, transport, and state-changing outcome-unknown errors; callers that match exact exception types must migrate.
 
 ### Migration
 
 - Pass actual integers to bank, count, unit, address, mode, and bit-index parameters. Keep `PROGRAM` and `RUN` only where the mode API explicitly documents those string forms.
+- Replace `write_bit_in_word` with a PLC-side atomic bit operation or an application/PLC ownership design for the complete word.
+- Catch the specific Host Link error type needed by the application. For `HostLinkOutcomeUnknownError`, inspect `reason`, reconcile PLC state explicitly, and do not blindly retry.
 
 ### Fixed
 
 - Library: Reject Float32 writes to direct bit devices before transport, require exact `0`/`1` operating-mode responses, reject non-positive or non-finite poll intervals, and calculate `R`/`MR`/`LR`/`CR` catalog bounds through banked-bit logical indexes.
+- Library: Normal sync/async clients now use arrival FIFO admission; waiting async cancellation sends nothing, and `close()` immediately rejects active and queued work. One absolute request deadline covers transmit, drain, receive, and decode, while connection establishment has a separate deadline.
+- Library: `read_named`/`poll` now preflight the complete caller-ordered input, keep entries indivisible, hold one FIFO turn, and split only necessary read-only work. Multi-request results remain non-atomic and never return a partial dictionary after failure.
+- Library: Enforce the 65,536-byte request-body and response-body boundaries before transport/acceptance, retain native failure causes, never automatically resend after a possible send, and keep all transports IPv4-only.
 - Samples: Correct the dtype-bearing normalization examples, validate every runnable sample, and make `basic_test.py` read-only unless a controlled write-test device is explicitly selected; write tests restore the original value.
-- CI: Include tests and fixtures in GitHub source archives and execute pytest plus an isolated archive build from the extracted archive. PyPI wheel and sdist contents remain governed by their separate minimal-package contract.
+- CI: Include tests and fixtures in GitHub source archives and execute the complete non-hardware and package-consumer gates from the extracted archive.
+- CI: Package validation now installs the built wheel into a fresh isolated virtual environment and checks public imports, signatures, docstrings, version identity, and installed origin without checkout or `PYTHONPATH` access.
+- CI: Worktree source-archive validation now uses one synthetic Git tree containing modifications, untracked files, and deletions instead of archiving `HEAD` with an incomplete overlay.
 
 ## [3.2.1] - 2026-07-29
 
