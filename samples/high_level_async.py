@@ -45,6 +45,13 @@ from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProt
 # ---------------------------------------------------------------------------
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than zero")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="KEYENCE Host Link asynchronous high-level API sample",
@@ -54,13 +61,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     p.add_argument(
         "--port",
-        type=int,
+        type=positive_int,
         required=True,
         help="Required Host Link TCP port",
     )
     p.add_argument(
         "--poll-count",
-        type=int,
+        type=positive_int,
         default=3,
         help="Number of poll snapshots to capture (default 3)",
     )
@@ -78,7 +85,7 @@ async def demo_open_and_connect(host: str, port: int, plc_profile: str) -> None:
 
     Parameters:
         host  - KV PLC IP / hostname
-        port  - KV Ethernet port (default 8501 inside open_and_connect)
+        port  - explicitly selected KV Ethernet port
 
     Returns a connected client object for the helper functions below.
     """
@@ -92,7 +99,7 @@ async def demo_open_and_connect(host: str, port: int, plc_profile: str) -> None:
 
 def demo_normalize_address() -> None:
     # Normalize helper-layer addresses before storing or displaying them.
-    print(f"[normalize_address] dm100 -> {normalize_address('dm100')}")
+    print(f"[normalize_address] dm100:u -> {normalize_address('dm100:u')}")
     print(f"[normalize_address] dm100.a -> {normalize_address('dm100.a')}")
     parsed = parse_address("dm100.a")
     print(f"[parse_address] dm100.a -> base={parsed.base_device} bit={parsed.bit_index}")

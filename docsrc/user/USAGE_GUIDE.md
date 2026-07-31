@@ -273,7 +273,10 @@ if __name__ == "__main__":
 
 `poll` requires a non-empty address list and yields one logical dictionary on
 each interval until cancellation or until your loop exits. The same
-non-atomic, potentially multi-request behavior as `read_named` applies.
+non-atomic, potentially multi-request behavior as `read_named` applies. The
+interval must be a positive finite number; zero, negative values, infinities,
+NaN, booleans, and strings are rejected before the first snapshot or PLC
+request.
 
 ## Operational recipes
 

@@ -8,7 +8,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$archivePath = Join-Path ([System.IO.Path]::GetTempPath()) ("plc-source-archive-" + [guid]::NewGuid().ToString("N") + ".zip")
+$workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot ".."))
+$runId = [guid]::NewGuid().ToString("N")
+$archivePath = Join-Path $workspaceRoot ("plc-source-archive-" + $runId + ".zip")
+$extractPath = Join-Path $workspaceRoot ("plc-source-archive-" + $runId)
+$buildOutputPath = Join-Path $workspaceRoot ("plc-source-archive-build-" + $runId)
 
 $forbiddenFileNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 @(
@@ -22,6 +26,9 @@ $forbiddenFileNames = [System.Collections.Generic.HashSet[string]]::new([System.
     "TODO.md"
 ) | ForEach-Object { [void]$forbiddenFileNames.Add($_) }
 
+$allowedTestSupportFiles = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+@("scripts/e2e_smoke_test.py") | ForEach-Object { [void]$allowedTestSupportFiles.Add($_) }
+
 $forbiddenPrefixes = @(
     ".codex",
     ".github",
@@ -34,8 +41,6 @@ $forbiddenPrefixes = @(
     "local_folder",
     "release-artifacts",
     "scripts",
-    "test",
-    "tests",
     "tools"
 )
 
@@ -71,6 +76,9 @@ try {
 
     $forbidden = @(
         foreach ($path in $archiveFiles) {
+            if ($allowedTestSupportFiles.Contains($path)) {
+                continue
+            }
             $fileName = [System.IO.Path]::GetFileName($path)
             $lowerPath = $path.ToLowerInvariant()
             $hasForbiddenPrefix = $false
@@ -96,6 +104,11 @@ try {
         throw "Source archive is missing required root files: $($missingRootFiles -join ', ')"
     }
 
+    $missingTestSupportFiles = @($allowedTestSupportFiles | Where-Object { $_ -notin $archiveFiles })
+    if ($missingTestSupportFiles.Count -ne 0) {
+        throw "Source archive is missing required test support files: $($missingTestSupportFiles -join ', ')"
+    }
+
     $expectedSamples = @(
         & git -C $repositoryRoot ls-tree -r --name-only $Treeish -- examples samples |
             ForEach-Object { $_.Replace("\", "/") } |
@@ -119,8 +132,50 @@ try {
         throw "Source archive sample set differs from the tracked sample set: $differenceText"
     }
 
-    Write-Host "[OK] Source archive contract passed: treeish=$Treeish files=$($archiveFiles.Count) samples=$($actualSamples.Count)"
+    $expectedTests = @(
+        & git -C $repositoryRoot ls-tree -r --name-only $Treeish -- tests |
+            ForEach-Object { $_.Replace("\", "/") } |
+            Sort-Object -Unique
+    )
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot enumerate tests for '$Treeish'."
+    }
+    if ($expectedTests.Count -eq 0) {
+        throw "No tracked tests were found under tests/."
+    }
+
+    $actualTests = @(
+        $archiveFiles |
+            Where-Object { $_.StartsWith("tests/") } |
+            Sort-Object -Unique
+    )
+    $testDifference = @(Compare-Object -ReferenceObject $expectedTests -DifferenceObject $actualTests -CaseSensitive)
+    if ($testDifference.Count -ne 0) {
+        $differenceText = ($testDifference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "; "
+        throw "Source archive test set differs from the tracked test set: $differenceText"
+    }
+
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $extractPath
+    Push-Location $extractPath
+    try {
+        & python -m pytest tests
+        if ($LASTEXITCODE -ne 0) {
+            throw "pytest failed in the extracted source archive."
+        }
+
+        & python -m build --outdir $buildOutputPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Package build failed in the extracted source archive."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    Write-Host "[OK] Source archive contract passed: treeish=$Treeish files=$($archiveFiles.Count) samples=$($actualSamples.Count) tests=$($actualTests.Count)"
 }
 finally {
     Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $buildOutputPath -Recurse -Force -ErrorAction SilentlyContinue
 }

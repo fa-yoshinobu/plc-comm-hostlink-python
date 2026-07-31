@@ -46,7 +46,7 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
     def test_tm_32bit_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
-        with self.assertRaises(HostLinkProtocolError):
+        with self.assertRaises(ValueError):
             plc.read_consecutive("TM0", 257, data_format=".D")
 
     def test_tc_group_count_limit_enforced(self) -> None:
@@ -101,13 +101,13 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
 
     def test_urd_32bit_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
-        with self.assertRaises(HostLinkProtocolError):
+        with self.assertRaises(ValueError):
             plc.read_expansion_unit_buffer(1, 100, 501, data_format=".D")
 
     def test_uwr_16bit_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
         values = [0] * 1001
-        with self.assertRaises(HostLinkProtocolError):
+        with self.assertRaises(ValueError):
             plc.write_expansion_unit_buffer(1, 100, values, data_format=".U")
 
     def test_decimal_device_rejects_hex_digits(self) -> None:

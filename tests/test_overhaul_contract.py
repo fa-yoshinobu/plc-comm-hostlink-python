@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import math
 import threading
 import time
 from unittest.mock import patch
@@ -12,9 +13,11 @@ from hostlink import (
     AsyncHostLinkClient,
     HostLinkClient,
     HostLinkConnectionOptions,
+    poll,
     read_dwords_single_request,
     read_words_single_request,
     write_dwords_single_request,
+    write_typed,
     write_words_single_request,
 )
 from hostlink.client import ABSOLUTE_RESPONSE_CAP, HostLinkTraceFrame
@@ -240,9 +243,9 @@ def test_set_time_requires_explicit_valid_calendar_and_weekday() -> None:
     client = _RecordingClient()
     with pytest.raises(TypeError):
         client.set_time()  # type: ignore[call-arg]
-    with pytest.raises(HostLinkProtocolError, match="nonexistent"):
+    with pytest.raises(ValueError, match="nonexistent"):
         client.set_time((26, 2, 30, 0, 0, 0, 1))
-    with pytest.raises(HostLinkProtocolError, match="does not match"):
+    with pytest.raises(ValueError, match="does not match"):
         client.set_time((26, 7, 11, 0, 0, 0, 0))
     assert client.frames == []
 
@@ -383,24 +386,90 @@ async def test_single_request_helpers_never_split_at_or_above_protocol_limit() -
 
     assert len(await read_words_single_request(client, "DM0", 1000)) == 1000
     sent = len(client.frames)
-    with pytest.raises(HostLinkProtocolError):
+    with pytest.raises(ValueError):
         await read_words_single_request(client, "DM0", 1001)
     assert len(client.frames) == sent
 
     assert len(await read_dwords_single_request(client, "DM0", 500)) == 500
     sent = len(client.frames)
-    with pytest.raises(HostLinkProtocolError):
+    with pytest.raises(ValueError):
         await read_dwords_single_request(client, "DM0", 501)
     assert len(client.frames) == sent
 
     await write_words_single_request(client, "DM0", [0] * 1000)
     sent = len(client.frames)
-    with pytest.raises(HostLinkProtocolError):
+    with pytest.raises(ValueError):
         await write_words_single_request(client, "DM0", [0] * 1001)
     assert len(client.frames) == sent
 
     await write_dwords_single_request(client, "DM0", [0] * 500)
     sent = len(client.frames)
-    with pytest.raises(HostLinkProtocolError):
+    with pytest.raises(ValueError):
         await write_dwords_single_request(client, "DM0", [0] * 501)
     assert len(client.frames) == sent
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", ["Y0", "R0", "B0", "MR0", "LR0", "CR0", "VB0", "X0", "M0", "L0"])
+async def test_float_write_rejects_every_direct_bit_family_without_send(device: str) -> None:
+    client = _AsyncRecordingClient()
+    with pytest.raises(ValueError, match="Float writes.*direct bit"):
+        await write_typed(client, device, "F", 1.25)
+    assert client.frames == []
+
+
+@pytest.mark.parametrize("response", [b"2\r", b"01\r", b" 1\r", b"+1\r", b"1x\r", b"\r", b"RUN\r"])
+def test_operating_mode_requires_exact_response_and_invalidates_connection(response: bytes) -> None:
+    client = _RecordingClient([response])
+    socket = _FakeSocket([])
+    client._sock = socket  # type: ignore[assignment]
+
+    with pytest.raises(HostLinkProtocolError):
+        client.confirm_operating_mode()
+
+    assert client.frames == [b"?M\r"]
+    assert socket.closed
+    assert client._sock is None
+
+
+@pytest.mark.parametrize(("response", "expected"), [(b"0\r", 0), (b"1\r", 1)])
+def test_operating_mode_accepts_only_exact_defined_values(response: bytes, expected: int) -> None:
+    client = _RecordingClient([response])
+    assert client.confirm_operating_mode() == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval", [0, -1, math.nan, math.inf, -math.inf, True, "1"])
+async def test_poll_rejects_invalid_interval_before_snapshot_or_send(interval: object) -> None:
+    client = _AsyncRecordingClient()
+    stream = poll(client, ["DM0:U"], interval=interval)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="positive finite"):
+        await anext(stream)
+    assert client.frames == []
+
+
+@pytest.mark.parametrize("invalid", [True, 1.0, "1", None])
+def test_integer_only_client_arguments_require_exact_int_without_send(invalid: object) -> None:
+    client = _RecordingClient()
+    operations = (
+        lambda: client.change_mode(invalid),
+        lambda: client.forced_set_consecutive("R0", invalid),
+        lambda: client.switch_bank(invalid),
+        lambda: client.read_consecutive("DM0", invalid, data_format=".U"),
+        lambda: client.read_expansion_unit_buffer(invalid, 0, 1, data_format=".U"),
+        lambda: client.read_expansion_unit_buffer(1, invalid, 1, data_format=".U"),
+        lambda: client.read_expansion_unit_buffer(1, 0, invalid, data_format=".U"),
+    )
+    for operation in operations:
+        with pytest.raises(ValueError):
+            operation()
+    assert client.frames == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", [True, 1.0, "1", None])
+async def test_dword_helper_count_requires_exact_int_before_multiplication(invalid: object) -> None:
+    client = _AsyncRecordingClient()
+    with pytest.raises(ValueError):
+        await read_dwords_single_request(client, "DM0", invalid)  # type: ignore[arg-type]
+    assert client.frames == []

@@ -40,6 +40,10 @@ python samples/named_snapshot.py --host 192.168.250.100 --plc-profile keyence:kv
 python samples/polling_monitor.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501 --poll-count 5
 ```
 
+```bash
+python samples/basic_test.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501 --transport tcp
+```
+
 ## Sample index
 
 | Project | What it demonstrates |
@@ -52,6 +56,8 @@ python samples/polling_monitor.py --host 192.168.250.100 --plc-profile keyence:k
 | `config_polling.py` | Read-only polling from JSON or YAML configuration, with `--dry-run` validation before connection. |
 | `named_snapshot.py` | A focused mixed snapshot using `read_named`. |
 | `polling_monitor.py` | A repeated snapshot loop using `poll`. |
-| `basic_test.py` | Low-level model, mode, and basic DM read/write validation. |
+| `basic_test.py` | Read-only low-level model, mode, and signed-word validation, with an explicit controlled write-test option. |
 
-`basic_test.py` writes `DM0` during initial connection validation. Run it only against a PLC and address range that are safe for your machine and program.
+`basic_test.py` does not write by default. Its `--write-test-device` option is
+only for a controlled test PLC: it writes one random signed value, verifies it,
+and restores the original value. Do not use that option on production equipment.

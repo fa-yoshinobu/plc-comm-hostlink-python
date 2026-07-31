@@ -380,8 +380,8 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
 
     if device_type not in DEVICE_NUMBER_BASES:
         raise HostLinkProtocolError(f"Unsupported device type: {device_type}")
-    if count < 1:
-        raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
+    if type(count) is not int or count < 1:
+        raise ValueError(f"count must be an integer in the range 1.., got {count!r}")
     if start_number < 0:
         raise HostLinkProtocolError(f"Device number must not be negative: {device_type}{start_number}")
 
@@ -439,8 +439,10 @@ def validate_expansion_buffer_count(effective_format: str, count: int) -> None:
 def validate_expansion_buffer_span(address: int, effective_format: str, count: int) -> None:
     """Validate that an expansion-buffer span stays inside the supported address range."""
 
-    if count < 1:
-        raise HostLinkProtocolError(f"count out of range: {count} (allowed: 1..)")
+    if type(address) is not int:
+        raise ValueError(f"address must be an integer, got {address!r}")
+    if type(count) is not int or count < 1:
+        raise ValueError(f"count must be an integer in the range 1.., got {count!r}")
 
     word_width = 2 if effective_format in {".D", ".L"} else 1
     end_address = address + (count * word_width) - 1
@@ -451,7 +453,7 @@ def validate_expansion_buffer_span(address: int, effective_format: str, count: i
 
 
 def validate_range(name: str, value: int, lo: int, hi: int) -> None:
-    """Raise ``HostLinkProtocolError`` when an integer falls outside a closed range."""
+    """Raise ``ValueError`` unless ``value`` is an exact ``int`` in range."""
 
-    if value < lo or value > hi:
-        raise HostLinkProtocolError(f"{name} out of range: {value} (allowed: {lo}..{hi})")
+    if type(value) is not int or value < lo or value > hi:
+        raise ValueError(f"{name} must be an integer in the range {lo}..{hi}, got {value!r}")

@@ -36,6 +36,13 @@ from hostlink import (
 from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than zero")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="KEYENCE Host Link synchronous CLI using the high-level helper API",
@@ -50,12 +57,12 @@ def parse_args() -> argparse.Namespace:
         help="Required transport protocol",
     )
     parser.add_argument("--timeout", type=float, default=3.0, help="Timeout in seconds (default 3.0)")
-    parser.add_argument("--poll-count", type=int, default=3, help="Number of poll snapshots (default 3)")
+    parser.add_argument("--poll-count", type=positive_int, default=3, help="Number of poll snapshots (default 3)")
     return parser.parse_args()
 
 
 async def run(args: argparse.Namespace) -> None:
-    print(f"[normalize_address] dm20 -> {normalize_address('dm20')}")
+    print(f"[normalize_address] dm20:u -> {normalize_address('dm20:u')}")
     print(f"[normalize_address] dm20.a -> {normalize_address('dm20.a')}")
 
     # Connect only to the explicitly selected endpoint and transport.

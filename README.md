@@ -25,6 +25,12 @@ The shared device and range tables are in the [KV Host Link Device Ranges](https
 pip install plc-comm-kv-hostlink
 ```
 
+The PyPI wheel and source distribution contain the files needed to install and
+use the library; they do not carry the maintained sample tree or documentation
+source. Use the GitHub repository for current samples and the shared
+documentation site for user guides. GitHub source archives include the test
+suite and fixtures so their standard build and test commands are self-contained.
+
 ## Quick example
 
 ```python

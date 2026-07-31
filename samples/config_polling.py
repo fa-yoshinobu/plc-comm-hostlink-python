@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import csv
 import json
+import math
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -117,11 +118,11 @@ def optional_float(section: Mapping[str, Any], key: str, default: float) -> floa
     """Read a float config value with a default."""
 
     value = section.get(key, default)
-    if not isinstance(value, int | float):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         raise SystemExit(f"{key} must be a number")
     parsed = float(value)
-    if parsed <= 0:
-        raise SystemExit(f"{key} must be greater than zero")
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise SystemExit(f"{key} must be a positive finite number")
     return parsed
 
 
@@ -131,7 +132,7 @@ def optional_int(section: Mapping[str, Any], key: str, default: int | None) -> i
     value = section.get(key, default)
     if value is None:
         return None
-    if not isinstance(value, int) or value <= 0:
+    if type(value) is not int or value <= 0:
         raise SystemExit(f"{key} must be a positive integer")
     return value
 
@@ -180,7 +181,7 @@ def build_plan(config_path: Path, args: argparse.Namespace) -> PollingPlan:
         raise SystemExit("defaults.transport must be tcp or udp")
     default_transport = parse_transport(default_transport_raw) if default_transport_raw is not None else None
     default_port = defaults.get("port")
-    if default_port is not None and (isinstance(default_port, bool) or not isinstance(default_port, int)):
+    if default_port is not None and type(default_port) is not int:
         raise SystemExit("defaults.port must be an integer")
     default_timeout = optional_float(defaults, "timeout", 3.0)
     default_interval = optional_float(defaults, "interval", 1.0)
@@ -198,7 +199,7 @@ def build_plan(config_path: Path, args: argparse.Namespace) -> PollingPlan:
         if not isinstance(name, str) or not isinstance(host, str) or not isinstance(profile, str):
             raise SystemExit(f"plcs[{index}] requires string name, host, and plc_profile")
         port = plc.get("port", default_port)
-        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        if type(port) is not int or not 1 <= port <= 65535:
             raise SystemExit(f"plcs[{index}].port is required and must be an integer in range 1..65535")
         transport = plc.get("transport", default_transport)
         if transport is None:

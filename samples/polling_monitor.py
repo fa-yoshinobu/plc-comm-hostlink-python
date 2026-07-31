@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 from pathlib import Path
 
@@ -16,13 +17,32 @@ from hostlink import HostLinkConnectionOptions, open_and_connect, poll
 from hostlink.errors import HostLinkConnectionError, HostLinkError, HostLinkProtocolError
 
 
+def positive_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive finite number")
+    return parsed
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than zero")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Host Link polling example")
     parser.add_argument("--host", required=True, help="PLC IP address or hostname")
     parser.add_argument("--plc-profile", required=True, help="Canonical PLC profile, for example keyence:kv-8000")
     parser.add_argument("--port", type=int, required=True, help="Required Host Link port")
-    parser.add_argument("--poll-count", type=int, default=5, help="Number of snapshots to print (default 5)")
-    parser.add_argument("--interval", type=float, default=1.0, help="Polling interval in seconds (default 1.0)")
+    parser.add_argument("--poll-count", type=positive_int, default=5, help="Number of snapshots to print (default 5)")
+    parser.add_argument(
+        "--interval",
+        type=positive_float,
+        default=1.0,
+        help="Polling interval in seconds (default 1.0)",
+    )
     return parser.parse_args()
 
 

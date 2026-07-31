@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -22,8 +23,8 @@ RETRYABLE_ERRORS = (OSError, ConnectionError, TimeoutError, EOFError, asyncio.Ti
 
 def positive_float(value: str) -> float:
     parsed = float(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("value must be greater than zero")
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive finite number")
     return parsed
 
 

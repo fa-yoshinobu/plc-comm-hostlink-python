@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -53,8 +54,8 @@ def positive_float(value: str) -> float:
     """Parse a positive floating-point CLI value."""
 
     parsed = float(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("value must be greater than zero")
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive finite number")
     return parsed
 
 
@@ -115,7 +116,7 @@ def parse_plc_spec(
     transport = parse_transport(parts[3]) if len(parts) == 4 and parts[3] else default_transport
     if port is None:
         raise argparse.ArgumentTypeError("port is required either in --plc or --port")
-    if isinstance(port, bool) or not 1 <= port <= 65535:
+    if type(port) is not int or not 1 <= port <= 65535:
         raise argparse.ArgumentTypeError("port must be in range 1..65535")
     if transport is None:
         raise argparse.ArgumentTypeError("transport is required either in --plc or --transport")

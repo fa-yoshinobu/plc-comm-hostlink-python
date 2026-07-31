@@ -15,6 +15,12 @@ call run_ci.bat
 `run_ci.bat` is the canonical local gate. It runs Ruff, formatting, mypy,
 documentation/sample validation, and the complete pytest suite.
 
+`scripts/check_source_archive.ps1` verifies the independently distributed
+GitHub source archive. It requires the complete tracked `tests/` tree and
+fixtures, extracts the archive under `D:\APP`, runs pytest, and builds the
+package from that extracted tree. This is separate from wheel/sdist content
+validation.
+
 ## Test Coverage
 
 The test suite covers:

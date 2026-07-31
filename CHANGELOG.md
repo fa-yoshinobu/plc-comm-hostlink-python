@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
 
+### BREAKING
+
+- Library: Integer-only public arguments now require an exact Python `int`; booleans, floats, numeric strings, implicit conversions, and out-of-range values raise `ValueError` before communication.
+
+### Migration
+
+- Pass actual integers to bank, count, unit, address, mode, and bit-index parameters. Keep `PROGRAM` and `RUN` only where the mode API explicitly documents those string forms.
+
+### Fixed
+
+- Library: Reject Float32 writes to direct bit devices before transport, require exact `0`/`1` operating-mode responses, reject non-positive or non-finite poll intervals, and calculate `R`/`MR`/`LR`/`CR` catalog bounds through banked-bit logical indexes.
+- Samples: Correct the dtype-bearing normalization examples, validate every runnable sample, and make `basic_test.py` read-only unless a controlled write-test device is explicitly selected; write tests restore the original value.
+- CI: Include tests and fixtures in GitHub source archives and execute pytest plus an isolated archive build from the extracted archive. PyPI wheel and sdist contents remain governed by their separate minimal-package contract.
+
 ## [3.2.1] - 2026-07-29
 
 - Release: Bumped package metadata and `hostlink.__version__` to `3.2.1`.

@@ -257,6 +257,8 @@ def _parse_segment_number(
         return None
     if default_device in {"X", "Y"}:
         return _parse_xym_segment_number(normalized)
+    if default_device in {"R", "MR", "LR", "CR"}:
+        return _parse_bit_bank_segment_number(normalized)
     base = 16 if notation == KvDeviceRangeNotation.HEXADECIMAL else 10
     try:
         return int(normalized, base)
@@ -272,6 +274,20 @@ def _parse_xym_segment_number(text: str) -> int | None:
     try:
         bit = int(text[-1], 16)
     except ValueError:
+        return None
+
+    bank = int(bank_text, 10) if bank_text else 0
+    return bank * 16 + bit
+
+
+def _parse_bit_bank_segment_number(text: str) -> int | None:
+    if not text.isascii() or not text.isdecimal():
+        return None
+
+    bank_text = text[:-2] if len(text) > 2 else ""
+    bit_text = text[-2:]
+    bit = int(bit_text, 10)
+    if bit > 15:
         return None
 
     bank = int(bank_text, 10) if bank_text else 0

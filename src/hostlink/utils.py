@@ -110,7 +110,7 @@ class HostLinkConnectionOptions:
         object.__setattr__(self, "plc_profile", normalize_plc_profile(self.plc_profile))
         if not isinstance(self.host, str) or not self.host.strip():
             raise ValueError("host is required and must be a non-empty string")
-        if isinstance(self.port, bool) or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
+        if type(self.port) is not int or not 1 <= self.port <= 65535:
             raise ValueError("port is required and must be an integer in the range 1..65535")
         if not isinstance(self.transport, str) or self.transport.strip().lower() not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
@@ -414,6 +414,9 @@ async def write_typed(
         raise ValueError("dtype is required; specify 'U', 'S', 'D', 'L', 'F', 'H', or 'BIT'.")
 
     if key == "F":
+        addr = parse_device(device)
+        if addr.device_type in _DIRECT_BIT_DEVICE_TYPES:
+            raise ValueError("Float writes are not defined for direct bit devices.")
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError(f"Float value must be finite, got {value!r}.")
         lo_word, hi_word = _float32_to_words(float(value))
@@ -565,6 +568,13 @@ async def poll(
     """
     if not addresses:
         raise ValueError("poll addresses must not be empty")
+    if (
+        isinstance(interval, bool)
+        or not isinstance(interval, (int, float))
+        or not math.isfinite(interval)
+        or interval <= 0
+    ):
+        raise ValueError(f"interval must be a positive finite number, got {interval!r}")
     plan = _try_compile_read_named_plan(addresses)
     while True:
         if plan is not None:
@@ -908,8 +918,9 @@ async def read_dwords_single_request(
     never silently splits the logical request.
     """
 
-    words = await read_words_single_request(client, device, count * 2)
-    return [(words[i] | (words[i + 1] << 16)) for i in range(0, count * 2, 2)]
+    normalized_count = _require_exact_integer(count, 1, 500, "dword count")
+    words = await read_words_single_request(client, device, normalized_count * 2)
+    return [(words[i] | (words[i + 1] << 16)) for i in range(0, normalized_count * 2, 2)]
 
 
 async def write_words_single_request(

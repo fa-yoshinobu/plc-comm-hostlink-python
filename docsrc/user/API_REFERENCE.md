@@ -41,6 +41,12 @@ their bit meaning is determined by the device family and command. `set_time`
 requires an explicit datetime/calendar value, and expansion-buffer reads and
 writes require an explicit format.
 
+Integer-only arguments require an exact Python `int`; `bool`, floating-point
+values such as `1.0`, and numeric strings are rejected with `ValueError` before
+frame construction. `confirm_operating_mode` accepts only the exact PLC
+response body `0` or `1`; any other body is a protocol error that invalidates
+the session.
+
 Semantic read operations validate the exact command-derived response token
 count. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`. UDP responses require a
 CR/LF terminator; missing framing is a protocol error and discards the
@@ -64,7 +70,12 @@ session before another request.
 `read_named` and `poll` require at least one address. A named snapshot may use
 multiple sequential PLC requests for mixed or non-contiguous addresses and is
 therefore a logical dictionary, not an atomic PLC-time snapshot. Contiguous
-single-request size limits are rejected rather than silently split.
+single-request size limits are rejected rather than silently split. Poll
+intervals must be positive finite numbers and cannot be booleans.
+
+Float32 reads and writes are defined only for word devices. An `F` write to a
+direct bit device such as `Y0` or `R0` raises `ValueError` before any command is
+sent.
 
 ## Address, Profile, And Diagnostics
 
@@ -74,6 +85,11 @@ single-request size limits are rejected rather than silently split.
 | Profile lookup | `KvHostLinkPlcProfile`, `KvHostLinkPlcProfileDescriptor`, `available_plc_profiles`, `plc_profile_descriptors`, `normalize_plc_profile`, `profile_from_name`, `display_name` |
 | Device range catalog lookup | `device_range_catalog_for_plc_profile` |
 | Error handling | `HostLinkBaseError`, `HostLinkError`, `HostLinkProtocolError`, `HostLinkConnectionError`, `decode_error_code` |
+
+For banked bit families `R`, `MR`, `LR`, and `CR`, numeric catalog bounds and
+point counts use `bank * 16 + bit`; `address_range` continues to display PLC
+notation. Catalog bounds describe profiles and are not transport-side address
+guards.
 
 ## Public Symbol Index
 

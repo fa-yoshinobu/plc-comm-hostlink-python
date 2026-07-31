@@ -20,6 +20,7 @@ python -m twine check dist/*
 Expected result:
 
 - all checks and the complete pytest suite in `run_ci.bat` pass
+- the extracted GitHub source archive contains tests/fixtures and passes pytest plus package build
 - `dist/` contains a source distribution and wheel
 - `twine check` accepts both artifacts
 
@@ -35,6 +36,8 @@ check exists.
 
 - do not commit build artifacts from `dist/`
 - do not commit packet captures or raw communication logs
+- keep PyPI wheel/sdist minimal; maintained samples come from GitHub and user guides come from the shared docs site
+- keep GitHub source archives self-contained for their standard build/test commands
 
 ## 5. Tagging Flow
 

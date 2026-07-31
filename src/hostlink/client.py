@@ -142,7 +142,7 @@ class HostLinkBase:
     ) -> None:
         if not isinstance(host, str) or not host.strip():
             raise ValueError("host is required and must be a non-empty string")
-        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        if type(port) is not int or not 1 <= port <= 65535:
             raise ValueError("port is required and must be an integer in the range 1..65535")
         if not isinstance(transport, str) or transport.strip().lower() not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
@@ -389,11 +389,13 @@ class HostLinkBase:
             elif upper == "RUN":
                 mode_no = 1
             else:
-                raise HostLinkProtocolError(f"Unsupported mode: {mode!r}")
+                raise ValueError(f"Unsupported mode: {mode!r}")
         else:
+            if type(mode) is not int:
+                raise ValueError("mode must be integer 0/1 or string PROGRAM/RUN")
             mode_no = mode
         if mode_no not in {0, 1}:
-            raise HostLinkProtocolError("mode must be 0/1 or PROGRAM/RUN")
+            raise ValueError("mode must be 0/1 or PROGRAM/RUN")
         return f"M{mode_no}"
 
     @staticmethod
@@ -418,7 +420,9 @@ class HostLinkBase:
 
     @staticmethod
     def _decode_confirm_operating_mode_response(response: str) -> int:
-        return int(response)
+        if response not in {"0", "1"}:
+            raise HostLinkProtocolError(f"Unsupported PLC mode response: {response!r}")
+        return 0 if response == "0" else 1
 
     def _build_set_time_command(
         self,
@@ -436,7 +440,7 @@ class HostLinkBase:
             week = (value.weekday() + 1) % 7
         else:
             if not isinstance(value, tuple) or len(value) != 7 or any(type(field) is not int for field in value):
-                raise HostLinkProtocolError(
+                raise ValueError(
                     "time value must contain integer year, month, day, hour, minute, second, and week fields"
                 )
             year, month, day, hour, minute, second, week = value
@@ -452,10 +456,10 @@ class HostLinkBase:
             try:
                 calendar = datetime(2000 + year, month, day, hour, minute, second)
             except ValueError as exc:
-                raise HostLinkProtocolError("time value contains a nonexistent calendar date") from exc
+                raise ValueError("time value contains a nonexistent calendar date") from exc
             expected_week = (calendar.weekday() + 1) % 7
             if week != expected_week:
-                raise HostLinkProtocolError(f"week {week} does not match the calendar date (expected {expected_week})")
+                raise ValueError(f"week {week} does not match the calendar date (expected {expected_week})")
 
         return "WRT " + " ".join(
             [
