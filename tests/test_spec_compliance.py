@@ -2,6 +2,7 @@ import unittest
 
 from hostlink import (
     HostLinkClient,
+    HostLinkCommentEncoding,
     KvDeviceRangeCategory,
     KvDeviceRangeNotation,
     available_plc_profiles,
@@ -91,12 +92,12 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_rdc_rejects_unsupported_device_type(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.read_comments("VB0")
+            plc.read_comments("VB0", HostLinkCommentEncoding.UTF8)
 
     def test_rdc_accepts_xym_alias_device_types(self) -> None:
         plc = FakeHostLinkClient()
         plc.queue("DM COMMENT                      ")
-        self.assertEqual(plc.read_comments("D10"), "DM COMMENT")
+        self.assertEqual(plc.read_comments("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
         self.assertEqual(plc.sent_frames[-1], b"RDC D10\r")
 
     def test_urd_32bit_count_limit_enforced(self) -> None:

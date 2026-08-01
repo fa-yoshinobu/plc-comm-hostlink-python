@@ -21,7 +21,9 @@
 | `read_timer_counter` | Read timer or counter status, current value, and preset. |
 | `read_timer` | Read a timer as status, current value, and preset. |
 | `read_counter` | Read a counter as status, current value, and preset. |
-| `read_comments` | Read a PLC device comment label. |
+| `HostLinkCommentEncoding` | Select the exact codec for a device-comment text read. |
+| `read_comments` | Read and explicitly decode a PLC device comment label. |
+| `read_comment_bytes` | Read undecoded PLC device-comment payload bytes. |
 | `read_expansion_unit_buffer` | Read expansion unit buffer memory. |
 | `write_expansion_unit_buffer` | Write expansion unit buffer memory. |
 
@@ -33,6 +35,7 @@ It intentionally excludes raw protocol methods and low-level client operations.
 ```python
 from hostlink import (
     HostLinkConnectionOptions,
+    HostLinkCommentEncoding,
     TimerCounterValue,
     available_plc_profiles,
     device_range_catalog_for_plc_profile,
@@ -43,6 +46,8 @@ from hostlink import (
     normalize_address,
     read_typed,
     write_typed,
+    read_comment_bytes,
+    read_comments,
     read_named,
     poll,
 )
@@ -187,14 +192,18 @@ This is a matched read/write/readback pattern. Keep it on a test address until y
 
 ```python
 import asyncio
-from hostlink import HostLinkConnectionOptions, open_and_connect, read_named
+from hostlink import HostLinkCommentEncoding, HostLinkConnectionOptions, open_and_connect, read_named
 
 
 async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
         addresses = ["DM0:U", "DM1:S", "DM2:D", "DM4:F", "DM10.A", "DM0:COMMENT"]
-        read_result = await read_named(client, addresses)
+        read_result = await read_named(
+            client,
+            addresses,
+            comment_encoding=HostLinkCommentEncoding.UTF8,
+        )
         for address, value in read_result.items():
             print(f"{address} = {value}")
 
@@ -211,6 +220,8 @@ entry is validated before the first send, individual entries are never split,
 requests retain caller declaration order, and the aggregate holds one FIFO
 turn. Failure returns no partial dictionary. This automatic splitting applies
 only to `read_named`/`poll`; state-changing multi-request work is not synthesized.
+When the collection contains `:COMMENT`, `comment_encoding` is required and is
+validated before any request is sent.
 
 ## Block reads
 
@@ -312,10 +323,12 @@ python samples/config_polling.py --config samples/config_polling.example.json --
 | `:L` | `DM100:L` | Signed 32-bit view. |
 | `:F` | `DM100:F` | IEEE 754 32-bit float view. |
 | `:BIT` | `CR000:BIT` | Direct bit device view. |
-| `:COMMENT` | `DM100:COMMENT` | PLC device comment text. |
+| `:COMMENT` | `DM100:COMMENT` | PLC device comment text; `read_named`/`poll` require `comment_encoding`. |
 | `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
 
 For `read_named` and `poll`, do not omit the type suffix. Use `DM100:U` instead of relying on `DM100` to mean an unsigned word.
+Pass `comment_encoding` only when the collection contains `:COMMENT`; an
+unused comment codec is rejected before communication.
 
 ## Timer/counter helpers
 
@@ -345,7 +358,28 @@ if __name__ == "__main__":
 
 ## Device comments
 
-Use `label = await read_comments(client, "DM0")` after connecting to read the PLC device comment label for `DM0`.
+`RDC` does not identify the payload codec. Select it explicitly; the library
+does not guess from the PLC profile and does not try another codec when the
+selected decoder fails.
+
+```python
+from hostlink import HostLinkCommentEncoding, read_comment_bytes, read_comments
+
+utf8_label = await read_comments(client, "DM0", HostLinkCommentEncoding.UTF8)
+cp932_label = await read_comments(client, "DM1", HostLinkCommentEncoding.CP932)
+raw_payload = await read_comment_bytes(client, "DM2")
+```
+
+`CP932` means Windows-31J and is the compatibility selection for KEYENCE
+material that calls the KV string encoding “Shift_JIS”. It includes standard
+Shift_JIS characters but is not presented as a separate strict-Shift_JIS
+codec. Across supported runtimes, ASCII bytes keep their exact code points,
+mapped Windows-31J characters are accepted, and malformed, unmapped, or
+vendor-private single bytes `80`, `A0`, and `FD` through `FF` are rejected.
+Text reads remove trailing ASCII space padding before strict decoding.
+Raw reads remove only CR/LF framing and preserve the exact payload, including
+trailing spaces. Invalid bytes raise `HostLinkProtocolError`; there is no
+replacement, automatic fallback, or `AUTO` selection.
 
 ## Expansion unit buffer
 

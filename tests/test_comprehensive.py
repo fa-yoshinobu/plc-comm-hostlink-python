@@ -8,6 +8,7 @@ import hostlink
 from hostlink import (
     AsyncHostLinkClient,
     HostLinkClient,
+    HostLinkCommentEncoding,
     HostLinkError,
     HostLinkProtocolError,
     HostLinkTrafficStats,
@@ -231,9 +232,9 @@ class TestComprehensiveSync(unittest.TestCase):
 
     def test_read_comments(self):
         self.server.responses["RDC R000"] = "TEST COMMENT                    "
-        self.assertEqual(self.client.read_comments("R0"), "TEST COMMENT")
+        self.assertEqual(self.client.read_comments("R0", HostLinkCommentEncoding.UTF8), "TEST COMMENT")
         self.server.responses["RDC D10"] = "DM COMMENT                      "
-        self.assertEqual(self.client.read_comments("D10"), "DM COMMENT")
+        self.assertEqual(self.client.read_comments("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
 
     def test_switch_bank(self):
         self.client.switch_bank(5)
@@ -449,13 +450,17 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_read_comments_helper_and_read_named_comment(self):
         self.server.responses["RDC DM150"] = "MAIN COMMENT                    "
-        comment = await read_comments(self.client, "DM150")
+        comment = await read_comments(self.client, "DM150", HostLinkCommentEncoding.UTF8)
         self.assertEqual(comment, "MAIN COMMENT")
 
         self.server.last_received.clear()
         self.server.responses["RD DM100.U"] = "321"
         self.server.responses["RDC DM101"] = "ALARM COMMENT                   "
-        result = await read_named(self.client, ["DM100:U", "DM101:COMMENT"])
+        result = await read_named(
+            self.client,
+            ["DM100:U", "DM101:COMMENT"],
+            comment_encoding=HostLinkCommentEncoding.UTF8,
+        )
         self.assertEqual(result, {"DM100:U": 321, "DM101:COMMENT": "ALARM COMMENT"})
         self.assertEqual(self.server.last_received, ["RD DM100.U", "RDC DM101"])
 

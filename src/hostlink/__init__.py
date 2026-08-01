@@ -17,6 +17,7 @@ from :mod:`hostlink.utils`:
 - :func:`read_counter`
 - :func:`write_typed`
 - :func:`read_comments`
+- :func:`read_comment_bytes`
 - :func:`read_words_single_request`
 - :func:`read_dwords_single_request`
 - :func:`read_expansion_unit_buffer`
@@ -63,6 +64,7 @@ from .plc_profiles import (
     plc_profile_descriptors,
     profile_from_name,
 )
+from .protocol import HostLinkCommentEncoding
 from .utils import (
     HostLinkAddress,
     HostLinkConnectionOptions,
@@ -72,6 +74,7 @@ from .utils import (
     open_and_connect,
     parse_address,
     poll,
+    read_comment_bytes,
     read_comments,
     read_counter,
     read_dwords,
@@ -122,12 +125,14 @@ __all__ = [
     "profile_from_name",
     "HostLinkAddress",
     "HostLinkConnectionOptions",
+    "HostLinkCommentEncoding",
     "TimerCounterValue",
     "format_address",
     "normalize_address",
     "open_and_connect",
     "parse_address",
     "poll",
+    "read_comment_bytes",
     "read_comments",
     "read_counter",
     "read_dwords",

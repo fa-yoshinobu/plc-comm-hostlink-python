@@ -37,7 +37,8 @@ close, transport failure, or malformed confirmation raises
 | Forced bit/device control | `forced_set`, `forced_reset`, `forced_set_consecutive`, `forced_reset_consecutive` |
 | Timer/counter set-value writes | `write_set_value`, `write_set_value_consecutive` |
 | Monitor registration/cycle | `register_monitor_bits`, `register_monitor_words`, `read_monitor_bits`, `read_monitor_words` |
-| Comment reads | `read_comments` |
+| Comment text reads | `read_comments`, `HostLinkCommentEncoding` |
+| Comment raw-byte reads | `read_comment_bytes` |
 | Data bank switching | `switch_bank` |
 | Expansion unit buffer access | `read_expansion_unit_buffer`, `write_expansion_unit_buffer` |
 
@@ -61,6 +62,19 @@ transport. Datetime clock values must be in years 2000 through 2099.
 For direct-bit devices, numeric single reads require the corresponding 16- or
 32-point response. Any malformed semantic response shape invalidates the
 session before another request.
+
+`read_comments(device, encoding)` requires
+`HostLinkCommentEncoding.UTF8` or `HostLinkCommentEncoding.CP932`; it never
+detects, falls back, or selects a codec from the PLC profile. `CP932` is the
+Windows-31J compatibility selection for KEYENCE “Shift_JIS” terminology. Its
+portable strict repertoire preserves ASCII code points, accepts mapped
+half-width and double-byte Windows-31J characters, and rejects malformed,
+unmapped, or vendor-private single bytes `80`, `A0`, and `FD` through `FF`.
+`read_comment_bytes(device)` returns the undecoded `RDC` body with CR/LF
+framing removed and trailing ASCII padding preserved. A named collection that
+contains `:COMMENT` likewise requires its explicit `comment_encoding`.
+Passing `comment_encoding` to a collection without `:COMMENT` is rejected as
+an unused configuration error before communication.
 
 ## High-Level Helpers
 
@@ -104,7 +118,7 @@ The package exports these public names from `hostlink.__all__`:
 
 `AsyncHostLinkClient`, `HostLinkAddress`, `HostLinkBaseError`,
 `HostLinkCancelledError`, `HostLinkClient`, `HostLinkClosedError`,
-`HostLinkConnectionError`, `HostLinkConnectionOptions`, `HostLinkError`,
+`HostLinkCommentEncoding`, `HostLinkConnectionError`, `HostLinkConnectionOptions`, `HostLinkError`,
 `HostLinkFailureReason`, `HostLinkNotConnectedError`, `HostLinkOutcomeUnknownError`,
 `HostLinkProtocolError`, `HostLinkTimeoutError`, `HostLinkTransportError`,
 `KvDeviceRangeCatalog`, `KvDeviceRangeCategory`,
@@ -113,7 +127,8 @@ The package exports these public names from `hostlink.__all__`:
 `available_plc_profiles`, `decode_error_code`,
 `device_range_catalog_for_plc_profile`, `display_name`, `format_address`,
 `normalize_address`, `normalize_plc_profile`, `open_and_connect`,
-`parse_address`, `poll`, `plc_profile_descriptors`, `profile_from_name`, `read_comments`,
+`parse_address`, `poll`, `plc_profile_descriptors`, `profile_from_name`,
+`read_comment_bytes`, `read_comments`,
 `read_counter`, `read_dwords`,
 `read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,

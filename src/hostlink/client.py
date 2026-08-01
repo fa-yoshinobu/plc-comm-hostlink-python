@@ -49,11 +49,14 @@ from .errors import (
     HostLinkTransportError,
 )
 from .protocol import (
+    HostLinkCommentEncoding,
     build_frame,
     decode_comment_response,
     decode_response,
     ensure_success,
+    extract_comment_payload,
     parse_data_tokens,
+    require_comment_encoding,
     split_data_tokens,
 )
 
@@ -345,6 +348,13 @@ class HostLinkBase:
         return ensure_success(decoder(response))
 
     @staticmethod
+    def _process_comment_payload(response: bytes) -> bytes:
+        payload = extract_comment_payload(response)
+        if len(payload) == 2 and payload[0] == ord("E") and ord("0") <= payload[1] <= ord("9"):
+            ensure_success(payload.decode("ascii"))
+        return payload
+
+    @staticmethod
     def _validate_response_cap(
         response: bytes,
         maximum_response_body: int = ABSOLUTE_RESPONSE_CAP,
@@ -480,10 +490,6 @@ class HostLinkBase:
         validate_device_type("RDC", addr.device_type, RDC_DEVICE_TYPES)
         token = self._device_token(device, drop_suffix=True)
         return f"RDC {token}"
-
-    @staticmethod
-    def _decode_read_comments_response(response: str) -> str:
-        return response
 
     def _build_write_command(self, device: str, value: int | str, data_format: str | None = None) -> str:
         token, suffix = self._device_with_format(device, data_format)
@@ -888,6 +894,25 @@ class HostLinkClient(HostLinkBase):
             self._check_decode_deadline(state_changing=state_changing)
             raise
 
+    def _send_comment_payload(
+        self,
+        body: str,
+        parser: Callable[[bytes], T],
+    ) -> T:
+        with self._lock:
+            response = self._exchange(self._build_command(body), state_changing=False)
+            try:
+                result = parser(self._process_comment_payload(response))
+                self._check_decode_deadline(state_changing=False)
+                return result
+            except HostLinkProtocolError:
+                self._check_decode_deadline(state_changing=False)
+                self._close_unlocked()
+                raise
+            except HostLinkError:
+                self._check_decode_deadline(state_changing=False)
+                raise
+
     def _send_parsed(
         self,
         body: str,
@@ -1205,11 +1230,19 @@ class HostLinkClient(HostLinkBase):
 
         return self._send_parsed("MWR", self._decode_monitor_words_response)
 
-    def read_comments(self, device: str) -> str:
-        """Read the PLC comment text for one supported device."""
+    def read_comment_bytes(self, device: str) -> bytes:
+        """Read exact PLC comment payload bytes without CR/LF framing."""
 
-        response = self._send_decoded(self._build_read_comments_command(device), decode_comment_response)
-        return self._decode_read_comments_response(response)
+        return self._send_comment_payload(self._build_read_comments_command(device), lambda payload: payload)
+
+    def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+        """Read PLC comment text using exactly the selected encoding."""
+
+        selected = require_comment_encoding(encoding)
+        return self._send_comment_payload(
+            self._build_read_comments_command(device),
+            lambda payload: decode_comment_response(payload, selected),
+        )
 
     def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""
@@ -1415,6 +1448,25 @@ class AsyncHostLinkClient(HostLinkBase):
         except HostLinkError:
             await self._check_decode_deadline(state_changing=state_changing)
             raise
+
+    async def _send_comment_payload(
+        self,
+        body: str,
+        parser: Callable[[bytes], T],
+    ) -> T:
+        async with self._lock:
+            response = await self._exchange(self._build_command(body), state_changing=False)
+            try:
+                result = parser(self._process_comment_payload(response))
+                await self._check_decode_deadline(state_changing=False)
+                return result
+            except HostLinkProtocolError:
+                await self._check_decode_deadline(state_changing=False)
+                await self._close_unlocked()
+                raise
+            except HostLinkError:
+                await self._check_decode_deadline(state_changing=False)
+                raise
 
     async def _send_parsed(
         self,
@@ -1738,11 +1790,19 @@ class AsyncHostLinkClient(HostLinkBase):
 
         return await self._send_parsed("MWR", self._decode_monitor_words_response)
 
-    async def read_comments(self, device: str) -> str:
-        """Read the PLC comment text for one supported device."""
+    async def read_comment_bytes(self, device: str) -> bytes:
+        """Read exact PLC comment payload bytes without CR/LF framing."""
 
-        response = await self._send_decoded(self._build_read_comments_command(device), decode_comment_response)
-        return self._decode_read_comments_response(response)
+        return await self._send_comment_payload(self._build_read_comments_command(device), lambda payload: payload)
+
+    async def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+        """Read PLC comment text using exactly the selected encoding."""
+
+        selected = require_comment_encoding(encoding)
+        return await self._send_comment_payload(
+            self._build_read_comments_command(device),
+            lambda payload: decode_comment_response(payload, selected),
+        )
 
     async def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""

@@ -29,6 +29,7 @@ from .device import (
     parse_device_text,
 )
 from .errors import HostLinkProtocolError
+from .protocol import HostLinkCommentEncoding, require_comment_encoding
 
 if TYPE_CHECKING:
     from .client import AsyncHostLinkClient
@@ -376,18 +377,29 @@ async def read_counter(client: AsyncHostLinkClient, device: str) -> TimerCounter
 async def read_comments(
     client: AsyncHostLinkClient,
     device: str,
+    encoding: HostLinkCommentEncoding,
 ) -> str:
-    """Read one PLC comment string through the high-level helper API.
+    """Read one PLC comment string using exactly the selected codec.
 
     Args:
         client: Connected asynchronous Host Link client.
         device: Base device address such as ``"DM100"``.
+        encoding: Explicit UTF-8 or CP932/Windows-31J selection.
 
     Returns:
         The PLC comment text for ``device``.
     """
 
-    return await client.read_comments(device)
+    return await client.read_comments(device, require_comment_encoding(encoding))
+
+
+async def read_comment_bytes(
+    client: AsyncHostLinkClient,
+    device: str,
+) -> bytes:
+    """Read exact PLC comment payload bytes without CR/LF framing."""
+
+    return await client.read_comment_bytes(device)
 
 
 async def write_typed(
@@ -471,6 +483,8 @@ def _parse_bit_write_value(value: int | float | bool | str) -> bool:
 async def read_named(
     client: AsyncHostLinkClient,
     addresses: list[str],
+    *,
+    comment_encoding: HostLinkCommentEncoding | None = None,
 ) -> dict[str, int | float | bool | str]:
     """Read multiple named values and return a snapshot dictionary.
 
@@ -503,6 +517,8 @@ async def read_named(
     Args:
         client: Connected asynchronous Host Link client.
         addresses: Address strings to read as one logical collection result.
+        comment_encoding: Required explicit codec when any address uses
+            ``:COMMENT``; omit it for collections without comments.
 
     Returns:
         Dictionary mapping each original address string to its decoded value.
@@ -516,14 +532,17 @@ async def read_named(
         raise ValueError("read_named addresses must not be empty")
 
     plan = _compile_read_named_plan(addresses)
+    selected_comment_encoding = _resolve_plan_comment_encoding(plan, comment_encoding)
     _preflight_read_named_plan(client, plan)
-    return await _execute_read_named_plan(client, plan)
+    return await _execute_read_named_plan(client, plan, selected_comment_encoding)
 
 
 async def poll(
     client: AsyncHostLinkClient,
     addresses: list[str],
     interval: float,
+    *,
+    comment_encoding: HostLinkCommentEncoding | None = None,
 ) -> AsyncIterator[dict[str, int | float | bool | str]]:
     """Continuously yield read results for the specified addresses.
 
@@ -535,6 +554,8 @@ async def poll(
         client: Connected asynchronous Host Link client.
         addresses: Address strings in :func:`read_named` format.
         interval: Delay in seconds between read results.
+        comment_encoding: Required explicit codec when any address uses
+            ``:COMMENT``; omit it for collections without comments.
 
     Yields:
         A dictionary for each polling cycle, keyed by the original address
@@ -555,9 +576,10 @@ async def poll(
     ):
         raise ValueError(f"interval must be a positive finite number, got {interval!r}")
     plan = _compile_read_named_plan(addresses)
+    selected_comment_encoding = _resolve_plan_comment_encoding(plan, comment_encoding)
     _preflight_read_named_plan(client, plan)
     while True:
-        yield await _execute_read_named_plan(client, plan)
+        yield await _execute_read_named_plan(client, plan, selected_comment_encoding)
         await asyncio.sleep(interval)
 
 
@@ -751,9 +773,24 @@ def _preflight_read_named_plan(client: AsyncHostLinkClient, plan: _CompiledReadN
                 client._build_read_command(base, f".{dtype}")
 
 
+def _resolve_plan_comment_encoding(
+    plan: _CompiledReadNamedPlan,
+    encoding: HostLinkCommentEncoding | None,
+) -> HostLinkCommentEncoding | None:
+    has_comment = any(request.kind == "COMMENT" for request in plan.requests_in_input_order)
+    if not has_comment:
+        if encoding is not None:
+            raise ValueError("comment_encoding requires at least one :COMMENT address")
+        return None
+    if encoding is None:
+        raise ValueError("comment_encoding is required when read_named or poll contains :COMMENT")
+    return require_comment_encoding(encoding)
+
+
 async def _execute_read_named_plan(
     client: AsyncHostLinkClient,
     plan: _CompiledReadNamedPlan,
+    comment_encoding: HostLinkCommentEncoding | None,
 ) -> dict[str, int | float | bool | str]:
     resolved: list[int | float | bool | str | None] = [None] * len(plan.requests_in_input_order)
 
@@ -789,7 +826,9 @@ async def _execute_read_named_plan(
                 request = segment.requests[0]
                 base = request.base_address.to_text()
                 if segment.mode == "COMMENT":
-                    resolved[request.index] = await read_comments(client, base)
+                    if comment_encoding is None:
+                        raise HostLinkProtocolError("Compiled COMMENT plan is missing its explicit encoding")
+                    resolved[request.index] = await read_comments(client, base, comment_encoding)
                 elif request.kind == "SINGLE_BIT_IN_WORD":
                     bit_index = _require_bit_in_word_index(request.address, request.bit_index)
                     raw = await client.read(base, data_format=".U")

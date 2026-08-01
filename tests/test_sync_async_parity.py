@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from hostlink import AsyncHostLinkClient, HostLinkClient
+from hostlink import AsyncHostLinkClient, HostLinkClient, HostLinkCommentEncoding
 
 
 class _RecordingSyncHostLinkClient(HostLinkClient):
@@ -177,9 +177,15 @@ _PARITY_CASES = [
     ),
     _ParityCase(
         "read_comments",
-        lambda client: client.read_comments("DM150"),
-        lambda client: client.read_comments("DM150"),
+        lambda client: client.read_comments("DM150", HostLinkCommentEncoding.UTF8),
+        lambda client: client.read_comments("DM150", HostLinkCommentEncoding.UTF8),
         response=b"MAIN COMMENT                    \r\n",
+    ),
+    _ParityCase(
+        "read_comment_bytes",
+        lambda client: client.read_comment_bytes("DM150"),
+        lambda client: client.read_comment_bytes("DM150"),
+        response=b"\x82\xa0   \r\n",
     ),
     _ParityCase(
         "switch_bank",

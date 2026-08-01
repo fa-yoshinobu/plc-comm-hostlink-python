@@ -22,18 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING
 
+- Library: Device-comment text reads now require an explicit `HostLinkCommentEncoding.UTF8` or `.CP932` selection. Removed UTF-8-first/Shift_JIS-fallback decoding; named reads containing `:COMMENT` also require `comment_encoding`.
 - Library: Integer-only public arguments now require an exact Python `int`; booleans, floats, numeric strings, implicit conversions, and out-of-range values raise `ValueError` before communication.
 - Library: Removed the public sync/async/helper `write_bit_in_word` read-modify-write API without an alias because it could lose updates made by the PLC or another connection.
 - Library: Replaced generic connection failures with machine-readable timeout, cancellation, closed, not-connected, transport, and state-changing outcome-unknown errors; callers that match exact exception types must migrate.
 
 ### Migration
 
+- Pass `HostLinkCommentEncoding.UTF8` or `.CP932` to `read_comments`; pass `comment_encoding` when `read_named` or `poll` contains `:COMMENT`. Use `read_comment_bytes` when the application cannot assert the payload encoding.
 - Pass actual integers to bank, count, unit, address, mode, and bit-index parameters. Keep `PROGRAM` and `RUN` only where the mode API explicitly documents those string forms.
 - Replace `write_bit_in_word` with a PLC-side atomic bit operation or an application/PLC ownership design for the complete word.
 - Catch the specific Host Link error type needed by the application. For `HostLinkOutcomeUnknownError`, inspect `reason`, reconcile PLC state explicitly, and do not blindly retry.
 
 ### Fixed
 
+- Library: `RDC` comment decoding no longer guesses a codec. UTF-8 and the portable strict CP932/Windows-31J repertoire decode consistently across runtimes, ambiguous bytes follow only the caller selection, malformed or runtime-private bytes never fall back or use replacement, and raw comment payload bytes are available without losing trailing padding.
 - Library: Reject Float32 writes to direct bit devices before transport, require exact `0`/`1` operating-mode responses, reject non-positive or non-finite poll intervals, and calculate `R`/`MR`/`LR`/`CR` catalog bounds through banked-bit logical indexes.
 - Library: Normal sync/async clients now use arrival FIFO admission; waiting async cancellation sends nothing, and `close()` immediately rejects active and queued work. One absolute request deadline covers transmit, drain, receive, and decode, while connection establishment has a separate deadline.
 - Library: `read_named`/`poll` now preflight the complete caller-ordered input, keep entries indivisible, hold one FIFO turn, and split only necessary read-only work. Multi-request results remain non-atomic and never return a partial dictionary after failure.

@@ -4,12 +4,28 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from enum import Enum
 
 from .errors import HostLinkError, HostLinkProtocolError
 
 ERROR_RE = re.compile(r"^E[0-9]$")
 CR = b"\r"
 LF = b"\n"
+
+
+class HostLinkCommentEncoding(str, Enum):
+    """Explicit codec choices for Host Link ``RDC`` comment payloads."""
+
+    UTF8 = "utf-8"
+    CP932 = "cp932"
+
+
+def require_comment_encoding(encoding: HostLinkCommentEncoding) -> HostLinkCommentEncoding:
+    """Require an explicit public comment codec selection."""
+
+    if not isinstance(encoding, HostLinkCommentEncoding):
+        raise ValueError("encoding must be HostLinkCommentEncoding.UTF8 or HostLinkCommentEncoding.CP932")
+    return encoding
 
 
 def build_frame(body: str) -> bytes:
@@ -53,30 +69,52 @@ def decode_response(raw: bytes) -> str:
     return text
 
 
-def decode_comment_response(raw: bytes) -> str:
-    """Decode comment responses which may be UTF-8 or Shift_JIS.
-
-    Normal Host Link responses are ASCII, but PLC comments often contain
-    localized text. Host Link comment padding is trailing ASCII space bytes.
-    Remove only those bytes before decoding so other whitespace remains.
-    """
+def extract_comment_payload(raw: bytes) -> bytes:
+    """Return the exact ``RDC`` response body bytes without CR/LF framing."""
 
     if not raw:
         raise HostLinkProtocolError("Empty response")
     payload = raw.rstrip(b"\r\n")
     if not payload:
         raise HostLinkProtocolError(f"Malformed response frame: {raw!r}")
-    payload = payload.rstrip(b" ")
+    return payload
 
-    try:
-        return payload.decode("utf-8")
-    except UnicodeDecodeError:
-        pass
 
+def decode_comment_response(raw: bytes, encoding: HostLinkCommentEncoding) -> str:
+    """Decode one comment response using exactly the caller-selected codec.
+
+    Normal Host Link responses are ASCII, but PLC comments often contain
+    localized text. Host Link comment padding is trailing ASCII space bytes.
+    Remove only those bytes before decoding so other whitespace remains. No
+    codec detection, fallback, or replacement is performed.
+    """
+
+    selected = require_comment_encoding(encoding)
+    payload = extract_comment_payload(raw).rstrip(b" ")
     try:
-        return payload.decode("shift_jis")
+        decoded = payload.decode(selected.value, errors="strict")
     except UnicodeDecodeError as exc:
-        raise HostLinkProtocolError("Response could not be decoded as UTF-8 or Shift_JIS") from exc
+        raise HostLinkProtocolError(
+            f"RDC response is not valid {selected.value}; no fallback codec was attempted"
+        ) from exc
+
+    if selected is HostLinkCommentEncoding.CP932:
+        # Python's CP932 codec accepts five vendor-private single-byte values
+        # that the other supported runtimes reject. Exclude those values when
+        # they occur as complete code units so the public contract is identical
+        # across Python, .NET, Rust, and Node.js. A valid double-byte sequence
+        # may still contain 0x80 or 0xA0 as its trail byte.
+        index = 0
+        while index < len(payload):
+            first = payload[index]
+            if first <= 0x7F or 0xA1 <= first <= 0xDF:
+                index += 1
+            elif 0x81 <= first <= 0x9F or 0xE0 <= first <= 0xFC:
+                index += 2
+            else:
+                raise HostLinkProtocolError("RDC response is not valid cp932; no fallback codec was attempted")
+
+    return decoded
 
 
 def ensure_success(response_text: str) -> str:

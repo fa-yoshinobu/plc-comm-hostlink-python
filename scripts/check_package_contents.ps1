@@ -109,6 +109,9 @@ expected = (
     "write_typed",
     "read_named",
     "poll",
+    "HostLinkCommentEncoding",
+    "read_comment_bytes",
+    "read_comments",
     "read_expansion_unit_buffer",
 )
 if not inspect.getdoc(hostlink):

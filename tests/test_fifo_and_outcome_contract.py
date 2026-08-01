@@ -12,6 +12,7 @@ from hostlink import (
     HostLinkCancelledError,
     HostLinkClient,
     HostLinkClosedError,
+    HostLinkCommentEncoding,
     HostLinkFailureReason,
     HostLinkOutcomeUnknownError,
     HostLinkProtocolError,
@@ -140,7 +141,7 @@ def test_sync_absolute_deadline_includes_response_decoding() -> None:
     client = _DecodeDeadlineSyncClient()
 
     def slow_decoder(_response: bytes) -> str:
-        time.sleep(0.01)
+        time.sleep(0.05)
         return "OK"
 
     with pytest.raises(HostLinkTimeoutError, match="decoding"):
@@ -242,7 +243,7 @@ async def test_async_absolute_deadline_includes_response_decoding() -> None:
     client = _DecodeDeadlineAsyncClient()
 
     def slow_decoder(_response: bytes) -> str:
-        time.sleep(0.01)
+        time.sleep(0.05)
         return "OK"
 
     with pytest.raises(HostLinkTimeoutError, match="decoding"):
@@ -320,7 +321,13 @@ class _NamedFifoClient(AsyncHostLinkClient):
 @pytest.mark.asyncio
 async def test_read_named_uses_one_fifo_turn_and_preserves_declared_request_order() -> None:
     client = _NamedFifoClient()
-    aggregate = asyncio.create_task(read_named(client, ["DM0:U", "DM2:COMMENT"]))
+    aggregate = asyncio.create_task(
+        read_named(
+            client,
+            ["DM0:U", "DM2:COMMENT"],
+            comment_encoding=HostLinkCommentEncoding.UTF8,
+        )
+    )
     await client.first_started.wait()
     competing = asyncio.create_task(client.read("DM9", data_format=".U"))
     await asyncio.sleep(0)
@@ -335,9 +342,33 @@ async def test_read_named_uses_one_fifo_turn_and_preserves_declared_request_orde
 async def test_read_named_preserves_order_across_device_types() -> None:
     client = _NamedFifoClient()
     client.release_first.set()
-    result = await read_named(client, ["DM0:U", "R0:BIT", "DM2:COMMENT"])
+    result = await read_named(
+        client,
+        ["DM0:U", "R0:BIT", "DM2:COMMENT"],
+        comment_encoding=HostLinkCommentEncoding.UTF8,
+    )
     assert result == {"DM0:U": 10, "R0:BIT": True, "DM2:COMMENT": "COMMENT"}
     assert client.commands == ["RD DM0.U", "RD R000", "RDC DM2"]
+
+
+@pytest.mark.asyncio
+async def test_read_named_comment_requires_explicit_encoding_before_any_send() -> None:
+    client = _NamedFifoClient()
+    with pytest.raises(ValueError, match="comment_encoding is required"):
+        await read_named(client, ["DM0:U", "DM2:COMMENT"])
+    assert client.commands == []
+
+
+@pytest.mark.asyncio
+async def test_read_named_rejects_unused_comment_encoding_before_any_send() -> None:
+    client = _NamedFifoClient()
+    with pytest.raises(ValueError, match="requires at least one :COMMENT"):
+        await read_named(
+            client,
+            ["DM0:U"],
+            comment_encoding=HostLinkCommentEncoding.UTF8,
+        )
+    assert client.commands == []
 
 
 @pytest.mark.asyncio
