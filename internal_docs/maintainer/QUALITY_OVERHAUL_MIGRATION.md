@@ -612,20 +612,22 @@ Machine-verifiable acceptance criteria:
 
 - [x] Implementation completed in this repository.
 - [x] Existing deterministic tests explicitly selected for every acceptance criterion.
-- [ ] The new Windows CI job passed on GitHub for the final source state.
+- [x] The new Windows CI job passed on GitHub for the final source state.
 - [x] The equivalent local Windows contract and full non-hardware gates passed with Python 3.10.20.
 - [x] Codex self-review completed after the requested local verification run.
 - [x] Live PLC checks are not required; all selected behavior uses localhost loopback or fake sockets.
 - [x] Maintainer CI documentation agrees with the workflow; no user migration note or changelog entry is required.
-- [ ] Final acceptance criteria verified and the item marked complete.
+- [x] Final acceptance criteria verified and the item marked complete.
 
 Verification evidence: the local Windows Python 3.10.20 run passed Ruff lint
 and formatting, mypy, documentation/sample/workflow checks, all 284 tests,
 wheel/sdist and isolated-consumer checks, and the synthetic current-worktree
 source archive's extracted full gate. This includes every test selected by the
-new Windows representative job. The GitHub-hosted Windows/Python 3.13 job and
-the Ubuntu Python 3.10 through 3.13 matrix remain unchecked because those
-hosted OS/runtime combinations were not run locally.
+new Windows representative job. The required GitHub-hosted Windows/Python 3.13
+job and the Ubuntu Python 3.10 through 3.13 matrix passed on final merged source
+commit `3830947730f6d2a821367aed71373056c7562194` in
+[CI run 30705296652](https://github.com/fa-yoshinobu/plc-comm-hostlink-python/actions/runs/30705296652).
+This follow-up changes only the maintainer evidence record.
 
 Self-review disposition:
 
