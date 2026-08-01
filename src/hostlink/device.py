@@ -141,6 +141,20 @@ DEFAULT_FORMAT_BY_DEVICE_TYPE = {
     "F": ".U",
 }
 
+# Float32 helpers always transfer two consecutive ordinary unsigned words.
+# Derive the eligible family set from the canonical Host Link family metadata
+# instead of maintaining a second, potentially divergent allow-list.
+FLOAT32_ELIGIBLE_DEVICE_TYPES = frozenset(
+    device_type for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items() if default_format == ".U"
+)
+
+
+def is_float32_eligible_device_type(device_type: str) -> bool:
+    """Return whether *device_type* has the ordinary two-word Float32 shape."""
+
+    return device_type in FLOAT32_ELIGIBLE_DEVICE_TYPES
+
+
 _COUNT_CATEGORY_BY_DEVICE_TYPE = {
     # up to 1000 for 16-bit/bit, up to 500 for 32-bit
     "R": "up_to_1000",

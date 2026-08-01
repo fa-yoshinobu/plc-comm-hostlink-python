@@ -20,9 +20,11 @@ from .device import (
     BIT_BANK_DEVICE_TYPES,
     DEFAULT_FORMAT_BY_DEVICE_TYPE,
     NATIVE_32BIT_DEVICE_TYPES,
+    RDC_DEVICE_TYPES,
     DeviceAddress,
     bit_bank_logical_number,
     bit_bank_number_from_logical,
+    is_float32_eligible_device_type,
     normalize_suffix,
     pack_direct_bit_tokens,
     parse_device,
@@ -200,6 +202,7 @@ def parse_address(address: str) -> HostLinkAddress:
 
     base_raw, dtype, bit_index = _parse_address(address)
     base_device = parse_device_text(base_raw)
+    _validate_address_semantics(address, parse_device(base_device), dtype)
     if dtype == "BIT_IN_WORD":
         bit_index = _require_bit_in_word_index(address, bit_index)
         canonical = f"{base_device}.{format(bit_index, 'X')}"
@@ -229,6 +232,10 @@ def try_parse_address(address: str) -> HostLinkAddress | None:
 def format_address(address: HostLinkAddress | str) -> str:
     """Return canonical Host Link helper address text.
 
+    Parsed objects are formatted from their semantic fields and validated by
+    the same device/data-type rules as :func:`parse_address`. The ``text``
+    field is not trusted as an alternate representation.
+
     Args:
         address: A parsed :class:`HostLinkAddress` or raw address string.
 
@@ -237,7 +244,16 @@ def format_address(address: HostLinkAddress | str) -> str:
     """
 
     if isinstance(address, HostLinkAddress):
-        return address.text
+        base_device = parse_device_text(address.base_device)
+        dtype = _normalize_helper_dtype(address.dtype)
+        if dtype == "BIT_IN_WORD":
+            bit_index = _require_bit_in_word_index(address.text, address.bit_index)
+            candidate = f"{base_device}.{format(bit_index, 'X')}"
+        else:
+            if address.bit_index is not None:
+                raise ValueError("bit_index is only valid when dtype is BIT_IN_WORD")
+            candidate = f"{base_device}:{dtype}"
+        return parse_address(candidate).text
     return normalize_address(address)
 
 
@@ -301,8 +317,10 @@ async def read_typed(
     direct_bit_device = addr.device_type in _DIRECT_BIT_DEVICE_TYPES
 
     if key == "F":
-        if direct_bit_device:
-            raise HostLinkProtocolError("Float reads are not defined for direct bit devices.")
+        if not is_float32_eligible_device_type(addr.device_type):
+            raise HostLinkProtocolError(
+                f"Float32 reads require an ordinary word-device family; {addr.device_type!r} is not eligible."
+            )
         lo_word, hi_word = await read_words(client, device, 2)
         return _words_to_float32(lo_word, hi_word)
 
@@ -336,6 +354,8 @@ async def read_typed(
 
 async def read_timer_counter(client: AsyncHostLinkClient, device: str) -> TimerCounterValue:
     """Read a timer/counter composite value as status, current, and preset.
+
+    The response status must be exactly ``0`` or ``1``.
 
     Existing :func:`read_typed` and :func:`read_named` keep their compatibility
     behavior of returning the preset value for ``T``/``C`` devices. Use this
@@ -436,8 +456,10 @@ async def write_typed(
 
     if key == "F":
         addr = parse_device(device)
-        if addr.device_type in _DIRECT_BIT_DEVICE_TYPES:
-            raise ValueError("Float writes are not defined for direct bit devices.")
+        if not is_float32_eligible_device_type(addr.device_type):
+            raise ValueError(
+                f"Float32 writes require an ordinary word-device family; {addr.device_type!r} is not eligible."
+            )
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError(f"Float value must be finite, got {value!r}.")
         lo_word, hi_word = _float32_to_words(float(value))
@@ -513,6 +535,11 @@ async def read_named(
     an individual entry. All requests run in caller order during one FIFO turn.
     A multi-request result is not one atomic PLC-time observation, and an error returns
     no partial dictionary.
+
+    Keys must be semantically unique after device family, numeric address,
+    dtype, bit index, and scalar count are normalized. Spelling variants are
+    rejected, while distinct dtype views, bit indices, and overlapping spans
+    remain valid. Returned keys retain their original input spelling.
 
     Args:
         client: Connected asynchronous Host Link client.
@@ -622,10 +649,39 @@ def _require_bit_in_word_index(address: str, bit_index: int | None) -> int:
     return bit_index
 
 
+def _validate_address_semantics(address: str, device: DeviceAddress, dtype: str) -> None:
+    """Validate device/data-type compatibility for every public address path."""
+
+    if dtype == "BIT" and device.device_type not in _DIRECT_BIT_DEVICE_TYPES:
+        raise ValueError(f"BIT is only valid for direct-bit devices: {address!r}")
+    if dtype == "F" and not is_float32_eligible_device_type(device.device_type):
+        raise ValueError(
+            f"Float32 is valid only for ordinary word-device families, not {device.device_type!r}: {address!r}"
+        )
+    if dtype == "COMMENT" and device.device_type not in RDC_DEVICE_TYPES:
+        raise ValueError(f"COMMENT is not valid for device family {device.device_type!r}: {address!r}")
+
+
 def _compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan:
     requests_in_input_order: list[_ReadPlanRequest] = []
+    semantic_keys: set[tuple[str, int, str, int | None, int]] = set()
     for index, address in enumerate(addresses):
-        requests_in_input_order.append(_parse_read_named_request(address, index))
+        request = _parse_read_named_request(address, index)
+        semantic_kind = request.kind.removeprefix("SINGLE_")
+        if semantic_kind == "DIRECT_BIT":
+            semantic_kind = "BIT"
+        semantic_bit_index = request.bit_index if semantic_kind == "BIT_IN_WORD" else None
+        semantic_key = (
+            request.base_address.device_type,
+            request.base_address.number,
+            semantic_kind,
+            semantic_bit_index,
+            1,
+        )
+        if semantic_key in semantic_keys:
+            raise ValueError(f"Named read address {address!r} is semantically duplicated.")
+        semantic_keys.add(semantic_key)
+        requests_in_input_order.append(request)
 
     segments: list[_ReadPlanSegment] = []
     pending: list[_ReadPlanRequest] = []
@@ -688,6 +744,7 @@ def _compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan:
 def _parse_read_named_request(address: str, index: int) -> _ReadPlanRequest:
     base_addr, dtype, bit_idx = _parse_address(address)
     parsed = parse_device(base_addr)
+    _validate_address_semantics(address, parsed, dtype)
 
     if dtype == "BIT" and parsed.device_type in _DIRECT_BIT_DEVICE_TYPES:
         return _ReadPlanRequest(
@@ -764,8 +821,8 @@ def _preflight_read_named_plan(client: AsyncHostLinkClient, plan: _CompiledReadN
         else:
             dtype = request.kind.removeprefix("SINGLE_")
             if dtype == "F":
-                if request.base_address.device_type in _DIRECT_BIT_DEVICE_TYPES:
-                    raise HostLinkProtocolError("Float reads are not defined for direct bit devices.")
+                if not is_float32_eligible_device_type(request.base_address.device_type):
+                    raise HostLinkProtocolError("Float32 reads require an ordinary word-device family.")
                 client._build_read_consecutive_command("RDS", base, 2, ".U")
             elif dtype == "BIT":
                 client._build_read_command(base, None)
@@ -946,14 +1003,7 @@ def normalize_address(address: str) -> str:
         Canonical uppercase address text.
     """
 
-    base, dtype, bit_index = _parse_address(address)
-    base_text = parse_device_text(base)
-    if dtype == "BIT_IN_WORD":
-        bit_index = _require_bit_in_word_index(address, bit_index)
-        return f"{base_text}.{format(bit_index, 'X')}"
-    if dtype:
-        return f"{base_text}:{dtype}"
-    raise ValueError(f"Address {address!r} requires an explicit data type such as ':U', ':D', or ':BIT'.")
+    return parse_address(address).text
 
 
 async def read_words_single_request(

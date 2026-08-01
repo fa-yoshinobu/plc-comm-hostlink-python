@@ -233,6 +233,12 @@ only to `read_named`/`poll`; state-changing multi-request work is not synthesize
 When the collection contains `:COMMENT`, `comment_encoding` is required and is
 validated before any request is sent.
 
+Named keys must be semantically unique by device family, numeric address,
+dtype, bit index, and scalar count. Case and leading zeros do not make a second
+key distinct. Different dtype views of the same word, different bit indices,
+and overlapping multiword spans are valid. Result keys preserve the original
+input strings.
+
 ## Block reads
 
 ```python
@@ -336,9 +342,19 @@ python samples/config_polling.py --config samples/config_polling.example.json --
 | `:COMMENT` | `DM100:COMMENT` | PLC device comment text; `read_named`/`poll` require `comment_encoding`. |
 | `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
 
+Float32 is available only for the ordinary `.U` word families `DM`, `EM`,
+`FM`, `ZF`, `W`, `TM`, `Z`, `CM`, `VM`, `D`, `E`, and `F`. Direct-bit and
+special-response families such as `R`, `T`, `C`, and `AT` reject `:F` before
+FIFO admission and communication.
+
 For `read_named` and `poll`, do not omit the type suffix. Use `DM100:U` instead of relying on `DM100` to mean an unsigned word.
 Pass `comment_encoding` only when the collection contains `:COMMENT`; an
 unused comment codec is rejected before communication.
+
+`parse_address`, `normalize_address`, and `format_address` share the same
+device/data-type compatibility checks. A hand-constructed `HostLinkAddress`
+with an invalid combination is rejected by the formatter; accepted formatted
+text can always be parsed again with the same semantics.
 
 ## Timer/counter helpers
 
@@ -362,7 +378,10 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`read_timer_counter` returns `status`, `current`, and `preset`. `read_timer` accepts timer devices, and `read_counter` accepts counter devices.
+`read_timer_counter` returns `status`, `current`, and `preset`. The response
+status must be exactly `0` or `1`; any other numeric value is an invalid
+response and retires the connection. `read_timer` accepts timer devices, and
+`read_counter` accepts counter devices.
 
 > **Caution:** Timer/Counter preset writes (`WS`/`WSS`) only supported on KV-8000/7000-series. Other models return error `E1`.
 

@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: **Breaking:** Float32 parsing, formatting, typed access, named reads, and polling now accept only canonical ordinary `.U` word families (`DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`, `CM`, `VM`, `D`, `E`, `F`); direct-bit and special-response families such as `R`, `T`, `C`, and `AT` fail before FIFO admission and transport.
+- Library: **Breaking:** Timer/counter composite response status must be exactly `0` or `1`; any other numeric status is an invalid response and retires the connection.
+- Library: **Breaking:** Public address parsing, normalization, and formatting now share device/data-type compatibility validation; formatters reject invalid hand-constructed address objects instead of emitting unusable text.
+- Library: **Breaking:** Named reads and polling reject semantically duplicate keys after device, address, dtype, bit-index, and scalar-count normalization; spelling variants no longer create two keys, while distinct dtype views, bit indices, and overlapping spans remain valid.
 - Library: Reject IPv6 literals before connection work and bound synchronous TCP/UDP connection establishment with one monotonic absolute `connect_timeout` from IPv4 DNS through socket configuration and atomic adoption; late resolver/socket results are discarded and partial sockets are closed.
 - Tests: Added deterministic synchronous literal/DNS, TCP/UDP, delayed-resolution, delayed-connect, concurrent-close, TCP-option failure, IPv6 rejection, and overflow-boundary coverage for the connection deadline.
 - Docs: Clarified the separate complete connection and request deadlines, explicit-only lifecycle, IPv4-only resolver policy, late-result handling, and synchronous TCP socket options.
