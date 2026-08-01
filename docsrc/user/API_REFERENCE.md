@@ -18,11 +18,16 @@ prefer `open_and_connect` plus the high-level helper functions.
 | PLC model and clock | `query_model`, `set_time`, `ModelInfo` |
 | Connection lifecycle | `connect`, `close` |
 
-Both clients are IPv4-only. `connect_timeout` governs connection establishment;
-`timeout` is one absolute deadline from immediately before first send/write
-through transmission, receive, and decoding. Normal operations use arrival
-FIFO admission. Waiting cancellation sends nothing, and `close()` immediately
-rejects active and queued work. No request is retried or resent automatically.
+Both clients are IPv4-only. `connect_timeout` is one absolute connection
+deadline beginning before IPv4 hostname resolution and ending only after the
+transport is fully configured and adopted. A literal IPv4 address bypasses DNS.
+The synchronous client returns at that deadline even if a platform resolver
+cannot be cancelled; a late resolver or socket result is discarded. Commands
+never connect lazily. `timeout` is a separate absolute request deadline from
+immediately before first send/write through transmission, receive, and
+decoding. Normal operations use arrival FIFO admission. Waiting cancellation
+sends nothing, and `close()` immediately rejects active and queued work. No
+request is retried or resent automatically.
 For a state-changing request that may have been sent, timeout, cancellation,
 close, transport failure, or malformed confirmation raises
 `HostLinkOutcomeUnknownError` with a machine-readable `HostLinkFailureReason`.

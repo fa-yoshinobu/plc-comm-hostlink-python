@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: Reject IPv6 literals before connection work and bound synchronous TCP/UDP connection establishment with one monotonic absolute `connect_timeout` from IPv4 DNS through socket configuration and atomic adoption; late resolver/socket results are discarded and partial sockets are closed.
+- Tests: Added deterministic synchronous literal/DNS, TCP/UDP, delayed-resolution, delayed-connect, concurrent-close, TCP-option failure, IPv6 rejection, and overflow-boundary coverage for the connection deadline.
+- Docs: Clarified the separate complete connection and request deadlines, explicit-only lifecycle, IPv4-only resolver policy, late-result handling, and synchronous TCP socket options.
 - Release: Aligned artifact roles so the registry package contains consumer runtime, native API metadata, license, README, and ecosystem-native examples where applicable while excluding repository tests and maintainer tooling; the GitHub source archive retains tracked non-hardware validation and maintainer inputs.
 - Docs: README documentation links now include the shared Performance and Choosing a Language pages, and package registry metadata was expanded for discoverability. No functional change.
 

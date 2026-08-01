@@ -38,10 +38,15 @@ Sync/async TCP and UDP connection and request paths.
 
 ### Target contract
 
-`connect_timeout` is a separate connection-establishment deadline. Each
-request snapshots `timeout` immediately before first send/write and uses one
-absolute deadline across transmit, drain, receive, and decoding. Timeout or
-cancellation retires the transport.
+`connect_timeout` is a separate absolute connection-establishment deadline
+formed before IPv4 resolution or socket work. Resolution, first-IPv4 endpoint
+selection, socket creation/connect, required TCP options, close/generation
+checks, and state adoption share that deadline. A synchronous resolver that
+cannot be cancelled may finish in its daemon worker, but a late result is never
+adopted and any partial socket is closed. Each request snapshots `timeout`
+immediately before first send/write and uses one absolute deadline across
+transmit, drain, receive, and decoding. Commands never connect lazily. Timeout
+or cancellation retires the transport.
 
 ### Compatibility impact
 
@@ -49,12 +54,20 @@ Slow partial traffic and slow writer drain can no longer restart the deadline.
 
 ### Acceptance criteria
 
-1. Positive finite validation applies independently to both deadlines.
-2. Sync and async trickle/drain fixtures cannot exceed one request deadline by
+1. Positive finite, platform-representable validation applies independently to
+   both deadlines.
+2. Delayed synchronous IPv4 resolution returns timeout at the connection
+   deadline, creates no request, and cannot adopt a late resolver result.
+3. Sync TCP and UDP literal/hostname paths share one deadline through socket
+   adoption; TCP no-delay and keepalive failures close the candidate.
+4. Concurrent close rejects an active synchronous connect as closed and the
+   late worker performs no further transport activity.
+5. Sync and async trickle/drain fixtures cannot exceed one request deadline by
    restarting per-I/O timeouts.
-3. Timed-out/cancelled transports cannot associate a late response with a
+6. Timed-out/cancelled transports cannot associate a late response with a
    later request.
-4. All connection creation is explicitly IPv4-only.
+7. All connection creation is explicitly IPv4-only; no IPv6 or route fallback
+   is introduced.
 
 ## HL-CONTRACT-003 — FIFO admission and immediate close
 

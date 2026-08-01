@@ -12,6 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from ipaddress import ip_address
 from typing import Any, NoReturn, TypeVar, cast
 
 from .device import (
@@ -134,6 +135,15 @@ class _SyncFifoAdmission:
         with self._guard:
             return generation != self._generation
 
+    def adopt_if_current(self, action: Callable[[], None]) -> None:
+        """Apply one final state adoption atomically with generation validation."""
+
+        generation = getattr(self._local, "generation", self._generation)
+        with self._guard:
+            if generation != self._generation:
+                raise HostLinkClosedError("Client closed before the connection was adopted")
+            action()
+
     def stats(self, request_count: int, tx_bytes: int, rx_bytes: int) -> HostLinkTrafficStats:
         with self._guard:
             return HostLinkTrafficStats(request_count, tx_bytes, rx_bytes)
@@ -230,6 +240,168 @@ def _validated_timeout(name: str, value: float) -> float:
     return float(value)
 
 
+def _absolute_deadline(name: str, value: float, *, clock: Callable[[], float]) -> float:
+    timeout = _validated_timeout(name, value)
+    if timeout > threading.TIMEOUT_MAX:
+        raise ValueError(f"{name} cannot be represented by the platform wait APIs")
+    deadline = clock() + timeout
+    if not math.isfinite(deadline):
+        raise ValueError(f"{name} cannot be represented as a monotonic deadline")
+    return deadline
+
+
+def _normalize_ipv4_host(host: object, *, name: str = "host") -> str:
+    if not isinstance(host, str):
+        raise ValueError(f"{name} must be a string")
+    normalized = host.strip()
+    if not normalized:
+        raise ValueError(f"{name} must not be empty")
+    literal_text = normalized[1:-1] if normalized.startswith("[") and normalized.endswith("]") else normalized
+    try:
+        literal = ip_address(literal_text)
+    except ValueError:
+        return normalized
+    if literal.version != 4:
+        raise ValueError(f"{name} must be an IPv4 address or a hostname that resolves to IPv4")
+    return literal_text
+
+
+def _resolve_first_ipv4_endpoint(host: str, port: int, socket_type: int) -> tuple[str, int]:
+    try:
+        literal = ip_address(host)
+    except ValueError:
+        endpoints = socket.getaddrinfo(host, port, socket.AF_INET, socket_type)
+        for family, resolved_type, _protocol, _canonical_name, sockaddr in endpoints:
+            if family != socket.AF_INET or resolved_type != socket_type:
+                continue
+            address, resolved_port = sockaddr[0], sockaddr[1]
+            if isinstance(address, str) and isinstance(resolved_port, int):
+                return address, resolved_port
+        raise socket.gaierror(f"host did not resolve to an IPv4 address: {host}") from None
+    if literal.version != 4:
+        raise socket.gaierror(f"host did not resolve to an IPv4 address: {host}")
+    return str(literal), port
+
+
+class _SyncConnectState:
+    def __init__(self) -> None:
+        self.condition = threading.Condition()
+        self.abandoned = False
+        self.done = False
+        self.completed_at: float | None = None
+        self.sock: socket.socket | None = None
+        self.error: BaseException | None = None
+
+
+def _close_socket_quietly(sock: socket.socket) -> None:
+    try:
+        sock.close()
+    except Exception:
+        pass
+
+
+def _open_sync_ipv4_socket_before_deadline(
+    *,
+    host: str,
+    port: int,
+    transport: str,
+    deadline: float,
+    ensure_current: Callable[[], None],
+) -> socket.socket:
+    """Resolve, create, connect, and configure without adopting a late result."""
+
+    state = _SyncConnectState()
+    socket_type = socket.SOCK_STREAM if transport == "tcp" else socket.SOCK_DGRAM
+
+    def worker() -> None:
+        candidate: socket.socket | None = None
+
+        def was_abandoned() -> bool:
+            with state.condition:
+                return state.abandoned
+
+        try:
+            endpoint = _resolve_first_ipv4_endpoint(host, port, socket_type)
+            if was_abandoned():
+                return
+            _remaining_timeout(deadline, clock=time.monotonic)
+            candidate = socket.socket(socket.AF_INET, socket_type)
+            if was_abandoned():
+                return
+            candidate.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
+            candidate.connect(endpoint)
+            if was_abandoned():
+                return
+            _remaining_timeout(deadline, clock=time.monotonic)
+            if transport == "tcp":
+                candidate.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                if was_abandoned():
+                    return
+                _remaining_timeout(deadline, clock=time.monotonic)
+                candidate.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                if was_abandoned():
+                    return
+                _remaining_timeout(deadline, clock=time.monotonic)
+            completed_at = time.monotonic()
+            with state.condition:
+                if not state.abandoned:
+                    state.sock = candidate
+                    state.completed_at = completed_at
+                    state.done = True
+                    candidate = None
+                    state.condition.notify_all()
+        except BaseException as exc:
+            completed_at = time.monotonic()
+            with state.condition:
+                if not state.abandoned:
+                    state.error = exc
+                    state.completed_at = completed_at
+                    state.done = True
+                    state.condition.notify_all()
+        finally:
+            if candidate is not None:
+                _close_socket_quietly(candidate)
+
+    threading.Thread(target=worker, name="hostlink-ipv4-connect", daemon=True).start()
+
+    with state.condition:
+        while not state.done:
+            try:
+                ensure_current()
+            except BaseException:
+                state.abandoned = True
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                state.abandoned = True
+                raise TimeoutError
+            state.condition.wait(timeout=min(remaining, 0.01))
+
+        try:
+            ensure_current()
+        except BaseException:
+            state.abandoned = True
+            late_socket = state.sock
+            state.sock = None
+            if late_socket is not None:
+                _close_socket_quietly(late_socket)
+            raise
+
+        if state.error is not None:
+            if state.completed_at is not None and state.completed_at >= deadline:
+                raise TimeoutError from state.error
+            raise state.error
+
+        connected = state.sock
+        state.sock = None
+        if connected is None:
+            raise HostLinkTransportError("Connection worker did not produce a socket")
+        if time.monotonic() >= deadline:
+            _close_socket_quietly(connected)
+            raise TimeoutError
+        return connected
+
+
 class HostLinkTraceDirection(Enum):
     """Direction for a traced Host Link frame."""
 
@@ -314,13 +486,11 @@ class HostLinkBase:
         *,
         plc_profile: str,
     ) -> None:
-        if not isinstance(host, str) or not host.strip():
-            raise ValueError("host is required and must be a non-empty string")
         if type(port) is not int or not 1 <= port <= 65535:
             raise ValueError("port is required and must be an integer in the range 1..65535")
         if not isinstance(transport, str) or transport.strip().lower() not in {"tcp", "udp"}:
             raise ValueError("transport must be 'tcp' or 'udp'")
-        self.host = host.strip()
+        self.host = _normalize_ipv4_host(host)
         self.port = port
         self.transport = transport.strip().lower()
         self._maintainer_trace_hook: Callable[[HostLinkTraceFrame], None] | None = None
@@ -804,21 +974,41 @@ class HostLinkClient(HostLinkBase):
         with self._lock:
             if self._sock is not None:
                 return
-            sock_type = socket.SOCK_STREAM if self.transport == "tcp" else socket.SOCK_DGRAM
-            sock = socket.socket(socket.AF_INET, sock_type)
-            sock.settimeout(self.connect_timeout)
-            if self.transport == "tcp":
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            deadline = _absolute_deadline("connect_timeout", self.connect_timeout, clock=time.monotonic)
+
+            def ensure_current() -> None:
+                if self._lock.active_was_invalidated():
+                    raise HostLinkClosedError("Client closed while connecting")
+
+            sock: socket.socket | None = None
             try:
-                sock.connect((self.host, self.port))
+                connected = _open_sync_ipv4_socket_before_deadline(
+                    host=self.host,
+                    port=self.port,
+                    transport=self.transport,
+                    deadline=deadline,
+                    ensure_current=ensure_current,
+                )
+                sock = connected
+
+                def adopt() -> None:
+                    _remaining_timeout(deadline, clock=time.monotonic)
+                    self._sock = connected
+                    self._rx_buffer = b""
+
+                self._lock.adopt_if_current(adopt)
             except TimeoutError as exc:
-                sock.close()
+                if sock is not None:
+                    _close_socket_quietly(sock)
                 raise HostLinkTimeoutError(f"Connect deadline expired for {self.host}:{self.port}") from exc
+            except HostLinkClosedError:
+                if sock is not None:
+                    _close_socket_quietly(sock)
+                raise
             except OSError as exc:
-                sock.close()
+                if sock is not None:
+                    _close_socket_quietly(sock)
                 raise HostLinkTransportError(f"Failed to connect to {self.host}:{self.port}") from exc
-            self._sock = sock
-            self._rx_buffer = b""
 
     def close(self) -> None:
         """Immediately retire the active generation and reject queued work."""
