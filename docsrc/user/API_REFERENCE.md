@@ -21,8 +21,9 @@ prefer `open_and_connect` plus the high-level helper functions.
 Both clients are IPv4-only. `connect_timeout` is one absolute connection
 deadline beginning before IPv4 hostname resolution and ending only after the
 transport is fully configured and adopted. A literal IPv4 address bypasses DNS.
-The synchronous client returns at that deadline even if a platform resolver
-cannot be cancelled; a late resolver or socket result is discarded. Commands
+The clients reject any resolver or socket result completed after the deadline,
+after cancellation, or after `close()`; the late candidate is closed exactly once
+before it can publish state. Commands
 never connect lazily. `timeout` is a separate absolute request deadline from
 immediately before first send/write through transmission, receive, and
 decoding. Normal operations use arrival FIFO admission. Waiting cancellation
@@ -31,6 +32,9 @@ request is retried or resent automatically.
 For a state-changing request that may have been sent, timeout, cancellation,
 close, transport failure, or malformed confirmation raises
 `HostLinkOutcomeUnknownError` with a machine-readable `HostLinkFailureReason`.
+Each UDP operation owns a fresh socket and source endpoint even though the
+public client remains logically connected. TCP accepts one non-empty response
+line per request; an extra non-empty line retires the transport.
 
 ## Device Operations
 
@@ -67,6 +71,10 @@ transport. Datetime clock values must be in years 2000 through 2099.
 For direct-bit devices, numeric single reads require the corresponding 16- or
 32-point response. Any malformed semantic response shape invalidates the
 session before another request.
+Semantic `.H` results are exactly four uppercase hexadecimal digits. MWS keeps
+the ordered registered formats, and MWR validates each returned token against
+its corresponding `.U`, `.S`, `.H`, `.D`, or `.L` rule. Raw response bodies are
+not normalized.
 
 `read_comments(device, encoding)` requires
 `HostLinkCommentEncoding.UTF8` or `HostLinkCommentEncoding.CP932`; it never
@@ -112,11 +120,11 @@ Timer/counter composite reads require response status to be exactly `0` or
 `1`; any other numeric status is an invalid response and retires the session.
 
 Float32 reads and writes are defined only for ordinary one-word `.U` families
-that support two consecutive words: `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`,
-`CM`, `VM`, `D`, `E`, and `F`. Direct-bit and special-response families,
-including `R`, `T`, `C`, and `AT`, reject `:F` during parsing and before FIFO
-admission or transport. Typed helpers and named reads use the same canonical
-family metadata.
+that support two consecutive words: `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `CM`,
+`VM`, `D`, `E`, and `F`. Native 32-bit `Z`, direct-bit, and special-response
+families, including `R`, `T`, `C`, and `AT`, reject `:F` during parsing and
+before FIFO admission or transport. Typed helpers and named reads use the same
+canonical family metadata.
 
 ## Address, Profile, And Diagnostics
 

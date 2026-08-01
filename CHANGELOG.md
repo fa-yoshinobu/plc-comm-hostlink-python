@@ -17,7 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Library: **Breaking:** Float32 parsing, formatting, typed access, named reads, and polling now accept only canonical ordinary `.U` word families (`DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`, `CM`, `VM`, `D`, `E`, `F`); direct-bit and special-response families such as `R`, `T`, `C`, and `AT` fail before FIFO admission and transport.
+- Library: **Breaking:** Float32 parsing, formatting, typed access, named reads, and polling now accept only canonical ordinary `.U` word families (`DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `CM`, `VM`, `D`, `E`, `F`); native 32-bit `Z`, direct-bit, and special-response families such as `R`, `T`, `C`, and `AT` fail before FIFO admission and transport.
+- Library: **Breaking:** Semantic `.H` reads now return exactly four uppercase hexadecimal digits, and MWR validates every returned token against the ordered formats registered by MWS.
+- Library: **Breaking:** Every UDP operation uses a fresh request-owned socket and source endpoint while the client remains logically connected. Firewalls and peers must return each response to that request's source port.
+- Library: TCP accepts exactly one non-empty response per request; an extra response is a protocol error and retires the transport instead of becoming the next command's result.
+- Library: Async TCP/UDP connection candidates completed after `close()`, cancellation, or timeout are discarded and closed exactly once before they can publish connected state.
 - Library: **Breaking:** Timer/counter composite response status must be exactly `0` or `1`; any other numeric status is an invalid response and retires the connection.
 - Library: **Breaking:** Public address parsing, normalization, and formatting now share device/data-type compatibility validation; formatters reject invalid hand-constructed address objects instead of emitting unusable text.
 - Library: **Breaking:** Named reads and polling reject semantically duplicate keys after device, address, dtype, bit-index, and scalar-count normalization; spelling variants no longer create two keys, while distinct dtype views, bit indices, and overlapping spans remain valid.
@@ -40,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass actual integers to bank, count, unit, address, mode, and bit-index parameters. Keep `PROGRAM` and `RUN` only where the mode API explicitly documents those string forms.
 - Replace `write_bit_in_word` with a PLC-side atomic bit operation or an application/PLC ownership design for the complete word.
 - Catch the specific Host Link error type needed by the application. For `HostLinkOutcomeUnknownError`, inspect `reason`, reconcile PLC state explicitly, and do not blindly retry.
+- Move Float32 data from `Z:F` to an ordinary word family or access Z through its supported integer representation. Expect semantic hexadecimal reads such as `A` to be returned as `000A`, and allow a changing UDP source port for each operation.
 
 ### Fixed
 

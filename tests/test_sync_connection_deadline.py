@@ -15,6 +15,14 @@ from hostlink import (
     HostLinkTransportError,
 )
 
+_FLOAT_TIMEOUT_TOLERANCE = 1e-9
+
+
+def _is_within_timeout_upper_bound(value: float, upper_bound: float) -> bool:
+    """Allow only binary floating-point representation noise at the deadline."""
+
+    return 0 < value <= upper_bound + _FLOAT_TIMEOUT_TOLERANCE
+
 
 class _FakeSocket:
     def __init__(
@@ -91,7 +99,7 @@ def test_sync_literal_ipv4_bypasses_dns_and_configures_before_adoption(
 
     assert client._sock is fake
     assert fake.connected_to == ("127.0.0.1", 8501)
-    assert fake.timeouts and 0 < fake.timeouts[0] <= client.connect_timeout
+    assert fake.timeouts and _is_within_timeout_upper_bound(fake.timeouts[0], client.connect_timeout)
     if transport == "tcp":
         assert fake.options == [
             (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
@@ -100,6 +108,11 @@ def test_sync_literal_ipv4_bypasses_dns_and_configures_before_adoption(
     else:
         assert fake.options == []
     client.close()
+
+
+def test_connection_timeout_tolerance_rejects_meaningful_overrun() -> None:
+    assert _is_within_timeout_upper_bound(0.20000000001164153, 0.2)
+    assert not _is_within_timeout_upper_bound(0.201, 0.2)
 
 
 @pytest.mark.parametrize(

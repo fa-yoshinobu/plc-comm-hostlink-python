@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import math
 from unittest.mock import patch
@@ -10,7 +11,9 @@ import hostlink
 from hostlink import (
     AsyncHostLinkClient,
     HostLinkAddress,
+    HostLinkCancelledError,
     HostLinkClient,
+    HostLinkClosedError,
     HostLinkCommentEncoding,
     HostLinkConnectionOptions,
     HostLinkError,
@@ -26,7 +29,7 @@ from hostlink import (
     write_words_single_request,
 )
 from hostlink.client import ABSOLUTE_RESPONSE_CAP, HostLinkTraceFrame
-from hostlink.errors import HostLinkConnectionError, HostLinkProtocolError
+from hostlink.errors import HostLinkConnectionError, HostLinkProtocolError, HostLinkTransportError
 from hostlink.protocol import parse_scalar_token
 
 
@@ -96,6 +99,54 @@ class _FakeSocket:
 
     def close(self) -> None:
         self.closed = True
+
+
+class _FakeAsyncWriter:
+    def __init__(self) -> None:
+        self.close_count = 0
+
+    def close(self) -> None:
+        self.close_count += 1
+
+    async def wait_closed(self) -> None:
+        return None
+
+
+class _FakeDatagramTransport:
+    def __init__(self) -> None:
+        self.close_count = 0
+
+    def close(self) -> None:
+        self.close_count += 1
+
+    def get_extra_info(self, name: str) -> object:
+        if name == "peername":
+            return ("127.0.0.1", 8501)
+        if name == "sockname":
+            return ("127.0.0.1", 40000)
+        return None
+
+
+class _FakeUdpProtocolOwner:
+    def __init__(self) -> None:
+        self.cancel_count = 0
+
+    def cancel_pending_response(self) -> None:
+        self.cancel_count += 1
+
+
+class _FailingUdpSocket:
+    def __init__(self) -> None:
+        self.close_count = 0
+
+    def settimeout(self, _timeout: float) -> None:
+        return None
+
+    def connect(self, _endpoint: tuple[str, int]) -> None:
+        raise OSError("synthetic bind/connect failure")
+
+    def close(self) -> None:
+        self.close_count += 1
 
 
 def _client_parameters(client_type: type[object]) -> set[str]:
@@ -178,6 +229,190 @@ async def test_async_constructor_and_unconnected_command_do_not_open_transport()
         await client.send_raw("?K")
     assert client._writer is None
     assert client._udp_transport is None
+
+
+@pytest.mark.asyncio
+async def test_async_close_invalidates_and_disposes_late_tcp_connection_candidate() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    writer = _FakeAsyncWriter()
+
+    async def blocked_open_connection(
+        *_args: object, **_kwargs: object
+    ) -> tuple[asyncio.StreamReader, _FakeAsyncWriter]:
+        started.set()
+        await release.wait()
+        return asyncio.StreamReader(), writer
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="tcp",
+        plc_profile="keyence:kv-8000",
+    )
+    with patch("hostlink.client.asyncio.open_connection", blocked_open_connection):
+        pending = asyncio.create_task(client.connect())
+        await started.wait()
+        await client.close()
+        release.set()
+        with pytest.raises(HostLinkClosedError):
+            await pending
+
+    assert writer.close_count == 1
+    assert client._reader is None
+    assert client._writer is None
+
+
+@pytest.mark.asyncio
+async def test_async_close_invalidates_and_disposes_late_udp_connection_candidate() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    transport = _FakeDatagramTransport()
+    loop = asyncio.get_running_loop()
+
+    async def blocked_create_datagram_endpoint(
+        *_args: object, **_kwargs: object
+    ) -> tuple[_FakeDatagramTransport, object]:
+        started.set()
+        await release.wait()
+        return transport, object()
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="udp",
+        plc_profile="keyence:kv-8000",
+    )
+    with patch.object(loop, "create_datagram_endpoint", blocked_create_datagram_endpoint):
+        pending = asyncio.create_task(client.connect())
+        await started.wait()
+        await client.close()
+        release.set()
+        with pytest.raises(HostLinkClosedError):
+            await pending
+
+    assert transport.close_count == 1
+    assert client._udp_transport is None
+    assert client._udp_protocol is None
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_connect_cancellation_closes_late_candidate_once_across_repeated_close() -> None:
+    started = asyncio.Event()
+    writer = _FakeAsyncWriter()
+
+    async def cancellation_resistant_open_connection(
+        *_args: object, **_kwargs: object
+    ) -> tuple[asyncio.StreamReader, _FakeAsyncWriter]:
+        started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            return asyncio.StreamReader(), writer
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="tcp",
+        plc_profile="keyence:kv-8000",
+    )
+    with patch("hostlink.client.asyncio.open_connection", cancellation_resistant_open_connection):
+        pending = asyncio.create_task(client.connect())
+        await started.wait()
+        pending.cancel()
+        with pytest.raises(HostLinkCancelledError, match="cancelled"):
+            await pending
+
+    await client.close()
+    await client.close()
+    assert writer.close_count == 1
+    assert client._reader is None
+    assert client._writer is None
+
+
+@pytest.mark.asyncio
+async def test_async_udp_connect_cancellation_closes_late_candidate_once_across_repeated_close() -> None:
+    started = asyncio.Event()
+    transport = _FakeDatagramTransport()
+    loop = asyncio.get_running_loop()
+
+    async def cancellation_resistant_create_datagram_endpoint(
+        *_args: object, **_kwargs: object
+    ) -> tuple[_FakeDatagramTransport, object]:
+        started.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            return transport, object()
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="udp",
+        plc_profile="keyence:kv-8000",
+    )
+    with patch.object(loop, "create_datagram_endpoint", cancellation_resistant_create_datagram_endpoint):
+        pending = asyncio.create_task(client.connect())
+        await started.wait()
+        pending.cancel()
+        with pytest.raises(HostLinkCancelledError, match="cancelled"):
+            await pending
+
+    await client.close()
+    await client.close()
+    assert transport.close_count == 1
+    assert client._udp_transport is None
+    assert client._udp_protocol is None
+
+
+def test_sync_udp_successor_bind_failure_closes_candidate_and_predecessor() -> None:
+    client = HostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="udp",
+        plc_profile="keyence:kv-8000",
+    )
+    predecessor = _FakeDatagramTransport()
+    candidate = _FailingUdpSocket()
+    client._udp_logically_connected = True
+    client._udp_remote_endpoint = ("127.0.0.1", 8501)
+    client._udp_previous_sock = predecessor  # type: ignore[assignment]
+
+    with patch("hostlink.client.socket.socket", return_value=candidate):
+        with pytest.raises(HostLinkTransportError, match="communication failed"):
+            client.send_raw("RD DM0.U")
+
+    assert candidate.close_count == 1
+    assert predecessor.close_count == 1
+    assert not client._udp_logically_connected
+
+
+@pytest.mark.asyncio
+async def test_async_udp_successor_bind_failure_closes_predecessor_generation() -> None:
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="udp",
+        plc_profile="keyence:kv-8000",
+    )
+    predecessor = _FakeDatagramTransport()
+    predecessor_protocol = _FakeUdpProtocolOwner()
+    client._udp_logically_connected = True
+    client._udp_remote_endpoint = ("127.0.0.1", 8501)
+    client._udp_previous_transport = predecessor
+    client._udp_previous_protocol = predecessor_protocol  # type: ignore[assignment]
+    loop = asyncio.get_running_loop()
+
+    async def fail_bind(*_args: object, **_kwargs: object) -> tuple[object, object]:
+        raise OSError("synthetic bind failure")
+
+    with patch.object(loop, "create_datagram_endpoint", fail_bind):
+        with pytest.raises(HostLinkTransportError, match="communication failed"):
+            await client.send_raw("RD DM0.U")
+
+    assert predecessor.close_count == 1
+    assert predecessor_protocol.cancel_count == 1
+    assert not client._udp_logically_connected
 
 
 def test_raw_command_preserves_error_and_non_ascii_response_bytes() -> None:
@@ -267,6 +502,53 @@ def test_write_formats_accept_boundaries_and_reject_overflow_without_masking(
 def test_typed_response_overflow_and_malformed_tokens_are_rejected(token: str, data_format: str) -> None:
     with pytest.raises(HostLinkProtocolError):
         parse_scalar_token(token, data_format=data_format)
+
+
+@pytest.mark.parametrize(
+    ("token", "expected"),
+    [("0", "0000"), ("a", "000A"), ("ff", "00FF"), ("FFFF", "FFFF")],
+)
+def test_semantic_hex_response_is_always_four_uppercase_digits(token: str, expected: str) -> None:
+    assert parse_scalar_token(token, data_format=".H") == expected
+
+
+def test_hex_timer_counter_read_keeps_status_semantic_and_canonicalizes_values() -> None:
+    client = _RecordingClient([b"1 a ff\r"])
+
+    assert client.read("T0", data_format=".H") == [1, "000A", "00FF"]
+    assert client.frames == [b"RD T0.H\r"]
+    assert not client.retired
+
+
+@pytest.mark.asyncio
+async def test_hex_direct_bit_typed_read_packs_status_tokens_before_canonicalizing_value() -> None:
+    response = " ".join(["1", "0", "1", "0"] + ["0"] * 12).encode() + b"\r"
+    client = _AsyncRecordingClient([response])
+
+    assert await read_typed(client, "R0", "H") == "0005"
+    assert client.frames == [b"RD R000.H\r"]
+    assert not client.retired
+
+
+def test_monitor_words_validate_each_registered_format_and_preserve_nonhex_strings() -> None:
+    client = _RecordingClient([b"OK\r", b"0001 -2 a 4294967295 -2147483648\r"])
+    client.register_monitor_words([("DM0", ".U"), ("DM1", ".S"), ("DM2", ".H"), ("DM3", ".D"), ("DM5", ".L")])
+
+    assert client.read_monitor_words() == ["0001", "-2", "000A", "4294967295", "-2147483648"]
+    assert not client.retired
+
+
+@pytest.mark.parametrize(
+    ("data_format", "response"),
+    [(".U", "-1"), (".S", "100000"), (".H", "NOT_HEX"), (".D", "4294967296"), (".L", "-2147483649")],
+)
+def test_monitor_word_format_violation_retires_transport(data_format: str, response: str) -> None:
+    client = _RecordingClient([b"OK\r", f"{response}\r".encode()])
+    client.register_monitor_words([("DM0", data_format)])
+
+    with pytest.raises(HostLinkProtocolError):
+        client.read_monitor_words()
+    assert client.retired
 
 
 def test_set_time_requires_explicit_valid_calendar_and_weekday() -> None:
@@ -449,6 +731,39 @@ def test_udp_response_cap_rejects_one_byte_more_and_invalidates_socket() -> None
     assert client._sock is None
 
 
+def test_sync_tcp_rejects_two_nonempty_responses_in_one_receive() -> None:
+    client = HostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="tcp",
+        plc_profile="keyence:kv-8000",
+    )
+    duplicate_socket = _FakeSocket([b"OK\rEXTRA\r"])
+    client._sock = duplicate_socket  # type: ignore[assignment]
+
+    with pytest.raises(HostLinkProtocolError, match="more than one"):
+        client._recv_tcp_line(sock=duplicate_socket)  # type: ignore[arg-type]
+    assert duplicate_socket.closed
+    assert client._sock is None
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_rejects_two_nonempty_responses_in_one_receive() -> None:
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        port=8501,
+        transport="tcp",
+        plc_profile="keyence:kv-8000",
+    )
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"OK\rEXTRA\r")
+    client._reader = reader
+
+    with pytest.raises(HostLinkProtocolError, match="more than one"):
+        await client._recv_tcp_line()
+    assert client._reader is None
+
+
 def test_removed_public_options_helpers_and_trace_types_are_absent() -> None:
     forbidden_parameters = {
         "append_lf_on_send",
@@ -513,7 +828,7 @@ async def test_float_write_rejects_every_direct_bit_family_without_send(device: 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("device", ["R0", "T0", "C0", "AT0"])
+@pytest.mark.parametrize("device", ["R0", "T0", "C0", "Z0", "AT0"])
 async def test_special_family_float32_typed_named_and_poll_reject_before_fifo(device: str) -> None:
     client = _AsyncRecordingClient()
     client._lock = _RejectAdmission()  # type: ignore[assignment]

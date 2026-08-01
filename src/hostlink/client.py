@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import select
 import socket
 import threading
 import time
@@ -496,7 +497,7 @@ class HostLinkBase:
         self._maintainer_trace_hook: Callable[[HostLinkTraceFrame], None] | None = None
         self.plc_profile = _normalize_connection_plc_profile(plc_profile)
         self._monitor_bit_count = 0
-        self._monitor_word_count = 0
+        self._monitor_word_formats: tuple[str, ...] = ()
 
     def _fire_trace(self, direction: HostLinkTraceDirection, data: bytes) -> None:
         if self._maintainer_trace_hook:
@@ -617,14 +618,24 @@ class HostLinkBase:
         expected_count: int = 1,
         *,
         timer_counter_composite: bool = False,
+        direct_bit_response: bool = False,
     ) -> int | str | list[int | str]:
-        values = parse_data_tokens(split_data_tokens(response), data_format=data_format)
-        if len(values) != expected_count:
+        tokens = split_data_tokens(response)
+        if len(tokens) != expected_count:
             raise HostLinkProtocolError(
-                f"Read response token count mismatch: expected {expected_count}, received {len(values)}"
+                f"Read response token count mismatch: expected {expected_count}, received {len(tokens)}"
             )
-        if timer_counter_composite and values[0] not in {0, 1, "0", "1"}:
-            raise HostLinkProtocolError(f"Timer/counter response status {values[0]!r} is invalid; expected 0 or 1")
+        if direct_bit_response:
+            values = parse_data_tokens(tokens)
+        elif timer_counter_composite:
+            if tokens[0] not in {"0", "1"}:
+                raise HostLinkProtocolError(
+                    f"Timer/counter response status {tokens[0]!r} is invalid; expected 0 or 1"
+                )
+            status = int(tokens[0])
+            values = [status, *parse_data_tokens(tokens[1:], data_format=data_format)]
+        else:
+            values = parse_data_tokens(tokens, data_format=data_format)
         return values[0] if expected_count == 1 else values
 
     @staticmethod
@@ -731,13 +742,14 @@ class HostLinkBase:
     def _build_register_monitor_words_command(
         self,
         entries: Sequence[str | tuple[str, str]],
-    ) -> str:
+    ) -> tuple[str, tuple[str, ...]]:
         targets = list(entries)
         if not targets:
             raise HostLinkProtocolError("At least one device is required")
         if len(targets) > 120:
             raise HostLinkProtocolError("Maximum 120 devices can be registered")
         tokens: list[str] = []
+        formats: list[str] = []
         for entry in targets:
             if isinstance(entry, str):
                 device = entry
@@ -750,20 +762,26 @@ class HostLinkBase:
                 )
             addr = parse_device(device)
             validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
-            tok, _ = self._device_with_format(device, data_format)
+            tok, suffix = self._device_with_format(device, data_format)
             tokens.append(tok)
-        return "MWS " + " ".join(tokens)
+            formats.append(suffix)
+        return "MWS " + " ".join(tokens), tuple(formats)
 
     def _decode_monitor_bits_response(self, response: str) -> list[int | str]:
         return self._decode_data_response(response, expected_count=self._monitor_bit_count)
 
     def _decode_monitor_words_response(self, response: str) -> list[str]:
         values = split_data_tokens(response)
-        if len(values) != self._monitor_word_count:
+        if len(values) != len(self._monitor_word_formats):
             raise HostLinkProtocolError(
-                f"Monitor response token count mismatch: expected {self._monitor_word_count}, received {len(values)}"
+                "Monitor response token count mismatch: "
+                f"expected {len(self._monitor_word_formats)}, received {len(values)}"
             )
-        return values
+        validated: list[str] = []
+        for token, data_format in zip(values, self._monitor_word_formats, strict=True):
+            parsed = parse_data_tokens([token], data_format=data_format)[0]
+            validated.append(parsed if isinstance(parsed, str) else token)
+        return validated
 
     def _build_change_mode_command(self, mode: int | str) -> str:
         if isinstance(mode, str):
@@ -948,6 +966,9 @@ class HostLinkClient(HostLinkBase):
         self.timeout = _validated_timeout("timeout", timeout)
         self.connect_timeout = _validated_timeout("connect_timeout", connect_timeout)
         self._sock: socket.socket | None = None
+        self._udp_previous_sock: socket.socket | None = None
+        self._udp_remote_endpoint: tuple[str, int] | None = None
+        self._udp_logically_connected = False
         self._rx_buffer = b""
         self._lock = _SyncFifoAdmission()
         self._request_count = 0
@@ -980,7 +1001,7 @@ class HostLinkClient(HostLinkBase):
         """Open the configured TCP or UDP socket if it is not already open."""
 
         with self._lock:
-            if self._sock is not None:
+            if self._sock is not None or (self.transport == "udp" and self._udp_logically_connected):
                 return
             deadline = _absolute_deadline("connect_timeout", self.connect_timeout, clock=time.monotonic)
 
@@ -1003,6 +1024,11 @@ class HostLinkClient(HostLinkBase):
                     _remaining_timeout(deadline, clock=time.monotonic)
                     self._sock = connected
                     self._rx_buffer = b""
+                    if self.transport == "udp":
+                        getpeername = getattr(connected, "getpeername", None)
+                        peer = getpeername() if callable(getpeername) else (self.host, self.port)
+                        self._udp_remote_endpoint = (str(peer[0]), int(peer[1]))
+                        self._udp_logically_connected = True
 
                 self._lock.adopt_if_current(adopt)
             except TimeoutError as exc:
@@ -1026,17 +1052,76 @@ class HostLinkClient(HostLinkBase):
 
     def _close_unlocked(self) -> None:
         self._monitor_bit_count = 0
-        self._monitor_word_count = 0
+        self._monitor_word_formats = ()
         sock = self._sock
+        previous_udp_sock = self._udp_previous_sock
         self._sock = None
+        self._udp_previous_sock = None
+        self._udp_remote_endpoint = None
+        self._udp_logically_connected = False
         self._rx_buffer = b""
-        if sock is None:
-            return
+        for owned_sock in (sock, previous_udp_sock):
+            if owned_sock is None:
+                continue
+            try:
+                owned_sock.shutdown(socket.SHUT_RDWR)
+            except (AttributeError, OSError):
+                pass
+            owned_sock.close()
+
+    def _prepare_udp_request_socket(self, *, deadline: float) -> socket.socket:
+        if self._sock is not None:
+            return self._sock
+        if not self._udp_logically_connected or self._udp_remote_endpoint is None:
+            raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
+
+        previous = self._udp_previous_sock
+        candidate = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            sock.shutdown(socket.SHUT_RDWR)
-        except (AttributeError, OSError):
-            pass
-        sock.close()
+            candidate.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
+            candidate.connect(self._udp_remote_endpoint)
+            if previous is not None and candidate.getsockname() == previous.getsockname():
+                raise HostLinkTransportError("UDP request socket reused the predecessor local endpoint")
+
+            def adopt() -> None:
+                self._sock = candidate
+                self._udp_previous_sock = None
+
+            self._lock.adopt_if_current(adopt)
+        except BaseException:
+            _close_socket_quietly(candidate)
+            raise
+
+        if previous is not None:
+            _close_socket_quietly(previous)
+        return candidate
+
+    def _retain_successful_udp_socket(self, sock: socket.socket) -> None:
+        def retain() -> None:
+            self._sock = None
+            self._udp_previous_sock = sock
+
+        self._lock.adopt_if_current(retain)
+
+    def _reject_unowned_tcp_input(self, sock: socket.socket) -> None:
+        self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
+        if self._rx_buffer:
+            self._close_unlocked()
+            raise HostLinkProtocolError("Received an extra non-empty TCP response before the next request")
+        if not isinstance(sock, socket.socket):
+            return
+        while True:
+            readable, _, _ = select.select([sock], [], [], 0)
+            if not readable:
+                return
+            pending = sock.recv(8192, socket.MSG_PEEK)
+            if not pending:
+                raise HostLinkTransportError("Connection closed by PLC")
+            separator_count = len(pending) - len(pending.lstrip(b"\r\n"))
+            if separator_count != len(pending):
+                self._close_unlocked()
+                raise HostLinkProtocolError("Received an extra non-empty TCP response before the next request")
+            sock.recv(separator_count)
 
     def send_raw(self, body: str) -> bytes:
         """Send one maintainer raw command and return undecoded response body bytes."""
@@ -1149,7 +1234,9 @@ class HostLinkClient(HostLinkBase):
     ) -> bytes:
         # Note: This is called within self._lock in send_raw
         sock = self._sock
-        if sock is None:
+        if self.transport == "udp" and not self._udp_logically_connected and sock is None:
+            raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
+        if self.transport == "tcp" and sock is None:
             raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
         if not 0 <= maximum_response_body <= ABSOLUTE_RESPONSE_CAP:
             raise HostLinkProtocolError("maximum response body is outside the protocol capacity")
@@ -1161,6 +1248,12 @@ class HostLinkClient(HostLinkBase):
             timeout = _validated_timeout("timeout", self.timeout)
             deadline = time.monotonic() + timeout
             self._last_exchange_deadline = deadline
+            if self.transport == "udp":
+                sock = self._prepare_udp_request_socket(deadline=deadline)
+            if sock is None:
+                raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
+            if self.transport == "tcp":
+                self._reject_unowned_tcp_input(sock)
             sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
             may_have_sent = True
             sock.sendall(payload)
@@ -1182,6 +1275,8 @@ class HostLinkClient(HostLinkBase):
                 self._rx_bytes += self._last_rx_frame_length
             if self._lock.active_was_invalidated():
                 raise HostLinkClosedError("Client closed before the response was accepted")
+            if self.transport == "udp":
+                self._retain_successful_udp_socket(sock)
             exchange_complete = True
             self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
             return response
@@ -1257,6 +1352,9 @@ class HostLinkClient(HostLinkBase):
                 while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
                     skip += 1
                 self._rx_buffer = self._rx_buffer[skip:]
+                if self._rx_buffer:
+                    self._close_unlocked()
+                    raise HostLinkProtocolError("Received more than one non-empty TCP response for one request")
                 # A TCP response line ends at the first CR/LF.  Consume any
                 # adjacent separator padding, but do not let TCP chunking
                 # change the traffic counter.
@@ -1339,13 +1437,15 @@ class HostLinkClient(HostLinkBase):
         """Read one device with the Host Link ``RD`` command."""
 
         body, suffix = self._build_read_command(device, data_format)
+        device_type = parse_device(device).device_type
         return self._send_parsed(
             body,
             lambda response: self._decode_read_response(
                 response,
                 suffix,
                 self._read_response_token_count(device, suffix),
-                timer_counter_composite=parse_device(device).device_type in {"T", "C"},
+                timer_counter_composite=device_type in {"T", "C"},
+                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES,
             ),
         )
 
@@ -1416,10 +1516,10 @@ class HostLinkClient(HostLinkBase):
     def register_monitor_words(self, entries: Sequence[str | tuple[str, str]]) -> None:
         """Register word devices for later monitor reads."""
 
-        body = self._build_register_monitor_words_command(entries)
+        body, formats = self._build_register_monitor_words_command(entries)
         with self._lock:
             self._expect_ok_unlocked(body)
-            self._monitor_word_count = len(entries)
+            self._monitor_word_formats = formats
 
     def read_monitor_bits(self) -> list[int | str]:
         """Read the currently registered bit monitor values."""
@@ -1498,6 +1598,11 @@ class AsyncHostLinkClient(HostLinkBase):
         self._writer: asyncio.StreamWriter | None = None
         self._udp_transport: asyncio.DatagramTransport | None = None
         self._udp_protocol: _HostLinkUDPProtocol | None = None
+        self._udp_previous_transport: asyncio.DatagramTransport | None = None
+        self._udp_previous_protocol: _HostLinkUDPProtocol | None = None
+        self._udp_remote_endpoint: tuple[str, int] | None = None
+        self._udp_logically_connected = False
+        self._rx_buffer = b""
         self._lock = _AsyncFifoAdmission()
         self._request_count = 0
         self._tx_bytes = 0
@@ -1537,38 +1642,101 @@ class AsyncHostLinkClient(HostLinkBase):
             await self._connect_unlocked()
 
     async def _connect_unlocked(self) -> None:
-        if self._reader is not None or self._udp_transport is not None:
+        if self._reader is not None or (self.transport == "udp" and self._udp_logically_connected):
             return
 
         if self.transport == "tcp":
+            candidate_writer: asyncio.StreamWriter | None = None
+            candidate_disposed = False
+            connection_attempt = asyncio.ensure_future(
+                asyncio.open_connection(self.host, self.port, family=socket.AF_INET)
+            )
+
+            async def dispose_writer(writer: asyncio.StreamWriter) -> None:
+                nonlocal candidate_disposed
+                if candidate_disposed:
+                    return
+                candidate_disposed = True
+                writer.close()
+                wait_closed = getattr(writer, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+
+            async def dispose_connection_attempt() -> None:
+                connection_attempt.cancel()
+                try:
+                    _, late_writer = await connection_attempt
+                except BaseException:
+                    return
+                await dispose_writer(late_writer)
+
             try:
-                self._reader, self._writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port, family=socket.AF_INET),
+                candidate_reader, candidate_writer = await asyncio.wait_for(
+                    asyncio.shield(connection_attempt),
                     timeout=self.connect_timeout,
                 )
+                assert candidate_writer is not None
+                if self._lock.active_was_invalidated():
+                    await dispose_writer(candidate_writer)
+                    raise HostLinkClosedError("Client closed while connecting")
+                self._reader = candidate_reader
+                self._writer = candidate_writer
+                self._rx_buffer = b""
             except asyncio.TimeoutError as exc:
+                await dispose_connection_attempt()
                 raise HostLinkTimeoutError(f"Connect deadline expired for {self.host}:{self.port}") from exc
             except asyncio.CancelledError as exc:
+                await dispose_connection_attempt()
                 raise HostLinkCancelledError(f"Connect cancelled for {self.host}:{self.port}") from exc
+            except HostLinkClosedError:
+                raise
             except OSError as exc:
                 raise HostLinkTransportError(f"Failed to connect to {self.host}:{self.port}") from exc
         else:
             loop = asyncio.get_running_loop()
             protocol = _HostLinkUDPProtocol()
+            candidate_transport: asyncio.DatagramTransport | None = None
+            endpoint_attempt = asyncio.ensure_future(
+                loop.create_datagram_endpoint(
+                    lambda: protocol,
+                    remote_addr=(self.host, self.port),
+                    family=socket.AF_INET,
+                )
+            )
+
+            async def dispose_endpoint_attempt() -> None:
+                endpoint_attempt.cancel()
+                try:
+                    late_transport, _ = await endpoint_attempt
+                except BaseException:
+                    return
+                late_transport.close()
+
             try:
-                self._udp_transport, _ = await asyncio.wait_for(
-                    loop.create_datagram_endpoint(
-                        lambda: protocol,
-                        remote_addr=(self.host, self.port),
-                        family=socket.AF_INET,
-                    ),
+                candidate_transport, _ = await asyncio.wait_for(
+                    asyncio.shield(endpoint_attempt),
                     timeout=self.connect_timeout,
                 )
+                assert candidate_transport is not None
+                if self._lock.active_was_invalidated():
+                    candidate_transport.close()
+                    raise HostLinkClosedError("Client closed while connecting")
+                peer = candidate_transport.get_extra_info("peername")
+                if not isinstance(peer, tuple) or len(peer) < 2:
+                    candidate_transport.close()
+                    raise HostLinkTransportError("UDP endpoint did not expose its connected peer")
+                self._udp_transport = candidate_transport
                 self._udp_protocol = protocol
+                self._udp_remote_endpoint = (str(peer[0]), int(peer[1]))
+                self._udp_logically_connected = True
             except asyncio.TimeoutError as exc:
+                await dispose_endpoint_attempt()
                 raise HostLinkTimeoutError(f"Connect deadline expired for {self.host}:{self.port}") from exc
             except asyncio.CancelledError as exc:
+                await dispose_endpoint_attempt()
                 raise HostLinkCancelledError(f"Connect cancelled for {self.host}:{self.port}") from exc
+            except HostLinkClosedError:
+                raise
             except OSError as exc:
                 raise HostLinkTransportError(f"Failed to setup UDP endpoint for {self.host}:{self.port}") from exc
 
@@ -1580,21 +1748,101 @@ class AsyncHostLinkClient(HostLinkBase):
 
     async def _close_unlocked(self) -> None:
         self._monitor_bit_count = 0
-        self._monitor_word_count = 0
+        self._monitor_word_formats = ()
         writer = self._writer
         self._writer = None
         self._reader = None
+        self._rx_buffer = b""
         udp_transport = self._udp_transport
         udp_protocol = self._udp_protocol
+        previous_udp_transport = self._udp_previous_transport
+        previous_udp_protocol = self._udp_previous_protocol
         self._udp_transport = None
         self._udp_protocol = None
+        self._udp_previous_transport = None
+        self._udp_previous_protocol = None
+        self._udp_remote_endpoint = None
+        self._udp_logically_connected = False
 
         if udp_protocol is not None:
             udp_protocol.cancel_pending_response()
+        if previous_udp_protocol is not None:
+            previous_udp_protocol.cancel_pending_response()
         if udp_transport is not None:
             udp_transport.close()
+        if previous_udp_transport is not None:
+            previous_udp_transport.close()
         if writer is not None:
             writer.close()
+
+    async def _prepare_udp_request_endpoint(
+        self, *, deadline: float
+    ) -> tuple[asyncio.DatagramTransport, _HostLinkUDPProtocol]:
+        if not self._udp_logically_connected or self._udp_remote_endpoint is None:
+            raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
+        if self._udp_transport is not None and self._udp_protocol is not None:
+            return self._udp_transport, self._udp_protocol
+
+        loop = asyncio.get_running_loop()
+        protocol = _HostLinkUDPProtocol()
+        candidate: asyncio.DatagramTransport | None = None
+        try:
+            candidate, _ = await asyncio.wait_for(
+                loop.create_datagram_endpoint(
+                    lambda: protocol,
+                    remote_addr=self._udp_remote_endpoint,
+                    family=socket.AF_INET,
+                ),
+                timeout=_remaining_timeout(deadline, clock=loop.time),
+            )
+            assert candidate is not None
+            if self._lock.active_was_invalidated():
+                raise HostLinkClosedError("Client closed while preparing the UDP request socket")
+            previous_transport = self._udp_previous_transport
+            previous_protocol = self._udp_previous_protocol
+            if previous_transport is not None and candidate.get_extra_info(
+                "sockname"
+            ) == previous_transport.get_extra_info("sockname"):
+                raise HostLinkTransportError("UDP request socket reused the predecessor local endpoint")
+            self._udp_transport = candidate
+            self._udp_protocol = protocol
+            self._udp_previous_transport = None
+            self._udp_previous_protocol = None
+        except BaseException:
+            if candidate is not None:
+                candidate.close()
+            raise
+
+        if previous_protocol is not None:
+            previous_protocol.cancel_pending_response()
+        if previous_transport is not None:
+            previous_transport.close()
+        return candidate, protocol
+
+    def _retain_successful_udp_endpoint(
+        self,
+        transport: asyncio.DatagramTransport,
+        protocol: _HostLinkUDPProtocol,
+    ) -> None:
+        if self._lock.active_was_invalidated():
+            raise HostLinkClosedError("Client closed before the UDP response was accepted")
+        protocol.cancel_pending_response()
+        self._udp_transport = None
+        self._udp_protocol = None
+        self._udp_previous_transport = transport
+        self._udp_previous_protocol = protocol
+
+    async def _reject_unowned_tcp_input(self) -> None:
+        self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
+        if self._reader is not None:
+            internal_buffer = getattr(self._reader, "_buffer", None)
+            if isinstance(internal_buffer, bytearray) and internal_buffer:
+                self._rx_buffer += bytes(internal_buffer)
+                internal_buffer.clear()
+                self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
+        if self._rx_buffer:
+            await self._close_unlocked()
+            raise HostLinkProtocolError("Received an extra non-empty TCP response before the next request")
 
     async def send_raw(self, body: str) -> bytes:
         """Send one maintainer raw command and return undecoded response body bytes."""
@@ -1706,7 +1954,9 @@ class AsyncHostLinkClient(HostLinkBase):
         state_changing: bool,
     ) -> bytes:
         # Note: This is called within self._lock in send_raw
-        if self._reader is None and self._udp_transport is None:
+        if self.transport == "tcp" and self._reader is None:
+            raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
+        if self.transport == "udp" and not self._udp_logically_connected:
             raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
         if not 0 <= maximum_response_body <= ABSOLUTE_RESPONSE_CAP:
             raise HostLinkProtocolError("maximum response body is outside the protocol capacity")
@@ -1720,6 +1970,7 @@ class AsyncHostLinkClient(HostLinkBase):
                     raise HostLinkNotConnectedError("Not connected")
                 if self._reader is None:
                     raise HostLinkNotConnectedError("Not connected")
+                await self._reject_unowned_tcp_input()
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 timeout = _validated_timeout("timeout", self.timeout)
                 deadline = loop.time() + timeout
@@ -1741,27 +1992,25 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
             else:
-                if self._udp_transport is None:
-                    raise HostLinkNotConnectedError("Not connected")
-                if self._udp_protocol is None:
-                    raise HostLinkNotConnectedError("Not connected")
-                self._fire_trace(HostLinkTraceDirection.SEND, payload)
                 timeout = _validated_timeout("timeout", self.timeout)
                 deadline = loop.time() + timeout
                 self._last_exchange_deadline = deadline
-                self._udp_protocol.prepare_response()
+                udp_transport, udp_protocol = await self._prepare_udp_request_endpoint(deadline=deadline)
+                self._fire_trace(HostLinkTraceDirection.SEND, payload)
+                udp_protocol.prepare_response()
                 may_have_sent = True
-                self._udp_transport.sendto(payload)
+                udp_transport.sendto(payload)
                 self._request_count += 1
                 self._tx_bytes += len(payload)
                 remaining = _remaining_timeout(deadline, clock=loop.time)
-                response = await asyncio.wait_for(self._udp_protocol.wait_response(), timeout=remaining)
+                response = await asyncio.wait_for(udp_protocol.wait_response(), timeout=remaining)
                 self._validate_response_cap(response, maximum_response_body)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
                 self._rx_bytes += len(response)
                 if self._lock.active_was_invalidated():
                     raise HostLinkClosedError("Client closed before the response was accepted")
+                self._retain_successful_udp_endpoint(udp_transport, udp_protocol)
                 exchange_complete = True
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
@@ -1822,23 +2071,41 @@ class AsyncHostLinkClient(HostLinkBase):
     async def _recv_tcp_line(self, *, maximum_response_body: int = ABSOLUTE_RESPONSE_CAP) -> bytes:
         if self._reader is None:
             raise HostLinkNotConnectedError("Not connected")
-        line = bytearray()
         while True:
-            byte = await self._reader.read(1)
-            if not byte:
+            self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
+            idx_cr = self._rx_buffer.find(b"\r")
+            idx_lf = self._rx_buffer.find(b"\n")
+            indexes = [index for index in (idx_cr, idx_lf) if index >= 0]
+            if indexes:
+                index = min(indexes)
+                if index > maximum_response_body:
+                    await self._close_unlocked()
+                    raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
+                line = self._rx_buffer[:index]
+                skip = index
+                while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
+                    skip += 1
+                self._rx_buffer = self._rx_buffer[skip:]
+                if self._rx_buffer:
+                    await self._close_unlocked()
+                    raise HostLinkProtocolError("Received more than one non-empty TCP response for one request")
+                self._last_rx_frame_length = len(line) + 1
+                return line
+
+            chunk = await self._reader.read(8192)
+            if not chunk:
                 message = (
-                    "Connection closed by PLC before the response terminator" if line else "Connection closed by PLC"
+                    "Connection closed by PLC before the response terminator"
+                    if self._rx_buffer
+                    else "Connection closed by PLC"
                 )
                 raise HostLinkTransportError(message)
-            if byte[0] in (10, 13):
-                if line:
-                    self._last_rx_frame_length = len(line) + 1
-                    return bytes(line)
-                # Discard CR/LF left by the previous response, including a
-                # terminator split across TCP reads.
-                continue
-            line.extend(byte)
-            if len(line) > maximum_response_body:
+            self._rx_buffer += chunk
+            if (
+                len(self._rx_buffer) > maximum_response_body
+                and b"\r" not in self._rx_buffer
+                and b"\n" not in self._rx_buffer
+            ):
                 await self._close_unlocked()
                 raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
 
@@ -1900,13 +2167,15 @@ class AsyncHostLinkClient(HostLinkBase):
         """Read one device with the Host Link ``RD`` command."""
 
         body, suffix = self._build_read_command(device, data_format)
+        device_type = parse_device(device).device_type
         return await self._send_parsed(
             body,
             lambda response: self._decode_read_response(
                 response,
                 suffix,
                 self._read_response_token_count(device, suffix),
-                timer_counter_composite=parse_device(device).device_type in {"T", "C"},
+                timer_counter_composite=device_type in {"T", "C"},
+                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES,
             ),
         )
 
@@ -1979,10 +2248,10 @@ class AsyncHostLinkClient(HostLinkBase):
     async def register_monitor_words(self, entries: Sequence[str | tuple[str, str]]) -> None:
         """Register word devices for later monitor reads."""
 
-        body = self._build_register_monitor_words_command(entries)
+        body, formats = self._build_register_monitor_words_command(entries)
         async with self._lock:
             await self._expect_ok_unlocked(body)
-            self._monitor_word_count = len(entries)
+            self._monitor_word_formats = formats
 
     async def read_monitor_bits(self) -> list[int | str]:
         """Read the currently registered bit monitor values."""

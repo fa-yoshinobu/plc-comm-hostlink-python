@@ -19,7 +19,7 @@ from hostlink import (
     write_expansion_unit_buffer,
     write_words_single_request,
 )
-from hostlink.device import DEFAULT_FORMAT_BY_DEVICE_TYPE, FLOAT32_ELIGIBLE_DEVICE_TYPES
+from hostlink.device import DEFAULT_FORMAT_BY_DEVICE_TYPE, FLOAT32_ELIGIBLE_DEVICE_TYPES, NATIVE_32BIT_DEVICE_TYPES
 from hostlink.errors import HostLinkProtocolError
 
 
@@ -95,14 +95,14 @@ class TestAddressSurface(unittest.TestCase):
         self.assertEqual((reparsed.base_device, reparsed.dtype, reparsed.bit_index), ("DM1", "U", None))
 
     def test_float32_family_eligibility_matches_canonical_metadata_exhaustively(self) -> None:
-        expected = frozenset({"DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"})
+        expected = frozenset({"DM", "EM", "FM", "ZF", "W", "TM", "CM", "VM", "D", "E", "F"})
         self.assertEqual(FLOAT32_ELIGIBLE_DEVICE_TYPES, expected)
         self.assertEqual(
             FLOAT32_ELIGIBLE_DEVICE_TYPES,
             frozenset(
                 device_type
                 for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items()
-                if default_format == ".U"
+                if default_format == ".U" and device_type not in NATIVE_32BIT_DEVICE_TYPES
             ),
         )
 

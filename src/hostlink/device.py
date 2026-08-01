@@ -145,7 +145,9 @@ DEFAULT_FORMAT_BY_DEVICE_TYPE = {
 # Derive the eligible family set from the canonical Host Link family metadata
 # instead of maintaining a second, potentially divergent allow-list.
 FLOAT32_ELIGIBLE_DEVICE_TYPES = frozenset(
-    device_type for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items() if default_format == ".U"
+    device_type
+    for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items()
+    if default_format == ".U" and device_type not in NATIVE_32BIT_DEVICE_TYPES
 )
 
 

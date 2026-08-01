@@ -105,9 +105,9 @@ if __name__ == "__main__":
 `connect_timeout` is one separate absolute connection-establishment deadline.
 It begins before IPv4 hostname resolution and includes endpoint selection,
 socket creation/connect, required TCP configuration, and final adoption. A
-literal IPv4 address bypasses DNS. If a synchronous platform resolver finishes
-after the deadline or after `close()`, its result is discarded and cannot
-connect the client. `timeout` is one absolute request deadline from
+literal IPv4 address bypasses DNS. If sync or async resolution/connection finishes
+after the deadline or after `close()`, its result is discarded, its candidate
+transport is closed, and it cannot connect the client. `timeout` is one absolute request deadline from
 immediately before the first send/write through send/drain, receive, and
 decoding. Both default to 3 seconds. A synchronous `connect_timeout` value too
 large for the platform wait APIs is rejected before connection work. The
@@ -129,6 +129,12 @@ Reuse one connected client for repeated reads and writes. Prefer
 many individual `read_typed` calls when one application snapshot can be read as
 one request.
 
+UDP keeps this logical connection state but assigns every admitted operation a
+fresh request-owned socket and source port. The previous socket stays bound
+until its successor has bound a different endpoint, preventing a delayed
+datagram from being reused by the next operation. Network rules must allow the
+PLC to reply to each request's source port.
+
 ## Connection reuse and concurrent requests
 
 Keep one connected `AsyncHostLinkClient` open for repeated reads, writes, and
@@ -137,6 +143,10 @@ An async operation cancelled while waiting sends nothing. `close()` immediately
 retires active and already queued work without waiting behind a command. A
 failed or cancelled exchange closes the transport, and the library never
 reconnects, retries, or resends automatically.
+
+TCP owns exactly one non-empty response line per request. Additional CR/LF
+separators are ignored, but a second non-empty line is a protocol error and
+retires the transport; it can never satisfy a later operation.
 
 Use `close()` and `connect()` for an intentional reconnect. After a persistent
 connection failure, create a new client with the same `HostLinkConnectionOptions`.
@@ -343,9 +353,17 @@ python samples/config_polling.py --config samples/config_polling.example.json --
 | `.n` | `DM100.A` | One bit inside a word; `n` is hexadecimal `0` to `F`. |
 
 Float32 is available only for the ordinary `.U` word families `DM`, `EM`,
-`FM`, `ZF`, `W`, `TM`, `Z`, `CM`, `VM`, `D`, `E`, and `F`. Direct-bit and
-special-response families such as `R`, `T`, `C`, and `AT` reject `:F` before
-FIFO admission and communication.
+`FM`, `ZF`, `W`, `TM`, `CM`, `VM`, `D`, `E`, and `F`. Native 32-bit `Z`,
+direct-bit, and special-response families such as `R`, `T`, `C`, and `AT`
+reject `:F` before FIFO admission and communication. Use Z through its
+supported integer representation, or move Float32 storage to an ordinary word
+family.
+
+Semantic `.H` reads return exactly four uppercase digits from `0000` through
+`FFFF`; shorter valid PLC tokens are padded after validation. Raw response APIs
+remain unchanged. MWS retains the ordered format of every registered word, and
+MWR validates each returned position against its matching `.U`, `.S`, `.H`,
+`.D`, or `.L` format before returning data.
 
 For `read_named` and `poll`, do not omit the type suffix. Use `DM100:U` instead of relying on `DM100` to mean an unsigned word.
 Pass `comment_encoding` only when the collection contains `:COMMENT`; an
