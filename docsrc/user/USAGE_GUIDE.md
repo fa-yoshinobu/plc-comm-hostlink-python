@@ -101,18 +101,28 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`host`, `port`, `transport`, and `plc_profile` are required. `connect_timeout`
-is a separate connection-establishment deadline. `timeout` is one absolute
-deadline from immediately before the first send/write through send/drain,
-receive, and decoding. Both default to 3 seconds. The clients are IPv4-only;
-IPv6 addresses and transports are not supported. Frames always end in CR.
+`host`, `port`, `transport`, and `plc_profile` are required.
+`connect_timeout` is one separate absolute connection-establishment deadline.
+It begins before IPv4 hostname resolution and includes endpoint selection,
+socket creation/connect, required TCP configuration, and final adoption. A
+literal IPv4 address bypasses DNS. If a synchronous platform resolver finishes
+after the deadline or after `close()`, its result is discarded and cannot
+connect the client. `timeout` is one absolute request deadline from
+immediately before the first send/write through send/drain, receive, and
+decoding. Both default to 3 seconds. A synchronous `connect_timeout` value too
+large for the platform wait APIs is rejected before connection work. The
+clients are IPv4-only; IPv6 addresses and transports are not supported. Frames
+always end in CR. Commands never connect lazily: call `connect()`, enter the
+client context, or use `open_and_connect` first.
 
 ## Performance notes
 
 For stable local networks, UDP usually has the lowest latency. TCP is the safer
 default for remote or less predictable networks because the OS handles
-retransmission. The TCP transport enables `TCP_NODELAY`, which keeps small Host
-Link command frames from waiting behind Nagle buffering.
+retransmission. The synchronous TCP transport enables `TCP_NODELAY` and
+socket keepalive before publishing the connected state. `TCP_NODELAY` keeps
+small Host Link command frames from waiting behind Nagle buffering; keepalive
+probe timing remains an operating-system setting.
 
 Reuse one connected client for repeated reads and writes. Prefer
 `read_words_single_request`, `read_dwords_single_request`, or `read_named` over

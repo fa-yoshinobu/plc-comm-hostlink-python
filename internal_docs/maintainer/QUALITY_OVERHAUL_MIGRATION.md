@@ -500,3 +500,138 @@ could not represent the current deleted and untracked paths.
 - [x] Live PLC verification is not required; artifact construction and import behavior are deterministic.
 - [x] Maintainer record and changelog agree with the implemented gates.
 - [x] Final acceptance criteria verified and the item marked complete.
+
+## GOAL-SERIAL-DEFER-002-CONNECT — Complete synchronous connection deadline
+
+Implementation scope: synchronous `HostLinkClient.connect()` and context
+entry for TCP and UDP. Existing explicit-only lifecycle remains authoritative;
+Host Link Python has no lazy command connection path.
+
+Target contract: one overflow-checked monotonic `connect_timeout` deadline is
+formed immediately before IPv4 resolution or socket work. Literal IPv4 bypasses
+DNS. Hostname resolution selects the first matching IPv4 result in resolver
+order. Resolution, socket creation/connect, required TCP no-delay/keepalive
+configuration, close-generation validation, and final state adoption share the
+same deadline. A platform resolver may finish on its daemon worker after the
+public operation returns, but it retains no client authority: no late result is
+adopted, no request is sent, and every partial socket is closed.
+
+Compatibility impact: no public signature changes. Synchronous hostname
+connections that previously allowed DNS time in addition to
+`connect_timeout` now return the stable `HostLinkTimeoutError` at the
+configured bound. IPv4-only and explicit-connect behavior are unchanged.
+
+Machine-verifiable acceptance criteria:
+
+1. TCP and UDP explicit connect create exactly one monotonic deadline before
+   resolver/socket work and adopt state only before that deadline.
+2. Literal IPv4 uses no resolver; hostname resolution requests `AF_INET` and
+   selects the first matching IPv4 endpoint without IPv6 or route fallback.
+3. Delayed DNS and delayed socket connect return promptly as timeout, send zero
+   requests, leave no connected state, and never adopt their late result.
+4. Concurrent `close()` remains distinguishable as
+   `HostLinkClosedError`; final adoption is atomic with generation validation.
+5. TCP no-delay and keepalive complete before adoption. Configuration failure
+   preserves its native cause, closes the candidate, and returns
+   `HostLinkTransportError`.
+6. Values exceeding platform wait representation fail before transport.
+7. Existing request send/receive/decode deadline and explicit-not-connected
+   tests remain authoritative; no lazy connect, retry, or resend is introduced.
+
+- [x] Implementation completed in this repository.
+- [x] Deterministic test code added for every repository-specific criterion.
+- [x] Ruff, formatting, mypy, unit/integration, package, and source-archive checks passed for the final source state.
+- [x] Codex self-review completed against the actual diff and approved connection contract.
+- [x] Live PLC verification is not required; resolver delay, adoption, cleanup, and error classification are local deterministic behavior.
+- [x] User documentation, contract record, changelog, and implementation agree.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: on Windows with Python 3.10.20, Ruff lint and formatting,
+mypy, high-level/public-API documentation checks, maintained-sample validation,
+release-workflow validation, and all 284 tests passed; coverage was 86%. The
+wheel/sdist gate passed with 14 wheel files, 20 sdist files, and an isolated
+consumer checking 11 public symbols. The synthetic current-worktree source
+archive contained 76 files, 13 sample files, and 13 test files, then passed its
+extracted full gate and isolated package-consumer check. The initial Ruff B904
+and formatting findings in `client.py` were corrected before this complete
+rerun. No live PLC communication was performed.
+
+Self-review disposition:
+
+- Accepted: applying the platform wait maximum in the shared timeout validator
+  would also change the unaffected async/request contracts. The bound now
+  applies only when the synchronous absolute connect deadline is formed.
+- Accepted: a worker that returned from DNS after concurrent `close()` could
+  otherwise proceed to socket creation before noticing abandonment. Explicit
+  abandonment checks now precede every later transport phase, and partial
+  sockets close in the worker `finally` path.
+- Accepted: final connected-state publication needed one linearization point
+  with `close()`. `adopt_if_current` validates the admission generation and
+  publishes the configured socket under the same guard.
+- Accepted: resolver exhaustion before deadline must remain transport failure,
+  not timeout. Test code now checks `HostLinkTransportError` and preservation
+  of the native `socket.gaierror` cause.
+- Accepted: a secondary candidate-close exception could mask the required
+  timeout, closed, or transport classification. Partial-connect cleanup now
+  suppresses close-only failures while preserving the primary error.
+- Rejected: adding lazy first-command connection would contradict the approved
+  D-057/D-058 explicit lifecycle and existing not-connected behavior.
+- Rejected: adding multi-address retry would change the established
+  first-matching-IPv4 selection policy; this implementation keeps that policy
+  and bounds the one selected candidate.
+- No duplicate or deferred self-review finding remains.
+
+## GOAL-CROSS-OS-CI-001 — Required Windows representative contract smoke
+
+Implementation scope: the repository CI workflow and existing deterministic
+loopback/deadline tests. Runtime code, public API, packaging, release workflows,
+and the Linux Python-version matrix are unchanged.
+
+Target contract: the primary Ubuntu full gate remains authoritative. One
+additional non-optional Windows job on Python 3.13 runs only representative
+local contracts for fragmented CR/LF receive, one request deadline across a
+trickled response, UDP late-response retirement and reconnect, async
+cancellation retirement, and late partial-socket cleanup during connect. The
+selection also requires pre-adoption TCP configuration failure to close the
+candidate and preserve its native cause. The job has a ten-minute bound and
+performs no package build or hardware communication.
+
+Compatibility impact: none; this adds CI evidence only.
+
+Machine-verifiable acceptance criteria:
+
+1. `.github/workflows/test.yml` contains exactly one `windows-latest` contract-
+   smoke job in addition to the unchanged Ubuntu full matrix.
+2. The Windows job is required by workflow semantics: it has no conditional,
+   failure suppression, or `continue-on-error` path.
+3. The selected loopback tests cover fragmented receive, bounded request and
+   connect completion, cancellation/retirement, reconnect, and rejection of a
+   delayed response or socket from the retired generation.
+4. The Windows job installs only pytest and pytest-asyncio, runs the explicit
+   bounded test list, and does not build, package, publish, or contact a PLC.
+
+- [x] Implementation completed in this repository.
+- [x] Existing deterministic tests explicitly selected for every acceptance criterion.
+- [ ] The new Windows CI job passed on GitHub for the final source state.
+- [x] The equivalent local Windows contract and full non-hardware gates passed with Python 3.10.20.
+- [x] Codex self-review completed after the requested local verification run.
+- [x] Live PLC checks are not required; all selected behavior uses localhost loopback or fake sockets.
+- [x] Maintainer CI documentation agrees with the workflow; no user migration note or changelog entry is required.
+- [ ] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: the local Windows Python 3.10.20 run passed Ruff lint
+and formatting, mypy, documentation/sample/workflow checks, all 284 tests,
+wheel/sdist and isolated-consumer checks, and the synthetic current-worktree
+source archive's extracted full gate. This includes every test selected by the
+new Windows representative job. The GitHub-hosted Windows/Python 3.13 job and
+the Ubuntu Python 3.10 through 3.13 matrix remain unchecked because those
+hosted OS/runtime combinations were not run locally.
+
+Self-review disposition:
+
+- Accepted and corrected: the first selection covered connect timeout cleanup
+  but not a non-timeout connection failure. The existing deterministic TCP
+  configuration-failure case is now included.
+- Rejected: a second Windows-specific copy of the loopback tests would diverge
+  from the Linux full gate. Exact existing test node IDs remain authoritative.
+- Duplicate findings: none. Deferred findings: none.
