@@ -113,7 +113,7 @@ class _FakeSocket:
 
 
 class _MalformedSyncClient(HostLinkClient):
-    def __init__(self) -> None:
+    def __init__(self, response: bytes = b"1 2\r") -> None:
         super().__init__(
             "127.0.0.1",
             plc_profile="keyence:kv-8000",
@@ -122,13 +122,14 @@ class _MalformedSyncClient(HostLinkClient):
         )
         self.fake_socket = _FakeSocket()
         self._sock = self.fake_socket  # type: ignore[assignment]
+        self.response = response
 
     def _exchange(self, payload: bytes, **_: object) -> bytes:
-        return b"1 2\r"
+        return self.response
 
 
 class _MalformedAsyncClient(AsyncHostLinkClient):
-    def __init__(self) -> None:
+    def __init__(self, response: bytes = b"1 2\r") -> None:
         super().__init__(
             "127.0.0.1",
             plc_profile="keyence:kv-8000",
@@ -136,9 +137,10 @@ class _MalformedAsyncClient(AsyncHostLinkClient):
             transport="tcp",
         )
         self._reader = object()  # type: ignore[assignment]
+        self.response = response
 
     async def _exchange(self, payload: bytes, **_: object) -> bytes:
-        return b"1 2\r"
+        return self.response
 
 
 class _ScriptedSyncClient(HostLinkClient):
@@ -170,6 +172,28 @@ async def test_async_response_shape_mismatch_invalidates_session() -> None:
     client = _MalformedAsyncClient()
     with pytest.raises(HostLinkProtocolError, match="expected 1, received 2"):
         await client.read("DM0", data_format=".U")
+    assert client._reader is None
+
+
+def test_timer_counter_status_must_be_exactly_zero_or_one() -> None:
+    assert HostLinkClient._decode_read_response("0 10 20", ".D", 3, timer_counter_composite=True) == [0, 10, 20]
+    assert HostLinkClient._decode_read_response("1 10 20", ".D", 3, timer_counter_composite=True) == [1, 10, 20]
+    for response in ("2 10 20", "-1 10 20"):
+        with pytest.raises(HostLinkProtocolError):
+            HostLinkClient._decode_read_response(response, ".L", 3, timer_counter_composite=True)
+
+    client = _MalformedSyncClient(b"2 10 20\r")
+    with pytest.raises(HostLinkProtocolError, match="status"):
+        client.read("T0", data_format=".D")
+    assert client._sock is None
+    assert client.fake_socket.closed
+
+
+@pytest.mark.asyncio
+async def test_async_invalid_timer_counter_status_invalidates_session() -> None:
+    client = _MalformedAsyncClient(b"2 10 20\r")
+    with pytest.raises(HostLinkProtocolError, match="status"):
+        await client.read("C0", data_format=".D")
     assert client._reader is None
 
 

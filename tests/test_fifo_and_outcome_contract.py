@@ -378,3 +378,28 @@ async def test_read_named_preflights_every_entry_before_any_send() -> None:
         with pytest.raises((HostLinkProtocolError, ValueError)):
             await read_named(client, ["DM0:U", invalid])
         assert client.commands == []
+
+
+@pytest.mark.asyncio
+async def test_read_named_rejects_semantic_duplicates_but_allows_distinct_views_and_overlaps() -> None:
+    client = _NamedFifoClient()
+    for addresses in (
+        ["DM0:U", "DM0:U"],
+        ["dm0:u", "DM0000:U"],
+        ["R0:BIT", "R000:BIT"],
+    ):
+        with pytest.raises(ValueError, match="semantically duplicated"):
+            await read_named(client, addresses)
+        assert client.commands == []
+
+    class _DistinctViewClient(_NamedFifoClient):
+        async def _exchange(self, payload: bytes, **_: object) -> bytes:
+            command = payload.rstrip(b"\r").decode("ascii")
+            self.commands.append(command)
+            if command == "RDS DM0.U 3":
+                return b"1 2 3\r"
+            raise AssertionError(command)
+
+    distinct = _DistinctViewClient()
+    result = await read_named(distinct, ["dm0:u", "DM0:S", "DM0.0", "DM0.1", "DM0:D", "DM1:D"])
+    assert list(result) == ["dm0:u", "DM0:S", "DM0.0", "DM0.1", "DM0:D", "DM1:D"]

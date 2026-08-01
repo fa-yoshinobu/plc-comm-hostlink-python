@@ -611,12 +611,20 @@ class HostLinkBase:
         return f"RD {token}", suffix
 
     @staticmethod
-    def _decode_read_response(response: str, data_format: str, expected_count: int = 1) -> int | str | list[int | str]:
+    def _decode_read_response(
+        response: str,
+        data_format: str,
+        expected_count: int = 1,
+        *,
+        timer_counter_composite: bool = False,
+    ) -> int | str | list[int | str]:
         values = parse_data_tokens(split_data_tokens(response), data_format=data_format)
         if len(values) != expected_count:
             raise HostLinkProtocolError(
                 f"Read response token count mismatch: expected {expected_count}, received {len(values)}"
             )
+        if timer_counter_composite and values[0] not in {0, 1, "0", "1"}:
+            raise HostLinkProtocolError(f"Timer/counter response status {values[0]!r} is invalid; expected 0 or 1")
         return values[0] if expected_count == 1 else values
 
     @staticmethod
@@ -1334,7 +1342,10 @@ class HostLinkClient(HostLinkBase):
         return self._send_parsed(
             body,
             lambda response: self._decode_read_response(
-                response, suffix, self._read_response_token_count(device, suffix)
+                response,
+                suffix,
+                self._read_response_token_count(device, suffix),
+                timer_counter_composite=parse_device(device).device_type in {"T", "C"},
             ),
         )
 
@@ -1892,7 +1903,10 @@ class AsyncHostLinkClient(HostLinkBase):
         return await self._send_parsed(
             body,
             lambda response: self._decode_read_response(
-                response, suffix, self._read_response_token_count(device, suffix)
+                response,
+                suffix,
+                self._read_response_token_count(device, suffix),
+                timer_counter_composite=parse_device(device).device_type in {"T", "C"},
             ),
         )
 

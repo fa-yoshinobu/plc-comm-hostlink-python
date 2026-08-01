@@ -9,12 +9,17 @@ import pytest
 import hostlink
 from hostlink import (
     AsyncHostLinkClient,
+    HostLinkAddress,
     HostLinkClient,
     HostLinkCommentEncoding,
     HostLinkConnectionOptions,
     HostLinkError,
+    format_address,
+    normalize_address,
     poll,
     read_dwords_single_request,
+    read_named,
+    read_typed,
     read_words_single_request,
     write_dwords_single_request,
     write_typed,
@@ -65,6 +70,14 @@ class _AsyncRecordingClient(AsyncHostLinkClient):
     async def _close_unlocked(self) -> None:
         self.retired = True
         await super()._close_unlocked()
+
+
+class _RejectAdmission:
+    async def __aenter__(self) -> None:
+        raise AssertionError("invalid Float32 request reached FIFO admission")
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
 
 
 class _FakeSocket:
@@ -494,9 +507,44 @@ async def test_single_request_helpers_never_split_at_or_above_protocol_limit() -
 @pytest.mark.parametrize("device", ["Y0", "R0", "B0", "MR0", "LR0", "CR0", "VB0", "X0", "M0", "L0"])
 async def test_float_write_rejects_every_direct_bit_family_without_send(device: str) -> None:
     client = _AsyncRecordingClient()
-    with pytest.raises(ValueError, match="Float writes.*direct bit"):
+    with pytest.raises(ValueError, match="Float32 writes.*ordinary word-device"):
         await write_typed(client, device, "F", 1.25)
     assert client.frames == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", ["R0", "T0", "C0", "AT0"])
+async def test_special_family_float32_typed_named_and_poll_reject_before_fifo(device: str) -> None:
+    client = _AsyncRecordingClient()
+    client._lock = _RejectAdmission()  # type: ignore[assignment]
+
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        await read_typed(client, device, "F")
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        await write_typed(client, device, "F", 1.25)
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        await read_named(client, [f"{device}:F"])
+
+    stream = poll(client, [f"{device}:F"], interval=0.01)
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        await anext(stream)
+
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        normalize_address(f"{device}:F")
+    with pytest.raises(ValueError, match="ordinary word-device"):
+        format_address(HostLinkAddress("ignored", device, "F"))
+    assert client.frames == []
+
+
+@pytest.mark.asyncio
+async def test_dm_float32_typed_read_and_write_remain_supported() -> None:
+    read_client = _AsyncRecordingClient([b"0 16256\r"])
+    assert await read_typed(read_client, "DM0", "F") == 1.0
+    assert read_client.frames == [b"RDS DM0.U 2\r"]
+
+    write_client = _AsyncRecordingClient([b"OK\r"])
+    await write_typed(write_client, "DM0", "F", 1.0)
+    assert write_client.frames == [b"WRS DM0.U 2 0 16256\r"]
 
 
 @pytest.mark.parametrize("response", [b"2\r", b"01\r", b" 1\r", b"+1\r", b"1x\r", b"\r", b"RUN\r"])

@@ -96,12 +96,27 @@ an unused configuration error before communication.
 input before send, preserve caller request order, keep each entry indivisible,
 and may split only necessary read-only work during one FIFO turn. Such a result
 is a logical dictionary, not an atomic PLC-time snapshot; failure returns no
-partial dictionary. Poll intervals must be positive finite numbers and cannot
-be booleans. The removed `write_bit_in_word` RMW API has no alias.
+partial dictionary. Named keys must be semantically unique by device family,
+numeric address, dtype, bit index, and scalar count. Case and leading-zero
+spelling variants are rejected as duplicates, while distinct dtype views, bit
+indices, and overlapping spans remain valid; returned keys preserve the input
+spelling. Poll intervals must be positive finite numbers and cannot be booleans.
+The removed `write_bit_in_word` RMW API has no alias.
 
-Float32 reads and writes are defined only for word devices. An `F` write to a
-direct bit device such as `Y0` or `R0` raises `ValueError` before any command is
-sent.
+`parse_address`, `normalize_address`, and `format_address` apply the same
+device/data-type compatibility rules. Formatting a `HostLinkAddress` validates
+its semantic fields, ignores stale `text`, and produces output that can be
+parsed again with the same device, dtype, and bit-index meaning.
+
+Timer/counter composite reads require response status to be exactly `0` or
+`1`; any other numeric status is an invalid response and retires the session.
+
+Float32 reads and writes are defined only for ordinary one-word `.U` families
+that support two consecutive words: `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `Z`,
+`CM`, `VM`, `D`, `E`, and `F`. Direct-bit and special-response families,
+including `R`, `T`, `C`, and `AT`, reject `:F` during parsing and before FIFO
+admission or transport. Typed helpers and named reads use the same canonical
+family metadata.
 
 ## Address, Profile, And Diagnostics
 

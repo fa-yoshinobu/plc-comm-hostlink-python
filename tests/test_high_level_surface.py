@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import hostlink
 from hostlink import (
+    HostLinkAddress,
     HostLinkConnectionOptions,
     format_address,
     normalize_address,
@@ -18,6 +19,7 @@ from hostlink import (
     write_expansion_unit_buffer,
     write_words_single_request,
 )
+from hostlink.device import DEFAULT_FORMAT_BY_DEVICE_TYPE, FLOAT32_ELIGIBLE_DEVICE_TYPES
 from hostlink.errors import HostLinkProtocolError
 
 
@@ -66,6 +68,61 @@ class TestAddressSurface(unittest.TestCase):
             parse_address("DM100:BIT_IN_WORD")
         with self.assertRaisesRegex(ValueError, "explicit bit index"):
             normalize_address("DM100:BIT_IN_WORD")
+
+    def test_parser_normalizer_and_formatter_share_semantic_validation(self) -> None:
+        invalid = ("DM0:BIT", "R0:F", "T0:F", "C0:F", "AT0:F", "AT0:COMMENT")
+        for text in invalid:
+            with self.subTest(text=text):
+                with self.assertRaises(ValueError):
+                    parse_address(text)
+                with self.assertRaises(ValueError):
+                    normalize_address(text)
+
+        invalid_objects = (
+            HostLinkAddress("ignored", "DM0", "BIT"),
+            HostLinkAddress("ignored", "R0", "F"),
+            HostLinkAddress("ignored", "AT0", "COMMENT"),
+        )
+        for address in invalid_objects:
+            with self.subTest(address=address):
+                with self.assertRaises(ValueError):
+                    format_address(address)
+
+        valid = HostLinkAddress("ignored", "dm0001", "u")
+        formatted = format_address(valid)
+        reparsed = parse_address(formatted)
+        self.assertEqual(formatted, "DM1:U")
+        self.assertEqual((reparsed.base_device, reparsed.dtype, reparsed.bit_index), ("DM1", "U", None))
+
+    def test_float32_family_eligibility_matches_canonical_metadata_exhaustively(self) -> None:
+        expected = frozenset({"DM", "EM", "FM", "ZF", "W", "TM", "Z", "CM", "VM", "D", "E", "F"})
+        self.assertEqual(FLOAT32_ELIGIBLE_DEVICE_TYPES, expected)
+        self.assertEqual(
+            FLOAT32_ELIGIBLE_DEVICE_TYPES,
+            frozenset(
+                device_type
+                for device_type, default_format in DEFAULT_FORMAT_BY_DEVICE_TYPE.items()
+                if default_format == ".U"
+            ),
+        )
+
+        for device_type in DEFAULT_FORMAT_BY_DEVICE_TYPE:
+            address = f"{device_type}0:F"
+            with self.subTest(address=address):
+                if device_type in expected:
+                    self.assertEqual(parse_address(address).dtype, "F")
+                    self.assertEqual(normalize_address(address.lower()), address)
+                    self.assertEqual(
+                        format_address(HostLinkAddress("ignored", f"{device_type}0", "F")),
+                        address,
+                    )
+                else:
+                    with self.assertRaises(ValueError):
+                        parse_address(address)
+                    with self.assertRaises(ValueError):
+                        normalize_address(address)
+                    with self.assertRaises(ValueError):
+                        format_address(HostLinkAddress("ignored", f"{device_type}0", "F"))
 
 
 class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
