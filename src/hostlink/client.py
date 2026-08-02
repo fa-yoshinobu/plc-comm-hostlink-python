@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import math
 import select
 import socket
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -155,13 +156,15 @@ class _AsyncAdmissionWaiter:
     task: asyncio.Task[object]
     generation: int
     future: asyncio.Future[None]
+    ticket: int
 
 
 class _AsyncFifoAdmission:
     """Arrival-ordered, reentrant async admission with waiting cancellation."""
 
     def __init__(self) -> None:
-        self._queue: deque[_AsyncAdmissionWaiter] = deque()
+        self._queue: OrderedDict[int, _AsyncAdmissionWaiter] = OrderedDict()
+        self._next_ticket = 0
         self._owner: asyncio.Task[object] | None = None
         self._owner_generation = 0
         self._depth = 0
@@ -175,20 +178,21 @@ class _AsyncFifoAdmission:
             self._depth += 1
             return self
         loop = asyncio.get_running_loop()
-        waiter = _AsyncAdmissionWaiter(task, self._generation, loop.create_future())
+        ticket = self._next_ticket
+        self._next_ticket += 1
+        waiter = _AsyncAdmissionWaiter(task, self._generation, loop.create_future(), ticket)
         if self._owner is None and not self._queue:
             self._owner = task
             self._owner_generation = self._generation
             self._depth = 1
             waiter.future.set_result(None)
         else:
-            self._queue.append(waiter)
+            self._queue[ticket] = waiter
         try:
             await asyncio.shield(waiter.future)
         except asyncio.CancelledError as exc:
-            if waiter in self._queue:
-                self._queue.remove(waiter)
-            elif self._owner is task:
+            removed = self._queue.pop(waiter.ticket, None)
+            if removed is None and self._owner is task:
                 self._release_owner(task)
             raise HostLinkCancelledError("Queued Host Link operation was cancelled before send") from exc
         if self._owner is not task:
@@ -210,7 +214,7 @@ class _AsyncFifoAdmission:
         self._owner = None
         self._depth = 0
         if self._queue:
-            waiter = self._queue.popleft()
+            _, waiter = self._queue.popitem(last=False)
             self._owner = waiter.task
             self._owner_generation = waiter.generation
             self._depth = 1
@@ -220,12 +224,109 @@ class _AsyncFifoAdmission:
     def invalidate(self) -> None:
         self._generation += 1
         while self._queue:
-            waiter = self._queue.popleft()
+            _, waiter = self._queue.popitem(last=False)
             if not waiter.future.done():
                 waiter.future.set_exception(HostLinkClosedError("Client closed before the queued operation was sent"))
 
     def active_was_invalidated(self) -> bool:
         return self._owner is not None and self._owner_generation != self._generation
+
+
+class _TcpReceiveAccumulator:
+    """Owned bounded TCP storage with incremental delimiter scanning."""
+
+    _INITIAL_CAPACITY = 4096
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+        self._start = 0
+        self._count = 0
+        self._scan = 0
+        self.scan_byte_count = 0
+        self.copy_byte_count = 0
+
+    def append(self, chunk: bytes | bytearray) -> None:
+        if not chunk:
+            return
+        required = self._count + len(chunk)
+        tail = self._start + self._count
+        if tail + len(chunk) > len(self._buffer):
+            if self._start > 0 and required <= len(self._buffer):
+                self._buffer[: self._count] = self._buffer[self._start : tail]
+                self.copy_byte_count += self._count
+                self._scan -= self._start
+                self._start = 0
+                tail = self._count
+            else:
+                capacity = max(self._INITIAL_CAPACITY, required, max(1, len(self._buffer)) * 2)
+                grown = bytearray(capacity)
+                grown[: self._count] = self._buffer[self._start : tail]
+                self.copy_byte_count += self._count
+                self._scan -= self._start
+                self._start = 0
+                self._buffer = grown
+                tail = self._count
+        self._buffer[tail : tail + len(chunk)] = chunk
+        self.copy_byte_count += len(chunk)
+        self._count += len(chunk)
+
+    def try_take_line(self, maximum_response_body: int) -> tuple[bytes, int] | None:
+        end = self._start + self._count
+        while self._scan < end:
+            value = self._buffer[self._scan]
+            self.scan_byte_count += 1
+            if self._scan == self._start and value in (10, 13):
+                self._start += 1
+                self._count -= 1
+                self._scan += 1
+                continue
+            if value in (10, 13):
+                body_length = self._scan - self._start
+                if body_length > maximum_response_body:
+                    raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
+                skip = self._scan + 1
+                while skip < end and self._buffer[skip] in (10, 13):
+                    self.scan_byte_count += 1
+                    skip += 1
+                if skip < end:
+                    raise HostLinkProtocolError("Received more than one non-empty TCP response for one request")
+                line = bytes(self._buffer[self._start : self._scan])
+                counted_length = body_length + 1
+                self.reset(release=False)
+                return line, counted_length
+            self._scan += 1
+            if self._scan - self._start > maximum_response_body:
+                raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
+        return None
+
+    def discard_separators(self) -> bool:
+        """Discard buffered CR/LF and report whether non-separator input remains."""
+
+        end = self._start + self._count
+        while self._scan < end and self._buffer[self._scan] in (10, 13):
+            self.scan_byte_count += 1
+            self._scan += 1
+            self._start += 1
+            self._count -= 1
+        if self._count == 0:
+            self.reset(release=False)
+            return False
+        return True
+
+    def reset(self, *, release: bool) -> None:
+        if release:
+            self._buffer = bytearray()
+        self._start = 0
+        self._count = 0
+        self._scan = 0
+
+    @property
+    def has_data(self) -> bool:
+        return self._count != 0
+
+    @property
+    def capacity(self) -> int:
+        return len(self._buffer)
 
 
 def _remaining_timeout(deadline: float, *, clock: Callable[[], float]) -> float:
@@ -304,7 +405,93 @@ def _close_socket_quietly(sock: socket.socket) -> None:
         pass
 
 
-def _open_sync_ipv4_socket_before_deadline(
+def _configure_sync_socket_before_deadline(
+    candidate: socket.socket,
+    *,
+    transport: str,
+    deadline: float,
+    ensure_current: Callable[[], None],
+) -> None:
+    ensure_current()
+    candidate.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
+    if transport == "tcp":
+        candidate.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        ensure_current()
+        _remaining_timeout(deadline, clock=time.monotonic)
+        candidate.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        ensure_current()
+        candidate.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
+
+
+def _open_sync_numeric_ipv4_socket_before_deadline(
+    *,
+    host: str,
+    port: int,
+    transport: str,
+    deadline: float,
+    ensure_current: Callable[[], None],
+    register_candidate: Callable[[socket.socket], None],
+    unregister_candidate: Callable[[socket.socket], None],
+) -> socket.socket:
+    """Connect a numeric IPv4 endpoint without a resolver or worker thread."""
+
+    socket_type = socket.SOCK_STREAM if transport == "tcp" else socket.SOCK_DGRAM
+    candidate = socket.socket(socket.AF_INET, socket_type)
+    registered = False
+    try:
+        ensure_current()
+        register_candidate(candidate)
+        registered = True
+        candidate.setblocking(False)
+        result = candidate.connect_ex((host, port))
+        in_progress = {
+            0,
+            errno.EINPROGRESS,
+            errno.EWOULDBLOCK,
+            errno.EALREADY,
+            errno.EISCONN,
+            getattr(errno, "WSAEINPROGRESS", 10036),
+            getattr(errno, "WSAEWOULDBLOCK", 10035),
+            getattr(errno, "WSAEALREADY", 10037),
+            getattr(errno, "WSAEISCONN", 10056),
+        }
+        if result not in in_progress:
+            raise OSError(result, "nonblocking IPv4 connect failed")
+        if result not in {0, errno.EISCONN, getattr(errno, "WSAEISCONN", 10056)}:
+            try:
+                _, writable, exceptional = select.select(
+                    [],
+                    [candidate],
+                    [candidate],
+                    _remaining_timeout(deadline, clock=time.monotonic),
+                )
+            except OSError:
+                ensure_current()
+                raise
+            ensure_current()
+            _remaining_timeout(deadline, clock=time.monotonic)
+            if not writable and not exceptional:
+                raise TimeoutError
+            socket_error = candidate.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+            if socket_error != 0:
+                raise OSError(socket_error, "nonblocking IPv4 connect failed")
+        _configure_sync_socket_before_deadline(
+            candidate,
+            transport=transport,
+            deadline=deadline,
+            ensure_current=ensure_current,
+        )
+        return candidate
+    except BaseException as error:
+        if registered:
+            unregister_candidate(candidate)
+        _close_socket_quietly(candidate)
+        if isinstance(error, OSError):
+            ensure_current()
+        raise
+
+
+def _open_sync_hostname_socket_before_deadline(
     *,
     host: str,
     port: int,
@@ -312,7 +499,7 @@ def _open_sync_ipv4_socket_before_deadline(
     deadline: float,
     ensure_current: Callable[[], None],
 ) -> socket.socket:
-    """Resolve, create, connect, and configure without adopting a late result."""
+    """Keep blocking hostname resolution isolated from the caller thread."""
 
     state = _SyncConnectState()
     socket_type = socket.SOCK_STREAM if transport == "tcp" else socket.SOCK_DGRAM
@@ -323,6 +510,10 @@ def _open_sync_ipv4_socket_before_deadline(
         def was_abandoned() -> bool:
             with state.condition:
                 return state.abandoned
+
+        def ensure_not_abandoned() -> None:
+            if was_abandoned():
+                raise HostLinkClosedError("Client closed while connecting")
 
         try:
             endpoint = _resolve_first_ipv4_endpoint(host, port, socket_type)
@@ -336,16 +527,12 @@ def _open_sync_ipv4_socket_before_deadline(
             candidate.connect(endpoint)
             if was_abandoned():
                 return
-            _remaining_timeout(deadline, clock=time.monotonic)
-            if transport == "tcp":
-                candidate.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                if was_abandoned():
-                    return
-                _remaining_timeout(deadline, clock=time.monotonic)
-                candidate.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-                if was_abandoned():
-                    return
-                _remaining_timeout(deadline, clock=time.monotonic)
+            _configure_sync_socket_before_deadline(
+                candidate,
+                transport=transport,
+                deadline=deadline,
+                ensure_current=ensure_not_abandoned,
+            )
             completed_at = time.monotonic()
             with state.condition:
                 if not state.abandoned:
@@ -404,6 +591,41 @@ def _open_sync_ipv4_socket_before_deadline(
             _close_socket_quietly(connected)
             raise TimeoutError
         return connected
+
+
+def _open_sync_ipv4_socket_before_deadline(
+    *,
+    host: str,
+    port: int,
+    transport: str,
+    deadline: float,
+    ensure_current: Callable[[], None],
+    register_candidate: Callable[[socket.socket], None],
+    unregister_candidate: Callable[[socket.socket], None],
+) -> socket.socket:
+    """Resolve, create, connect, and configure without adopting a late result."""
+
+    try:
+        literal = ip_address(host)
+    except ValueError:
+        return _open_sync_hostname_socket_before_deadline(
+            host=host,
+            port=port,
+            transport=transport,
+            deadline=deadline,
+            ensure_current=ensure_current,
+        )
+    if literal.version != 4:
+        raise socket.gaierror(f"host did not resolve to an IPv4 address: {host}")
+    return _open_sync_numeric_ipv4_socket_before_deadline(
+        host=str(literal),
+        port=port,
+        transport=transport,
+        deadline=deadline,
+        ensure_current=ensure_current,
+        register_candidate=register_candidate,
+        unregister_candidate=unregister_candidate,
+    )
 
 
 class HostLinkTraceDirection(Enum):
@@ -967,9 +1189,11 @@ class HostLinkClient(HostLinkBase):
         self.timeout = _validated_timeout("timeout", timeout)
         self.connect_timeout = _validated_timeout("connect_timeout", connect_timeout)
         self._sock: socket.socket | None = None
+        self._connecting_sock: socket.socket | None = None
+        self._socket_guard = threading.Lock()
         self._udp_remote_endpoint: tuple[str, int] | None = None
         self._udp_logically_connected = False
-        self._rx_buffer = b""
+        self._rx_buffer = _TcpReceiveAccumulator()
         self._lock = _SyncFifoAdmission()
         self._request_count = 0
         self._tx_bytes = 0
@@ -1009,6 +1233,20 @@ class HostLinkClient(HostLinkBase):
                 if self._lock.active_was_invalidated():
                     raise HostLinkClosedError("Client closed while connecting")
 
+            def register_candidate(candidate: socket.socket) -> None:
+                def register() -> None:
+                    with self._socket_guard:
+                        if self._connecting_sock is not None:
+                            raise HostLinkConnectionError("Another connection candidate is already active")
+                        self._connecting_sock = candidate
+
+                self._lock.adopt_if_current(register)
+
+            def unregister_candidate(candidate: socket.socket) -> None:
+                with self._socket_guard:
+                    if self._connecting_sock is candidate:
+                        self._connecting_sock = None
+
             sock: socket.socket | None = None
             try:
                 connected = _open_sync_ipv4_socket_before_deadline(
@@ -1017,30 +1255,39 @@ class HostLinkClient(HostLinkBase):
                     transport=self.transport,
                     deadline=deadline,
                     ensure_current=ensure_current,
+                    register_candidate=register_candidate,
+                    unregister_candidate=unregister_candidate,
                 )
                 sock = connected
 
                 def adopt() -> None:
                     _remaining_timeout(deadline, clock=time.monotonic)
-                    self._sock = connected
-                    self._rx_buffer = b""
-                    if self.transport == "udp":
-                        getpeername = getattr(connected, "getpeername", None)
-                        peer = getpeername() if callable(getpeername) else (self.host, self.port)
-                        self._udp_remote_endpoint = (str(peer[0]), int(peer[1]))
-                        self._udp_logically_connected = True
+                    with self._socket_guard:
+                        if self._connecting_sock is not None and self._connecting_sock is not connected:
+                            raise HostLinkClosedError("Connection candidate identity changed before adoption")
+                        self._connecting_sock = None
+                        self._sock = connected
+                        self._rx_buffer.reset(release=False)
+                        if self.transport == "udp":
+                            getpeername = getattr(connected, "getpeername", None)
+                            peer = getpeername() if callable(getpeername) else (self.host, self.port)
+                            self._udp_remote_endpoint = (str(peer[0]), int(peer[1]))
+                            self._udp_logically_connected = True
 
                 self._lock.adopt_if_current(adopt)
             except TimeoutError as exc:
                 if sock is not None:
+                    unregister_candidate(sock)
                     _close_socket_quietly(sock)
                 raise HostLinkTimeoutError(f"Connect deadline expired for {self.host}:{self.port}") from exc
             except HostLinkClosedError:
                 if sock is not None:
+                    unregister_candidate(sock)
                     _close_socket_quietly(sock)
                 raise
             except OSError as exc:
                 if sock is not None:
+                    unregister_candidate(sock)
                     _close_socket_quietly(sock)
                 raise HostLinkTransportError(f"Failed to connect to {self.host}:{self.port}") from exc
 
@@ -1053,17 +1300,22 @@ class HostLinkClient(HostLinkBase):
     def _close_unlocked(self) -> None:
         self._monitor_bit_count = 0
         self._monitor_word_formats = ()
-        sock = self._sock
-        self._sock = None
-        self._udp_remote_endpoint = None
-        self._udp_logically_connected = False
-        self._rx_buffer = b""
-        if sock is not None:
+        with self._socket_guard:
+            sock = self._sock
+            connecting_sock = self._connecting_sock
+            self._sock = None
+            self._connecting_sock = None
+            self._udp_remote_endpoint = None
+            self._udp_logically_connected = False
+            self._rx_buffer.reset(release=True)
+        for candidate in (sock, connecting_sock):
+            if candidate is None:
+                continue
             try:
-                sock.shutdown(socket.SHUT_RDWR)
+                candidate.shutdown(socket.SHUT_RDWR)
             except (AttributeError, OSError):
                 pass
-            sock.close()
+            candidate.close()
 
     def _prepare_udp_request_socket(self, *, deadline: float) -> socket.socket:
         if self._sock is not None:
@@ -1111,8 +1363,7 @@ class HostLinkClient(HostLinkBase):
             raise HostLinkProtocolError("Received an unowned UDP response outside the active request")
 
     def _reject_unowned_tcp_input(self, sock: socket.socket) -> None:
-        self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
-        if self._rx_buffer:
+        if self._rx_buffer.discard_separators():
             self._close_unlocked()
             raise HostLinkProtocolError("Received an extra non-empty TCP response before the next request")
         if not isinstance(sock, socket.socket):
@@ -1348,28 +1599,14 @@ class HostLinkClient(HostLinkBase):
         if deadline is None:
             deadline = time.monotonic() + self.timeout
         while True:
-            while self._rx_buffer and self._rx_buffer[0] in (10, 13):
-                self._rx_buffer = self._rx_buffer[1:]
-            idx_cr = self._rx_buffer.find(b"\r")
-            idx_lf = self._rx_buffer.find(b"\n")
-            idx_list = [idx for idx in (idx_cr, idx_lf) if idx >= 0]
-            if idx_list:
-                idx = min(idx_list)
-                if idx > maximum_response_body:
-                    self._close_unlocked()
-                    raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
-                line = self._rx_buffer[:idx]
-                skip = idx
-                while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
-                    skip += 1
-                self._rx_buffer = self._rx_buffer[skip:]
-                if self._rx_buffer:
-                    self._close_unlocked()
-                    raise HostLinkProtocolError("Received more than one non-empty TCP response for one request")
-                # A TCP response line ends at the first CR/LF.  Consume any
-                # adjacent separator padding, but do not let TCP chunking
-                # change the traffic counter.
-                self._last_rx_frame_length = idx + 1
+            try:
+                completed = self._rx_buffer.try_take_line(maximum_response_body)
+            except HostLinkProtocolError:
+                self._close_unlocked()
+                raise
+            if completed is not None:
+                line, counted_length = completed
+                self._last_rx_frame_length = counted_length
                 return line
 
             sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
@@ -1377,18 +1614,11 @@ class HostLinkClient(HostLinkBase):
             if not chunk:
                 message = (
                     "Connection closed by PLC before the response terminator"
-                    if self._rx_buffer
+                    if self._rx_buffer.has_data
                     else "Connection closed by PLC"
                 )
                 raise HostLinkTransportError(message)
-            self._rx_buffer += chunk
-            if (
-                len(self._rx_buffer) > maximum_response_body
-                and b"\r" not in self._rx_buffer
-                and b"\n" not in self._rx_buffer
-            ):
-                self._close_unlocked()
-                raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
+            self._rx_buffer.append(chunk)
 
     # --- Commands ---
 
@@ -1611,7 +1841,7 @@ class AsyncHostLinkClient(HostLinkBase):
         self._udp_protocol: _HostLinkUDPProtocol | None = None
         self._udp_remote_endpoint: tuple[str, int] | None = None
         self._udp_logically_connected = False
-        self._rx_buffer = b""
+        self._rx_buffer = _TcpReceiveAccumulator()
         self._lock = _AsyncFifoAdmission()
         self._request_count = 0
         self._tx_bytes = 0
@@ -1690,7 +1920,7 @@ class AsyncHostLinkClient(HostLinkBase):
                     raise HostLinkClosedError("Client closed while connecting")
                 self._reader = candidate_reader
                 self._writer = candidate_writer
-                self._rx_buffer = b""
+                self._rx_buffer.reset(release=False)
             except asyncio.TimeoutError as exc:
                 await dispose_connection_attempt()
                 raise HostLinkTimeoutError(f"Connect deadline expired for {self.host}:{self.port}") from exc
@@ -1761,7 +1991,7 @@ class AsyncHostLinkClient(HostLinkBase):
         writer = self._writer
         self._writer = None
         self._reader = None
-        self._rx_buffer = b""
+        self._rx_buffer.reset(release=True)
         udp_transport = self._udp_transport
         udp_protocol = self._udp_protocol
         self._udp_transport = None
@@ -1835,14 +2065,12 @@ class AsyncHostLinkClient(HostLinkBase):
             await self._close_unlocked()
 
     async def _reject_unowned_tcp_input(self) -> None:
-        self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
         if self._reader is not None:
             internal_buffer = getattr(self._reader, "_buffer", None)
             if isinstance(internal_buffer, bytearray) and internal_buffer:
-                self._rx_buffer += bytes(internal_buffer)
+                self._rx_buffer.append(internal_buffer)
                 internal_buffer.clear()
-                self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
-        if self._rx_buffer:
+        if self._rx_buffer.discard_separators():
             await self._close_unlocked()
             raise HostLinkProtocolError("Received an extra non-empty TCP response before the next request")
 
@@ -2076,42 +2304,25 @@ class AsyncHostLinkClient(HostLinkBase):
         if self._reader is None:
             raise HostLinkNotConnectedError("Not connected")
         while True:
-            self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
-            idx_cr = self._rx_buffer.find(b"\r")
-            idx_lf = self._rx_buffer.find(b"\n")
-            indexes = [index for index in (idx_cr, idx_lf) if index >= 0]
-            if indexes:
-                index = min(indexes)
-                if index > maximum_response_body:
-                    await self._close_unlocked()
-                    raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
-                line = self._rx_buffer[:index]
-                skip = index
-                while skip < len(self._rx_buffer) and self._rx_buffer[skip] in (10, 13):
-                    skip += 1
-                self._rx_buffer = self._rx_buffer[skip:]
-                if self._rx_buffer:
-                    await self._close_unlocked()
-                    raise HostLinkProtocolError("Received more than one non-empty TCP response for one request")
-                self._last_rx_frame_length = len(line) + 1
+            try:
+                completed = self._rx_buffer.try_take_line(maximum_response_body)
+            except HostLinkProtocolError:
+                await self._close_unlocked()
+                raise
+            if completed is not None:
+                line, counted_length = completed
+                self._last_rx_frame_length = counted_length
                 return line
 
             chunk = await self._reader.read(8192)
             if not chunk:
                 message = (
                     "Connection closed by PLC before the response terminator"
-                    if self._rx_buffer
+                    if self._rx_buffer.has_data
                     else "Connection closed by PLC"
                 )
                 raise HostLinkTransportError(message)
-            self._rx_buffer += chunk
-            if (
-                len(self._rx_buffer) > maximum_response_body
-                and b"\r" not in self._rx_buffer
-                and b"\n" not in self._rx_buffer
-            ):
-                await self._close_unlocked()
-                raise HostLinkProtocolError(f"Response line exceeds {maximum_response_body} bytes")
+            self._rx_buffer.append(chunk)
 
     # --- Async Commands ---
 

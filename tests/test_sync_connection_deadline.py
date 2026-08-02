@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import socket
 import threading
 import time
@@ -30,10 +31,15 @@ class _FakeSocket:
         *,
         connect_action: Callable[[], None] | None = None,
         keepalive_error: OSError | None = None,
+        connect_result: int = 0,
+        socket_error: int = 0,
     ) -> None:
         self.connect_action = connect_action
         self.keepalive_error = keepalive_error
+        self.connect_result = connect_result
+        self.socket_error = socket_error
         self.timeouts: list[float] = []
+        self.blocking: list[bool] = []
         self.options: list[tuple[int, int, int]] = []
         self.connected_to: tuple[str, int] | None = None
         self.closed = False
@@ -46,6 +52,19 @@ class _FakeSocket:
         self.connected_to = endpoint
         if self.connect_action is not None:
             self.connect_action()
+
+    def setblocking(self, value: bool) -> None:
+        self.blocking.append(value)
+
+    def connect_ex(self, endpoint: tuple[str, int]) -> int:
+        self.connected_to = endpoint
+        if self.connect_action is not None:
+            self.connect_action()
+        return self.connect_result
+
+    def getsockopt(self, level: int, option: int) -> int:
+        assert (level, option) == (socket.SOL_SOCKET, socket.SO_ERROR)
+        return self.socket_error
 
     def setsockopt(self, level: int, option: int, value: int) -> None:
         if option == socket.SO_KEEPALIVE and self.keepalive_error is not None:
@@ -91,14 +110,19 @@ def test_sync_literal_ipv4_bypasses_dns_and_configures_before_adoption(
     def forbidden_resolver(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("literal IPv4 must not use DNS")
 
+    def forbidden_worker(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("numeric IPv4 must not create a worker")
+
     monkeypatch.setattr("hostlink.client.socket.getaddrinfo", forbidden_resolver)
     monkeypatch.setattr("hostlink.client.socket.socket", lambda family, kind: fake)
+    monkeypatch.setattr("hostlink.client.threading.Thread", forbidden_worker)
 
     client = _client("127.0.0.1", transport=transport)
     client.connect()
 
     assert client._sock is fake
     assert fake.connected_to == ("127.0.0.1", 8501)
+    assert fake.blocking == [False]
     assert fake.timeouts and _is_within_timeout_upper_bound(fake.timeouts[0], client.connect_timeout)
     if transport == "tcp":
         assert fake.options == [
@@ -189,24 +213,19 @@ def test_sync_connect_timeout_closes_a_late_partial_socket(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     connect_started = threading.Event()
-    release_connect = threading.Event()
-
-    def block_connect() -> None:
-        connect_started.set()
-        assert release_connect.wait(timeout=1.0)
-
-    fake = _FakeSocket(connect_action=block_connect)
+    fake = _FakeSocket(connect_action=connect_started.set, connect_result=errno.EINPROGRESS)
     monkeypatch.setattr("hostlink.client.socket.socket", lambda family, kind: fake)
+    monkeypatch.setattr(
+        "hostlink.client.select.select",
+        lambda *_args, **_kwargs: (time.sleep(0.04) or ([], [], [])),
+    )
     client = _client("127.0.0.1", transport="tcp", connect_timeout=0.03)
 
-    try:
-        with pytest.raises(HostLinkTimeoutError, match="Connect deadline expired"):
-            client.connect()
-    finally:
-        release_connect.set()
+    with pytest.raises(HostLinkTimeoutError, match="Connect deadline expired"):
+        client.connect()
 
     assert connect_started.is_set()
-    assert fake.closed_event.wait(timeout=0.3)
+    assert fake.closed_event.is_set()
     assert client._sock is None
     assert client.traffic_stats().request_count == 0
 

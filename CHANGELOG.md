@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: TCP response framing now uses a reusable growable accumulator with an incremental scan cursor; synchronous numeric-IPv4 connection establishment uses workerless nonblocking `connect_ex`, while hostname DNS remains isolated from the caller deadline.
+- Library: Async request admission now uses an O(1) ordered FIFO for enqueue, cancellation removal, and dequeue.
+- Tests: Added maximum-size one-byte-fragment response bounds, FIFO source-contract checks, and deterministic numeric-IPv4 connect/close lifecycle coverage.
 - Library: **Breaking:** Reject bracketed IPv4 host input such as `[127.0.0.1]` before DNS or socket work; use `127.0.0.1` instead.
 - Library: **Breaking:** Limit every raw ASCII request body to 65,506 bytes so the terminating CR produces a maximum 65,507-byte frame for both TCP and UDP.
 - CI: Restored Ruff formatting compliance for all tracked Python source.
