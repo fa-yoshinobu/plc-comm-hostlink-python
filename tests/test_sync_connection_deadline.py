@@ -217,7 +217,7 @@ def test_sync_connect_timeout_closes_a_late_partial_socket(
     monkeypatch.setattr("hostlink.client.socket.socket", lambda family, kind: fake)
     monkeypatch.setattr(
         "hostlink.client.select.select",
-        lambda *_args, **_kwargs: (time.sleep(0.04) or ([], [], [])),
+        lambda *_args, **_kwargs: time.sleep(0.04) or ([], [], []),
     )
     client = _client("127.0.0.1", transport="tcp", connect_timeout=0.03)
 
