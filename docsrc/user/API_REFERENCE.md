@@ -74,16 +74,29 @@ response body `0` or `1`; any other body is a protocol error that invalidates
 the session.
 
 Semantic read operations validate the exact command-derived response token
-count. Direct-bit responses accept only `0`, `1`, `OFF`, or `ON`. UDP responses require a
-CR/LF terminator; missing framing is a protocol error and discards the
-transport. Datetime clock values must be in years 2000 through 2099.
-For direct-bit devices, numeric single reads require the corresponding 16- or
-32-point response. Any malformed semantic response shape invalidates the
-session before another request.
+count. Bare direct-bit responses accept only `0`, `1`, `OFF`, or `ON`.
+Formatted direct-bit single reads return one packed numeric token: `.U`, `.S`,
+and `.H` represent 16 bits, while `.D` and `.L` represent 32 bits. Signed `.S`
+and `.L` tokens may include an explicit leading `+`. Any malformed semantic
+response shape invalidates the session before another request. UDP responses
+require a CR/LF terminator; missing framing is a protocol error and discards
+the transport. Datetime clock values must be in years 2000 through 2099.
 Semantic `.H` results are exactly four uppercase hexadecimal digits. MWS keeps
 the ordered registered formats, and MWR validates each returned token against
 its corresponding `.U`, `.S`, `.H`, `.D`, or `.L` rule. Raw response bodies are
 not normalized.
+
+A bare direct-bit entry is a special case only for `MWS`/`MWR`. For example,
+`register_monitor_words(["R5000"])` transmits exact `MWS R5000`; it does not
+append `.U`. The matching MWR field is the packed unsigned 16-bit word beginning
+at `R5000`. Its field grammar is exactly one through five ASCII decimal digits,
+with optional leading zeros, and its numeric value must be `0` through `65535`.
+Signs, empty or whitespace-only fields, non-decimal characters, more than five
+digits, and overflow are protocol errors that retire the transport.
+`read_monitor_words` preserves
+the existing public string representation, so PLC field `00013` returns
+`["00013"]`. Bare scalar `RD` and `MBS`/`MBR` remain strict bit operations and
+accept only `0`, `1`, `OFF`, or `ON` per field.
 
 `read_comments(device, encoding)` requires
 `HostLinkCommentEncoding.UTF8` or `HostLinkCommentEncoding.CP932`; it never
@@ -131,7 +144,11 @@ its semantic fields, ignores stale `text`, and produces output that can be
 parsed again with the same device, dtype, and bit-index meaning.
 
 Timer/counter composite reads require response status to be exactly `0` or
-`1`; any other numeric status is an invalid response and retires the session.
+`1`; any other spelling or numeric status is an invalid response and retires
+the session. The status is a structural field and remains the integer `0` or
+`1`. The selected `.U`, `.S`, `.H`, `.D`, or `.L` format applies only to the
+current and preset fields; for example, `.H` does not turn status `0` into
+`"0000"`.
 
 Float32 reads and writes are defined only for ordinary one-word `.U` families
 that support two consecutive words: `DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `CM`,

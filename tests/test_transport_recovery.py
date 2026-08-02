@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import select
 import socket
 import threading
 import time
@@ -106,6 +107,291 @@ async def test_async_tcp_traffic_stats_are_independent_of_crlf_segmentation(spli
         await client.close()
         server.close()
         await server.wait_closed()
+
+
+def test_sync_tcp_pre_send_unowned_input_sends_nothing_and_retires_connection() -> None:
+    client_socket, peer_socket = socket.socketpair()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=8501,
+        transport="tcp",
+        timeout=1.0,
+    )
+    client._sock = client_socket
+    try:
+        peer_socket.sendall(b"STALE\r")
+        readable, _, _ = select.select([client_socket], [], [], 1.0)
+        assert readable == [client_socket]
+
+        with pytest.raises(HostLinkProtocolError, match="extra non-empty TCP response"):
+            client.send_raw("RD DM0.U")
+
+        assert client._sock is None
+        assert client.traffic_stats().request_count == 0
+        assert client.traffic_stats().tx_bytes == 0
+        peer_socket.settimeout(1.0)
+        try:
+            transmitted = peer_socket.recv(4096)
+        except ConnectionResetError:
+            transmitted = b""
+        assert transmitted == b""
+    finally:
+        client.close()
+        peer_socket.close()
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_pre_send_unowned_input_sends_nothing_and_retires_connection() -> None:
+    class RecordingWriter:
+        def __init__(self) -> None:
+            self.frames: list[bytes] = []
+            self.close_count = 0
+
+        def write(self, payload: bytes) -> None:
+            self.frames.append(payload)
+
+        async def drain(self) -> None:
+            return None
+
+        def close(self) -> None:
+            self.close_count += 1
+
+        async def wait_closed(self) -> None:
+            return None
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=8501,
+        transport="tcp",
+        timeout=1.0,
+    )
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"STALE\r")
+    writer = RecordingWriter()
+    client._reader = reader
+    client._writer = writer  # type: ignore[assignment]
+
+    with pytest.raises(HostLinkProtocolError, match="extra non-empty TCP response"):
+        await client.send_raw("RD DM0.U")
+
+    assert writer.frames == []
+    assert writer.close_count == 1
+    assert client._reader is None
+    assert client._writer is None
+    assert client.traffic_stats().request_count == 0
+    assert client.traffic_stats().tx_bytes == 0
+
+
+def test_sync_empty_raw_rejects_before_admission_connection_and_exchange() -> None:
+    class RejectAdmission:
+        def __enter__(self) -> None:
+            raise AssertionError("empty raw input must not enter admission")
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=8501,
+        transport="tcp",
+    )
+    exchange_count = 0
+
+    def reject_exchange(*_args: object, **_kwargs: object) -> bytes:
+        nonlocal exchange_count
+        exchange_count += 1
+        raise AssertionError("empty raw input must not reach exchange")
+
+    client._lock = RejectAdmission()  # type: ignore[assignment]
+    client._exchange = reject_exchange  # type: ignore[method-assign]
+
+    with pytest.raises(HostLinkProtocolError, match="command body must not be empty"):
+        client.send_raw("")
+
+    assert exchange_count == 0
+    assert client._sock is None
+    assert client._request_count == 0
+    assert client._tx_bytes == 0
+    assert client._rx_bytes == 0
+
+
+@pytest.mark.asyncio
+async def test_async_empty_raw_rejects_before_fifo_connection_and_exchange() -> None:
+    class RejectAdmission:
+        async def __aenter__(self) -> None:
+            raise AssertionError("empty raw input must not enter FIFO admission")
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=8501,
+        transport="tcp",
+    )
+    exchange_count = 0
+
+    async def reject_exchange(*_args: object, **_kwargs: object) -> bytes:
+        nonlocal exchange_count
+        exchange_count += 1
+        raise AssertionError("empty raw input must not reach exchange")
+
+    client._lock = RejectAdmission()  # type: ignore[assignment]
+    client._exchange = reject_exchange  # type: ignore[method-assign]
+
+    with pytest.raises(HostLinkProtocolError, match="command body must not be empty"):
+        await client.send_raw("")
+
+    assert exchange_count == 0
+    assert client._reader is None
+    assert client._writer is None
+    assert client._request_count == 0
+    assert client._tx_bytes == 0
+    assert client._rx_bytes == 0
+
+
+def test_sync_tcp_monitor_registration_is_connection_bound_and_must_be_repeated_after_reconnect() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(3)
+    port = server.getsockname()[1]
+    server_error: list[BaseException] = []
+    observed_sessions: list[list[bytes]] = []
+
+    def receive_request(connection: socket.socket) -> bytes:
+        request = bytearray()
+        while not request.endswith(b"\r"):
+            chunk = connection.recv(4096)
+            if not chunk:
+                raise ConnectionError("client closed before request terminator")
+            request.extend(chunk)
+        return bytes(request)
+
+    def serve() -> None:
+        try:
+            for session_index in range(3):
+                connection, _ = server.accept()
+                with connection:
+                    observed: list[bytes] = []
+                    if session_index != 1:
+                        observed.append(receive_request(connection))
+                        connection.sendall(b"OK\r")
+                    observed.append(receive_request(connection))
+                    connection.sendall(b"1 0\r")
+                    observed_sessions.append(observed)
+                    assert connection.recv(4096) == b""
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            server_error.append(exc)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        client.register_monitor_bits("R0", "R1")
+        assert client.read_monitor_bits() == [1, 0]
+        client.close()
+
+        client.connect()
+        with pytest.raises(HostLinkProtocolError, match="expected 0, received 2"):
+            client.read_monitor_bits()
+        assert client._sock is None
+
+        client.connect()
+        client.register_monitor_bits("R0", "R1")
+        assert client.read_monitor_bits() == [1, 0]
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
+
+    assert not thread.is_alive()
+    assert server_error == []
+    assert observed_sessions == [
+        [b"MBS R000 R001\r", b"MBR\r"],
+        [b"MBR\r"],
+        [b"MBS R000 R001\r", b"MBR\r"],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_tcp_monitor_registration_is_connection_bound_and_must_be_repeated_after_reconnect() -> None:
+    session_count = 0
+    completed_count = 0
+    completed = asyncio.Event()
+    server_error: list[BaseException] = []
+    observed_sessions: list[list[bytes] | None] = [None, None, None]
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        nonlocal session_count, completed_count
+        session_index = session_count
+        session_count += 1
+        try:
+            observed: list[bytes] = []
+            if session_index != 1:
+                observed.append(await reader.readuntil(b"\r"))
+                writer.write(b"OK\r")
+                await writer.drain()
+            observed.append(await reader.readuntil(b"\r"))
+            writer.write(b"1 0\r")
+            await writer.drain()
+            observed_sessions[session_index] = observed
+            assert await reader.read() == b""
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            server_error.append(exc)
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            completed_count += 1
+            if completed_count == 3:
+                completed.set()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="tcp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        await client.register_monitor_bits("R0", "R1")
+        assert await client.read_monitor_bits() == [1, 0]
+        await client.close()
+
+        await client.connect()
+        with pytest.raises(HostLinkProtocolError, match="expected 0, received 2"):
+            await client.read_monitor_bits()
+        assert client._writer is None
+
+        await client.connect()
+        await client.register_monitor_bits("R0", "R1")
+        assert await client.read_monitor_bits() == [1, 0]
+        await client.close()
+        await asyncio.wait_for(completed.wait(), timeout=1.0)
+    finally:
+        await client.close()
+        server.close()
+        await server.wait_closed()
+
+    assert server_error == []
+    assert observed_sessions == [
+        [b"MBS R000 R001\r", b"MBR\r"],
+        [b"MBR\r"],
+        [b"MBS R000 R001\r", b"MBR\r"],
+    ]
 
 
 def test_sync_tcp_eof_before_terminator_rejects_partial_response() -> None:

@@ -27,7 +27,6 @@ from .device import (
     bit_bank_number_from_logical,
     is_float32_eligible_device_type,
     normalize_suffix,
-    pack_direct_bit_tokens,
     parse_device,
     parse_device_text,
 )
@@ -324,8 +323,6 @@ async def read_typed(
         return _parse_bool_token(values[0])
 
     addr = parse_device(device)
-    direct_bit_device = addr.device_type in _DIRECT_BIT_DEVICE_TYPES
-
     if key == "F":
         if not is_float32_eligible_device_type(addr.device_type):
             raise HostLinkProtocolError(
@@ -339,18 +336,6 @@ async def read_typed(
     values = result if isinstance(result, list) else [result]
     if not values:
         raise HostLinkProtocolError(f"No value returned for {device!r}")
-    if direct_bit_device:
-        packed = pack_direct_bit_tokens(values, 32 if key in {"D", "L"} else 16, device)
-        if key == "S":
-            return packed if packed < 0x8000 else packed - 0x10000
-        if key == "L":
-            return packed if packed < 0x80000000 else packed - 0x100000000
-        if key == "H":
-            return f"{packed:04X}"
-        if key in {"U", "D"}:
-            return packed
-        raise HostLinkProtocolError(f"Unsupported direct-bit word dtype {dtype!r}.")
-
     if addr.device_type in {"T", "C"} and key in {"U", "S", "D", "L", "H"}:
         raw = values[-1]
         if key == "H":
@@ -912,12 +897,7 @@ async def _execute_read_named_plan(
                     bit_index = _require_bit_in_word_index(request.address, request.bit_index)
                     raw = await client.read(base, data_format=".U")
                     values = raw if isinstance(raw, list) else [raw]
-                    parsed = parse_device(base)
-                    word = (
-                        pack_direct_bit_tokens(values, 16, base)
-                        if parsed.device_type in _DIRECT_BIT_DEVICE_TYPES
-                        else int(values[0])
-                    )
+                    word = int(values[0])
                     resolved[request.index] = bool((word >> bit_index) & 1)
                 else:
                     dtype = request.kind.removeprefix("SINGLE_")

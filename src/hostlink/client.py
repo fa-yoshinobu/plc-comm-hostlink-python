@@ -68,6 +68,7 @@ UDP_RECEIVE_BUFFER_SIZE = ABSOLUTE_RESPONSE_CAP + 2
 ABSOLUTE_REQUEST_BODY_CAP = 65_506
 ABSOLUTE_REQUEST_FRAME_CAP = ABSOLUTE_REQUEST_BODY_CAP + 1
 _ASYNC_TIMEOUT_ERRORS = (TimeoutError, asyncio.TimeoutError)
+_PACKED_DIRECT_BIT_MWR_FORMAT = "<packed-direct-bit-u16>"
 
 _READ_ONLY_COMMANDS = frozenset({"?E", "?K", "?M", "RD", "RDS", "RDE", "RDC", "MBR", "MWR", "URD"})
 
@@ -862,15 +863,10 @@ class HostLinkBase:
         return values[0] if expected_count == 1 else values
 
     @staticmethod
-    def _read_response_token_count(device: str, data_format: str) -> int:
+    def _read_response_token_count(device: str, _data_format: str) -> int:
         device_type = parse_device(device).device_type
         if device_type in {"T", "C"}:
             return 3
-        if device_type in DIRECT_BIT_DEVICE_TYPES:
-            if data_format in {".U", ".S", ".H"}:
-                return 16
-            if data_format in {".D", ".L"}:
-                return 32
         return 1
 
     def _build_read_consecutive_command(
@@ -987,7 +983,11 @@ class HostLinkBase:
             validate_device_type("MWS", addr.device_type, MWS_DEVICE_TYPES)
             tok, suffix = self._device_with_format(device, data_format)
             tokens.append(tok)
-            formats.append(suffix)
+            # The MWS wire token stays bare, while MWR reports the packed
+            # unsigned 16-bit word beginning at a bare direct-bit target.
+            formats.append(
+                _PACKED_DIRECT_BIT_MWR_FORMAT if not suffix and addr.device_type in DIRECT_BIT_DEVICE_TYPES else suffix
+            )
         return "MWS " + " ".join(tokens), tuple(formats)
 
     def _decode_monitor_bits_response(self, response: str) -> list[int | str]:
@@ -1002,6 +1002,17 @@ class HostLinkBase:
             )
         validated: list[str] = []
         for token, data_format in zip(values, self._monitor_word_formats, strict=True):
+            if data_format == _PACKED_DIRECT_BIT_MWR_FORMAT:
+                if not 1 <= len(token) <= 5 or any(character < "0" or character > "9" for character in token):
+                    raise HostLinkProtocolError(
+                        f"Invalid packed direct-bit MWR token {token!r}; expected 1..5 ASCII decimal digits"
+                    )
+                if int(token, 10) > 0xFFFF:
+                    raise HostLinkProtocolError(
+                        f"Packed direct-bit MWR token {token!r} is outside the unsigned 16-bit range"
+                    )
+                validated.append(token)
+                continue
             parsed = parse_data_tokens([token], data_format=data_format)[0]
             validated.append(parsed if isinstance(parsed, str) else token)
         return validated
@@ -1384,14 +1395,15 @@ class HostLinkClient(HostLinkBase):
     def send_raw(self, body: str) -> bytes:
         """Send one maintainer raw command and return undecoded response body bytes."""
 
+        payload = self._build_command(body)
+        state_changing = self._raw_command_is_state_changing(payload)
         with self._lock:
-            payload = self._build_command(body)
             response = self._exchange(
                 payload,
-                state_changing=self._raw_command_is_state_changing(payload),
+                state_changing=state_changing,
             )
             result = response.rstrip(b"\r\n")
-            self._check_decode_deadline(state_changing=self._raw_command_is_state_changing(payload))
+            self._check_decode_deadline(state_changing=state_changing)
             return result
 
     def _send_decoded(
@@ -1686,7 +1698,7 @@ class HostLinkClient(HostLinkBase):
                 suffix,
                 self._read_response_token_count(device, suffix),
                 timer_counter_composite=device_type in {"T", "C"},
-                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES,
+                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES and not suffix,
             ),
         )
 
@@ -2077,14 +2089,15 @@ class AsyncHostLinkClient(HostLinkBase):
     async def send_raw(self, body: str) -> bytes:
         """Send one maintainer raw command and return undecoded response body bytes."""
 
+        payload = self._build_command(body)
+        state_changing = self._raw_command_is_state_changing(payload)
         async with self._lock:
-            payload = self._build_command(body)
             response = await self._exchange(
                 payload,
-                state_changing=self._raw_command_is_state_changing(payload),
+                state_changing=state_changing,
             )
             result = response.rstrip(b"\r\n")
-            await self._check_decode_deadline(state_changing=self._raw_command_is_state_changing(payload))
+            await self._check_decode_deadline(state_changing=state_changing)
             return result
 
     async def _send_decoded(
@@ -2390,7 +2403,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 suffix,
                 self._read_response_token_count(device, suffix),
                 timer_counter_composite=device_type in {"T", "C"},
-                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES,
+                direct_bit_response=device_type in DIRECT_BIT_DEVICE_TYPES and not suffix,
             ),
         )
 

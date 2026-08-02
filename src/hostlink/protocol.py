@@ -140,7 +140,8 @@ def parse_scalar_token(token: str, *, data_format: str = "") -> int | str:
             raise HostLinkProtocolError(f"Invalid hexadecimal response token {token!r}")
         return f"{int(normalized, 16):04X}"
     if data_format in {".U", ".S", ".D", ".L"}:
-        if not re.fullmatch(r"-?\d+", token):
+        numeric_pattern = r"[+-]?\d+" if data_format in {".S", ".L"} else r"\d+"
+        if not re.fullmatch(numeric_pattern, token):
             raise HostLinkProtocolError(f"Invalid numeric response token {token!r} for format {data_format!r}")
         parsed = int(token, 10)
         limits = {

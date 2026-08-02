@@ -17,9 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: Bare direct-bit `MWS` targets remain suffix-free on the wire, while their corresponding `MWR` fields are now validated as packed unsigned 16-bit values using exactly one through five ASCII decimal digits and numeric range `0..65535`. Leading zeros are optional; empty or whitespace-only, signed, non-decimal, over-five-digit, and overflowing fields retire the transport. The existing `list[str]` return representation is unchanged; scalar `RD` and `MBS`/`MBR` remain strict bit operations.
+- Tests: Added sync/async live-vector, mixed-registration, invalid-response retirement, and reconnect/stale-monitor-metadata coverage for bare direct-bit `MWS`/`MWR`.
+- Library: Timer/counter composite responses keep the structural status as the PLC-semantic integer `0` or `1`; the selected `.U`, `.S`, `.H`, `.D`, or `.L` format applies only to current and preset values. Public signatures and Python return types are unchanged.
+- Library: Correct formatted single reads of direct-bit devices to accept the PLC's one packed scalar response token instead of expecting 16 or 32 separate bit tokens. Signed `.S` and `.L` responses accept the PLC's explicit leading `+`; bare bit reads remain strict `0`/`1`/`ON`/`OFF` reads. Public signatures are unchanged.
 - Library: TCP response framing now uses a reusable growable accumulator with an incremental scan cursor; synchronous numeric-IPv4 connection establishment uses workerless nonblocking `connect_ex`, while hostname DNS remains isolated from the caller deadline.
 - Library: Async request admission now uses an O(1) ordered FIFO for enqueue, cancellation removal, and dequeue.
 - Tests: Added maximum-size one-byte-fragment response bounds, FIFO source-contract checks, and deterministic numeric-IPv4 connect/close lifecycle coverage.
+- Docs: Documented the TCP request-identifier limitation, the residual pre-send-check race, healthy persistent-connection latency decision, and connection-scoped monitor registration.
+- Tests: Added direct sync/async TCP checks proving observable pre-send unowned input sends no request and retires the connection, plus monitor registration/read and reconnect/re-registration coverage.
+- Library: Public sync/async raw commands now finish frame validation before FIFO admission; the already-invalid empty command remains a protocol input error and reaches no connection or exchange work.
+- Tests: Added explicit sync/async cross-language contract evidence that empty public raw input enters neither admission nor exchange and leaves connection and traffic state unchanged.
 - Library: **Breaking:** Reject bracketed IPv4 host input such as `[127.0.0.1]` before DNS or socket work; use `127.0.0.1` instead.
 - Library: **Breaking:** Limit every raw ASCII request body to 65,506 bytes so the terminating CR produces a maximum 65,507-byte frame for both TCP and UDP.
 - CI: Restored Ruff formatting compliance for all tracked Python source.

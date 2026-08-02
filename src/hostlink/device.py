@@ -406,32 +406,6 @@ def validate_device_span(device_type: str, start_number: int, effective_format: 
     _ = start_span_number + (count * device_width) - 1
 
 
-def pack_direct_bit_tokens(tokens: list[int | str], expected_count: int, context: str) -> int:
-    """Pack direct-bit response tokens with the first token as bit zero."""
-
-    if len(tokens) != expected_count:
-        raise HostLinkProtocolError(
-            f"Direct-bit word response for {context!r} contained {len(tokens)} tokens; expected {expected_count}"
-        )
-    result = 0
-    for bit, token in enumerate(tokens):
-        if isinstance(token, str):
-            normalized = token.strip().upper()
-            if normalized in {"1", "ON"}:
-                enabled = True
-            elif normalized in {"0", "OFF"}:
-                enabled = False
-            else:
-                raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
-        elif type(token) is int and token in {0, 1}:
-            enabled = token == 1
-        else:
-            raise HostLinkProtocolError(f"Invalid direct bit response token: {token!r}")
-        if enabled:
-            result |= 1 << bit
-    return result
-
-
 def _device_span_width(device_type: str, effective_format: str) -> int:
     if device_type in DIRECT_BIT_DEVICE_TYPES:
         if effective_format in {".U", ".S", ".H"}:

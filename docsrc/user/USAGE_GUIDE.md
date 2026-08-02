@@ -154,6 +154,23 @@ TCP owns exactly one non-empty response line per request. Additional CR/LF
 separators are ignored, but a second non-empty line is a protocol error and
 retires the transport; it can never satisfy a later operation.
 
+Host Link response lines do not contain a request identifier. Before sending,
+the client rejects already observable TCP input without transmitting the new
+request and retires that connection. Input that arrives after this check but
+before the actual send is a residual race: the library cannot prove whether the
+next response belongs to the current request. A healthy TCP connection is not
+closed and reopened for every request because doing so would add a TCP
+handshake to normal operations, break connection-scoped monitor registration,
+and still would not add a protocol request identifier. The library instead
+serializes requests, reuses healthy connections for normal latency, and retires
+the connection as soon as unowned, malformed, extra, timed-out, or cancelled
+input is observed.
+
+`MBS`/`MWS` monitor registration and the corresponding `MBR`/`MWR` read must use
+the same live TCP connection. Closing, losing, or replacing that connection
+clears the client's registration metadata. Register the monitor devices again
+after every reconnect before reading monitor values.
+
 Use `close()` and `connect()` for an intentional reconnect. After a persistent
 connection failure, create a new client with the same `HostLinkConnectionOptions`.
 
@@ -385,6 +402,25 @@ remain unchanged. MWS retains the ordered format of every registered word, and
 MWR validates each returned position against its matching `.U`, `.S`, `.H`,
 `.D`, or `.L` format before returning data.
 
+Only `MWS`/`MWR` gives a bare direct-bit target packed-word meaning. This mixed
+registration keeps its field order and sends the relay target without a suffix:
+
+```python
+await client.register_monitor_words([("DM120", ".U"), "R5000", ("DM121", ".S")])
+values = await client.read_monitor_words()
+```
+
+The wire registration is `MWS DM120.U R5000 DM121.S`. The `R5000` MWR field is
+the unsigned 16-bit packed value beginning at that bit. Its exact grammar is
+one through five ASCII decimal digits with optional leading zeros, and its
+numeric value must be `0..65535`. Empty or whitespace-only, signed,
+non-decimal, over-five-digit, and overflowing fields are protocol errors that
+retire the transport. The method keeps its existing `list[str]` result, so wire
+value `00013` remains string `"00013"`. This does not change bare scalar `RD`,
+which still reads one strict bit, or `MBS`/`MBR`, which still returns one strict
+bit per registered device. Monitor registration is connection-scoped;
+re-register after reconnect before calling MWR.
+
 For `read_named` and `poll`, do not omit the type suffix. Use `DM100:U` instead of relying on `DM100` to mean an unsigned word.
 Pass `comment_encoding` only when the collection contains `:COMMENT`; an
 unused comment codec is rejected before communication.
@@ -417,8 +453,11 @@ if __name__ == "__main__":
 ```
 
 `read_timer_counter` returns `status`, `current`, and `preset`. The response
-status must be exactly `0` or `1`; any other numeric value is an invalid
-response and retires the connection. `read_timer` accepts timer devices, and
+status must be exactly `0` or `1`; any other spelling or numeric value is an
+invalid response and retires the connection. Status remains the integer `0` or
+`1`; the selected numeric format applies only to current and preset. Thus an
+`.H` response can be `[0, "270F", "270F"]`, never
+`["0000", "270F", "270F"]`. `read_timer` accepts timer devices, and
 `read_counter` accepts counter devices.
 
 > **Caution:** Timer/Counter preset writes (`WS`/`WSS`) only supported on KV-8000/7000-series. Other models return error `E1`.

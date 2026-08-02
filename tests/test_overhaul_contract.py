@@ -506,29 +506,179 @@ def test_semantic_hex_response_is_always_four_uppercase_digits(token: str, expec
 
 
 def test_hex_timer_counter_read_keeps_status_semantic_and_canonicalizes_values() -> None:
-    client = _RecordingClient([b"1 a ff\r"])
+    client = _RecordingClient([b"0 270F 270F\r"])
 
-    assert client.read("T0", data_format=".H") == [1, "000A", "00FF"]
+    assert client.read("T0", data_format=".H") == [0, "270F", "270F"]
     assert client.frames == [b"RD T0.H\r"]
     assert not client.retired
 
 
 @pytest.mark.asyncio
-async def test_hex_direct_bit_typed_read_packs_status_tokens_before_canonicalizing_value() -> None:
-    response = " ".join(["1", "0", "1", "0"] + ["0"] * 12).encode() + b"\r"
-    client = _AsyncRecordingClient([response])
+async def test_direct_bit_typed_reads_accept_scalar_numeric_responses_observed_on_kv_x500() -> None:
+    client = _AsyncRecordingClient([b"00000\r", b"+00000\r", b"0000\r", b"0000000000\r", b"+0000000000\r"])
 
-    assert await read_typed(client, "R0", "H") == "0005"
-    assert client.frames == [b"RD R000.H\r"]
+    assert await read_typed(client, "R0", "U") == 0
+    assert await read_typed(client, "R0", "S") == 0
+    assert await read_typed(client, "R0", "H") == "0000"
+    assert await read_typed(client, "R0", "D") == 0
+    assert await read_typed(client, "R0", "L") == 0
+    assert client.frames == [
+        b"RD R000.U\r",
+        b"RD R000.S\r",
+        b"RD R000.H\r",
+        b"RD R000.D\r",
+        b"RD R000.L\r",
+    ]
+    assert not client.retired
+
+
+def test_sync_direct_bit_low_level_reads_accept_scalar_numeric_responses_observed_on_kv_x500() -> None:
+    client = _RecordingClient([b"00000\r", b"+00000\r", b"0000\r", b"0000000000\r", b"+0000000000\r"])
+
+    assert client.read("R0", data_format=".U") == 0
+    assert client.read("R0", data_format=".S") == 0
+    assert client.read("R0", data_format=".H") == "0000"
+    assert client.read("R0", data_format=".D") == 0
+    assert client.read("R0", data_format=".L") == 0
     assert not client.retired
 
 
 def test_monitor_words_validate_each_registered_format_and_preserve_nonhex_strings() -> None:
-    client = _RecordingClient([b"OK\r", b"0001 -2 a 4294967295 -2147483648\r"])
-    client.register_monitor_words([("DM0", ".U"), ("DM1", ".S"), ("DM2", ".H"), ("DM3", ".D"), ("DM5", ".L")])
+    client = _RecordingClient([b"OK\r", b"0001 -2 a 00013 4294967295 -2147483648\r"])
+    client.register_monitor_words([("DM0", ".U"), ("DM1", ".S"), ("DM2", ".H"), "R5000", ("DM3", ".D"), ("DM5", ".L")])
 
-    assert client.read_monitor_words() == ["0001", "-2", "000A", "4294967295", "-2147483648"]
+    assert client.read_monitor_words() == ["0001", "-2", "000A", "00013", "4294967295", "-2147483648"]
+    assert client.frames == [b"MWS DM0.U DM1.S DM2.H R5000 DM3.D DM5.L\r", b"MWR\r"]
     assert not client.retired
+
+
+def test_sync_bare_direct_bit_monitor_word_accepts_complete_packed_u16_domain() -> None:
+    accepted = ["0", "2", "13", "00000", "00002", "00013", "65535"]
+    client = _RecordingClient([b"OK\r", *(f"{value}\r".encode() for value in accepted)])
+
+    client.register_monitor_words(["R5000"])
+
+    assert [client.read_monitor_words() for _ in accepted] == [[value] for value in accepted]
+    assert client.frames == [b"MWS R5000\r", *([b"MWR\r"] * len(accepted))]
+    assert not client.retired
+
+
+@pytest.mark.asyncio
+async def test_async_bare_direct_bit_monitor_word_accepts_complete_packed_u16_domain() -> None:
+    accepted = ["0", "2", "13", "00000", "00002", "00013", "65535"]
+    client = _AsyncRecordingClient([b"OK\r", *(f"{value}\r".encode() for value in accepted)])
+
+    await client.register_monitor_words(["R5000"])
+
+    observed = [await client.read_monitor_words() for _ in accepted]
+    assert observed == [[value] for value in accepted]
+    assert client.frames == [b"MWS R5000\r", *([b"MWR\r"] * len(accepted))]
+    assert not client.retired
+
+
+@pytest.mark.parametrize("response", ["", " ", "-1", "+2", "65536", "000000", "NOT_DECIMAL", "00002 0"])
+def test_sync_bare_direct_bit_monitor_word_rejects_invalid_response_and_retires_transport(response: str) -> None:
+    client = _RecordingClient([b"OK\r", f"{response}\r".encode()])
+    client.register_monitor_words(["R5000"])
+
+    with pytest.raises(HostLinkProtocolError):
+        client.read_monitor_words()
+
+    assert client.retired
+    assert client._monitor_word_formats == ()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", ["", " ", "-1", "+2", "65536", "000000", "NOT_DECIMAL", "00002 0"])
+async def test_async_bare_direct_bit_monitor_word_rejects_invalid_response_and_retires_transport(
+    response: str,
+) -> None:
+    client = _AsyncRecordingClient([b"OK\r", f"{response}\r".encode()])
+    await client.register_monitor_words(["R5000"])
+
+    with pytest.raises(HostLinkProtocolError):
+        await client.read_monitor_words()
+
+    assert client.retired
+    assert client._monitor_word_formats == ()
+
+
+def test_sync_packed_monitor_word_does_not_change_scalar_or_bit_monitor_contract() -> None:
+    scalar = _RecordingClient([b"00002\r"])
+    with pytest.raises(HostLinkProtocolError, match="direct bit"):
+        scalar.read("R5000")
+    assert scalar.retired
+
+    bits = _RecordingClient([b"OK\r", b"00002\r"])
+    bits.register_monitor_bits("R5000")
+    with pytest.raises(HostLinkProtocolError, match="direct bit"):
+        bits.read_monitor_bits()
+    assert bits.retired
+
+
+@pytest.mark.asyncio
+async def test_async_packed_monitor_word_does_not_change_scalar_or_bit_monitor_contract() -> None:
+    scalar = _AsyncRecordingClient([b"00002\r"])
+    with pytest.raises(HostLinkProtocolError, match="direct bit"):
+        await scalar.read("R5000")
+    assert scalar.retired
+
+    bits = _AsyncRecordingClient([b"OK\r", b"00002\r"])
+    await bits.register_monitor_bits("R5000")
+    with pytest.raises(HostLinkProtocolError, match="direct bit"):
+        await bits.read_monitor_bits()
+    assert bits.retired
+
+
+def test_sync_monitor_word_close_and_failed_registration_discard_packed_metadata() -> None:
+    client = _RecordingClient([b"OK\r"])
+    client.register_monitor_words(["R5000"])
+    assert len(client._monitor_word_formats) == 1
+    assert client._monitor_word_formats != (".U",)
+
+    client.close()
+    assert client._monitor_word_formats == ()
+
+    client.retired = False
+    client.responses = [b"00013\r"]
+    with pytest.raises(HostLinkProtocolError, match="expected 0, received 1"):
+        client.read_monitor_words()
+    assert client.retired
+
+    client.retired = False
+    client.responses = [b"OK\r", b"00013\r", b"NO\r"]
+    client.register_monitor_words(["R5000"])
+    assert client.read_monitor_words() == ["00013"]
+    with pytest.raises(hostlink.HostLinkOutcomeUnknownError):
+        client.register_monitor_words([("DM0", ".U")])
+    assert client.retired
+    assert client._monitor_word_formats == ()
+
+
+@pytest.mark.asyncio
+async def test_async_monitor_word_close_and_failed_registration_discard_packed_metadata() -> None:
+    client = _AsyncRecordingClient([b"OK\r"])
+    await client.register_monitor_words(["R5000"])
+    assert len(client._monitor_word_formats) == 1
+    assert client._monitor_word_formats != (".U",)
+
+    await client.close()
+    assert client._monitor_word_formats == ()
+
+    client.retired = False
+    client.responses = [b"00013\r"]
+    with pytest.raises(HostLinkProtocolError, match="expected 0, received 1"):
+        await client.read_monitor_words()
+    assert client.retired
+
+    client.retired = False
+    client.responses = [b"OK\r", b"00013\r", b"NO\r"]
+    await client.register_monitor_words(["R5000"])
+    assert await client.read_monitor_words() == ["00013"]
+    with pytest.raises(hostlink.HostLinkOutcomeUnknownError):
+        await client.register_monitor_words([("DM0", ".U")])
+    assert client.retired
+    assert client._monitor_word_formats == ()
 
 
 @pytest.mark.parametrize(

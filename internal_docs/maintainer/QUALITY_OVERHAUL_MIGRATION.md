@@ -381,9 +381,11 @@ Acceptance criteria:
    no removed LF option or decoded-raw behavior remains.
 5. A 1001-word named range rejects before send and no library-local
    cross-implementation vector or runner remains.
-6. Direct-bit numeric single reads require 16 or 32 response tokens according
-   to the explicit format, and any command-derived response-shape mismatch
-   invalidates the session before another request.
+6. Direct-bit numeric single reads require exactly one packed scalar response
+   token. `.U`/`.S`/`.H` span 16 direct-bit addresses and `.D`/`.L` span 32;
+   any command-derived response-shape mismatch invalidates the session before
+   another request. This corrects the former 16/32-token assumption using the
+   KV-X500 live response vectors recorded by `LIVE-HL-001`.
 
 - [x] Implementation completed in this repository.
 - [x] Tests added or updated for every acceptance criterion.
@@ -639,6 +641,69 @@ Self-review disposition:
   from the Linux full gate. Exact existing test node IDs remain authoritative.
 - Duplicate findings: none. Deferred findings: none.
 
+## REAUDIT-001 — TCP response ownership residual limitation
+
+Decision status: accepted finding corrected on 2026-08-02.
+
+Implementation scope: existing sync/async TCP pre-send ownership checks,
+connection-scoped monitor state, deterministic transport tests, the user
+transport guide, and changelog. Runtime transport behavior and public APIs are
+unchanged.
+
+Target contract: Host Link TCP has no request identifier. A client sends no new
+request and retires the connection when unowned input is observable before
+send, while accepting that input arriving between that check and send cannot be
+identified perfectly. Healthy persistent connections remain in use because a
+one-request-per-connection design would add handshake latency, invalidate
+monitor registration every cycle, and still would not add a protocol request
+identifier. `MBS`/`MWS` registration and `MBR`/`MWR` read use the same live
+connection; reconnect clears local registration metadata and requires explicit
+registration again.
+
+Compatibility impact: none. This records and directly tests the already
+approved persistent-connection and observed-abnormal-input behavior.
+
+Machine-verifiable acceptance criteria:
+
+1. Sync and async clients detect already buffered TCP input before send,
+   transmit zero bytes, and retire the connection.
+2. Monitor registration followed by read succeeds on one physical connection.
+3. After reconnect, a monitor read cannot reuse the prior local registration;
+   explicit re-registration restores the read.
+4. User documentation states the missing request identifier, the residual
+   check-to-send race, and the normal-latency reason for rejecting
+   one-request-per-connection operation.
+
+- [x] Implementation and documentation correction completed in HostLink Python.
+- [x] Direct sync/async ownership and monitor lifecycle tests passed.
+- [x] Relevant static, full test, sample, documentation, package/build, and source-archive gates passed.
+- [x] Codex self-review completed for send count, retirement, connection identity, monitor reset, and documentation.
+- [x] Live PLC verification disposition recorded.
+- [x] User documentation, maintainer record, and changelog agree.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: direct sync/async tests prove that observable pre-send
+TCP input produces zero transmitted request bytes and retires the connection.
+Loopback tests prove registration and monitor read share one accepted TCP
+connection, that reconnect does not inherit the prior local registration, and
+that explicit re-registration restores the read. `run_ci.bat` passed Ruff,
+mypy, documentation/API/sample/workflow checks, and all 351 tests. The
+current-worktree source archive repeated the full gate and passed wheel/sdist
+construction plus the isolated package consumer. Live PLC verification is not
+required because the accepted finding concerns deterministic client-side
+ownership checks, connection identity, and local registration-state lifetime;
+it does not change or newly claim PLC command support.
+
+Self-review finding classification:
+
+- Accepted and corrected: the implementation had pre-send rejection and
+  monitor-state reset, but direct sync/async proof of zero send, physical
+  connection reuse, and required re-registration was incomplete.
+- Accepted and corrected: the user guide did not state the protocol identifier
+  limitation, the residual check-to-send race, or why healthy TCP connections
+  are not replaced for every request.
+- Rejected findings: none. Duplicate findings: none. Deferred findings: none.
+
 ## REAUDIT-004 — Reject bracketed IPv4 input
 
 Implementation scope: sync/async client construction, shared connection
@@ -672,10 +737,60 @@ Verification evidence: `run_ci.bat` passed on Windows with Python 3.14.3,
 including Ruff lint/format, mypy, documentation/sample/workflow checks, and all
 335 tests. No live PLC communication was performed.
 
+## REAUDIT-005 cross-language evidence — Empty public raw input
+
+Decision status: accepted cross-language evidence finding corrected on
+2026-08-02.
+
+Implementation scope: sync/async public `send_raw`, frame validation ordering,
+and direct rejection tests. Python already rejected an empty command as a
+`HostLinkProtocolError`; validation now completes before sync admission or
+async FIFO admission.
+
+Target contract: empty public raw input is rejected as a protocol input error
+before admission, connection-state inspection, client-state mutation, network
+work, or exchange/send. Non-empty raw requests retain their existing framing,
+FIFO, timeout, result, and error contracts.
+
+Compatibility impact: none for valid callers. Empty input was already invalid;
+only the timing of that existing local rejection moves before admission.
+
+Machine-verifiable acceptance criteria:
+
+1. Sync and async `send_raw("")` raise `HostLinkProtocolError` with neither
+   admission context entered nor private exchange invoked.
+2. Connection references and traffic counters remain unchanged at zero.
+3. Existing non-empty raw command tests and the complete repository gate pass.
+
+- [x] Validation ordering completed in sync and async clients.
+- [x] Direct cross-language contract tests passed.
+- [x] Relevant static, full test, sample, documentation, package/build, and source-archive gates passed.
+- [x] Codex self-review completed for validation order, FIFO, state, network, and error behavior.
+- [x] Live PLC verification disposition recorded.
+- [x] Maintainer record and changelog agree; no user migration is required.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: direct sync and async tests replace admission and
+exchange with fail-fast spies, call the public `send_raw("")`, and observe the
+existing `HostLinkProtocolError` before either spy is entered. Connection
+references and request/TX/RX counters remain unchanged. `run_ci.bat` and the
+current-worktree source-archive/package-consumer gate passed with all 351
+tests. Live PLC verification is not required because rejection is complete
+before FIFO, connection inspection, socket work, or frame transmission.
+
+Self-review finding classification:
+
+- Accepted and corrected: Python's public raw API rejected empty input, but the
+  explicit sync/async proof of rejection before admission and exchange was
+  missing, and validation still occurred inside admission.
+- Rejected findings: none. Duplicate findings: none. Deferred findings: none.
+
 ## REAUDIT-007 — Ruff source formatting
 
 Implementation scope: the pre-existing non-compliant layout in
-`src/hostlink/client.py`; runtime behavior and public API are unchanged.
+`src/hostlink/client.py` and the later Ruff gate correction in
+`tests/test_sync_connection_deadline.py`; runtime behavior and public API are
+unchanged.
 
 Target state: every tracked Python file satisfies the repository's Ruff format
 check without changing runtime behavior for the formatting-only correction.
@@ -692,6 +807,21 @@ Compatibility impact: none.
 - [x] Live PLC verification is not required for formatting-only work.
 - [x] Changelog agrees with the correction; no migration or API documentation is required.
 - [x] Final acceptance criterion verified and the item marked complete.
+
+Acceptance evidence reverified on 2026-08-02 at source commit `9a586eb`:
+
+- `python -m ruff format --check src tests` passed with all 22 files already
+  formatted.
+- `run_ci.bat` passed Ruff lint/format, mypy, documentation, API, sample, and
+  workflow checks together with all 345 tests.
+- `scripts/check_source_archive.ps1` passed the extracted-source full gate,
+  wheel/sdist build, and isolated package-consumer check.
+- The final test-file correction is one Ruff-only parenthesis-layout change;
+  its Python AST is identical before and after the correction. No strings,
+  branches, exceptions, public APIs, or communication behavior changed.
+- Live PLC verification remains unnecessary because neither formatting
+  correction changes executable syntax, request frames, transport behavior,
+  response decoding, or profile decisions.
 
 ## REAUDIT-008 — Raw request frame capacity
 
@@ -786,9 +916,51 @@ Machine-verifiable acceptance criteria:
 - [x] Deterministic sync/async reuse, delayed-unowned-input, failure, replacement, and close tests added or updated.
 - [x] Relevant static, full test, sample, documentation, package/build, and current-worktree source-archive gates passed on this source state.
 - [x] Codex self-review completed for sync/async lifecycle, outcome classification, and cross-language consistency requirements.
-- [x] Live PLC verification is not required for the deterministic transport lifecycle contract.
+- [x] Live PLC verification passed for healthy sync/async UDP socket reuse and explicit post-close rejection (`HL-KVX500-02`).
+- [x] Live PLC verification passed for sync/async timeout isolation, failed-socket retirement, and DNS-free replacement (`HL-KVX500-02B`).
 - [x] User documentation, migration notes, and changelog agree with the implementation.
 - [x] Final acceptance criteria verified and the item marked complete.
+
+Final live evidence: after the fixed guarded runner was compiled, reviewed, and
+separately approved, `HL-KVX500-02` ran read-only against KEYENCE KV-X500
+profile `keyence:kv-x500` at `192.168.250.100:8501` over UDP. The synchronous
+and asynchronous public clients each retained one socket, socket generation,
+and local endpoint across two complete 11-request cycles: 22 successful
+requests and 44 raw send/receive frames per client. Each client performed one
+socket creation and one bind/connect, performed no resolver-helper or actual
+DNS lookup, and did not close or reopen the socket between requests. Explicit
+close raised the close count to one and left no active socket. A subsequent
+read-only `RD DM120.U` on the same closed client was rejected before send with
+`HostLinkNotConnectedError`; raw frames, traffic counters, lifecycle counters,
+and socket state remained unchanged for both client variants.
+
+Both cycles and both clients returned direct word values
+`[0, 0, "0000", 0, 0, 13]` and normalized MWR values
+`[0, 0, "0000", 0, 0, 13]`; the preserved raw MWR fields were
+`["00000", "+00000", "0000", "0000000000", "+0000000000", "00013"]`.
+RDS and MBR both returned the prepared bit pattern `[1, 0, 1]`. Thus direct
+reads equaled monitor reads semantically, the bare direct-bit packed value was
+`13`, and the batch performed no device writes. Evidence file:
+`D:\APP\live-kvx500-20260802\python_hl_kvx500_02_udp_final_result.json`
+(SHA-256
+`E4B412D60D989EDF03EFACA8D2C7876B18289B742FA719E27DFD780DCDFB1044`).
+The reviewed runner SHA-256 is
+`839AC22101C30FB5470B3DB0A42D78C359431D74EEA925D2F4F160462DFF4A86`.
+
+Controlled anomaly evidence: after separate approval of the fixed runner,
+`HL-KVX500-02B` used one physical UDP-path interruption and one restoration
+while keeping the synchronous and asynchronous public clients alive. All
+communication was read-only and strictly sequential. In phase A, each client
+read `DM120.U` as `0` on its retained socket. In phase B, each client issued
+exactly one request, reached the fixed two-second timeout without retry, and
+retired the failed socket so no active socket remained. In phase C, each client
+created socket generation 2 from the retained numeric endpoint without another
+DNS lookup, read `DM120.U` as `0`, and closed without an active socket. Each
+client recorded three requests, 33 transmitted bytes, and 14 received bytes;
+the batch performed no writes. Evidence file:
+`D:\APP\live-kvx500-20260802\python_hl_kvx500_02b_udp_anomaly_result.json`
+(SHA-256
+`BE05E1C8D623CE67CC027C88E19295672C0B4994564CE1F61EDD1E4D3103A63F`).
 
 ## PERF-008B — Own one FIFO turn for a named-read aggregate
 
@@ -868,3 +1040,217 @@ Machine-verifiable acceptance criteria:
   repository/package gates and four-implementation consistency review passed;
   deterministic request-count and lifecycle tests provide the required
   performance-contract evidence without a separate wall-clock benchmark.
+
+## LIVE-HL-003 — Preserve structural timer/counter status
+
+Decision status: approved by the maintainer on 2026-08-02; implemented and
+live-verified in HostLink Python.
+
+Implementation scope: synchronous and asynchronous `RD T/C` composite
+decoding, typed helpers, documentation, and deterministic response vectors.
+Target contract: validate the raw first token as exact `0` or `1` before
+numeric parsing. Keep that structural field as integer status and apply the
+selected `.U`, `.S`, `.H`, `.D`, or `.L` format only to current and preset.
+
+Compatibility impact: Python already implemented the approved target, so
+public signatures and returned Python types do not change. The record and
+tests now make the cross-language low-level contract explicit.
+
+Machine-verifiable acceptance criteria:
+
+1. Raw status accepts only exact `0` or `1` and is never numeric-format normalized.
+2. Current and preset alone use the requested format and its bounds.
+3. `.H` returns status `0`/`1` with four-uppercase-digit current and preset values.
+4. Invalid status, shape, numeric text, or range retires the supplying transport.
+5. The real KV-X500 vector `0,270F,270F` is shared with the other HostLink implementations.
+
+- [x] Implementation completed in HostLink Python.
+- [x] Tests added or updated for every local acceptance criterion.
+- [x] Relevant static, unit, integration, sample, documentation, package, and build checks passed on the final source state.
+- [x] Codex self-review completed against the approved contract and cross-language consistency requirements.
+- [x] Corrected representative live batch passed after explicit approval.
+- [x] User documentation, migration notes, changelog, and API reference agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: `run_ci.bat` passed Ruff lint/format, mypy, public and
+high-level documentation coverage, sample/workflow validation, and all 392
+tests plus 58 subtests. Direct format-matrix tests cover `.U`, `.S`, `.H`,
+`.D`, and `.L`; direct transport tests cover missing/extra fields, invalid
+current/preset text, every
+numeric range, exact-status rejection, and session retirement. The package
+content gate built wheel/sdist artifacts and passed an isolated consumer check.
+
+Corrected representative live evidence: the explicitly approved read-only
+`HL-KVX500-01` batch ran against profile `keyence:kv-x500` at
+`192.168.250.100:8501` over TCP from
+2026-08-02T11:11:51.411151Z through 2026-08-02T11:11:51.475295Z. Both the
+synchronous and asynchronous public clients returned `R000.H = 0000` and
+`T0.H = [0, 270F, 270F]`, preserving status as integer `0` and applying `.H`
+only to current and preset. Each client completed exactly 12 requests with
+163 transmitted bytes and 139 received bytes. The batch result is `pass`.
+Evidence file:
+`D:\APP\live-kvx500-20260802\python_hl_kvx500_01_result.json` (SHA-256
+`D5F6C926F149658E1A51B9D95D5F036728555854DDAD883E5D6716E8E756C3D2`).
+The reviewed runner SHA-256 is
+`FBCB158D386D41A38C82F02D76C6C61959C2F3A1A27A0CEA917830494CE7DACC`;
+it loaded the approved worktree based on repository HEAD
+`9a586ebd77d5f7e675645c08422ff18207f091c9`.
+
+Self-review finding classification:
+
+- Accepted and corrected: cross-language evidence needed the real
+  `0,270F,270F` vector plus direct all-format and malformed composite tests.
+- Accepted and corrected: user and maintainer documentation did not explicitly
+  separate structural status from formatted current/preset fields.
+- Rejected findings: none. Duplicate findings: none. Deferred implementation
+  findings: none. The corrected representative live batch passed after its
+  separate explicit approval.
+
+## LIVE-HL-004 — Bare direct-bit MWS packed-word response
+
+Decision status: approved by the maintainer on 2026-08-02 and implemented in
+HostLink Python.
+
+Implementation scope: synchronous and asynchronous monitor-word registration,
+ordered MWR response validation, connection-scoped monitor metadata, user/API
+documentation, changelog, and deterministic response vectors.
+
+Target contract: only in `MWS`/`MWR`, a bare direct-bit target such as `R5000`
+means the packed unsigned 16-bit word beginning at that bit. Registration sends
+the exact bare target and does not append `.U`. Its MWR position accepts decimal
+text of exactly one through five ASCII digits, with optional leading zeros and
+numeric value `0` through `65535`, and uses the existing `list[str]`
+monitor-word result. Scalar bare `RD` and `MBS`/`MBR` retain strict bit
+semantics.
+
+Compatibility impact: valid bare direct-bit MWR fields such as `00000`,
+`00002`, and `00013` no longer raise a protocol error. Public method signatures
+and returned Python types do not change. Existing callers receive the same
+string representation already used for an explicit unsigned MWR field.
+
+Machine-verifiable acceptance criteria:
+
+1. Sync and async registration of bare `R5000` sends exact `MWS R5000`.
+2. Bare direct-bit MWR fields accept `0`, `2`, `13`, `00000`, `00002`,
+   `00013`, and `65535`, preserving the selected wire spelling as `str`.
+3. Empty, whitespace-only, signed, overflow, non-decimal, over-five-digit, and
+   extra-field responses raise `HostLinkProtocolError`, retire the supplying
+   transport, and clear metadata.
+4. Mixed monitor registrations preserve field order and apply each registered
+   numeric format independently.
+5. Bare scalar RD and MBS/MBR still reject packed values as invalid bit tokens.
+6. Close/reconnect and uncertain failed registration cannot reuse the prior
+   packed-word metadata; explicit re-registration restores it.
+7. User documentation, API reference, migration record, and changelog describe
+   the same command-specific distinction and unchanged public representation.
+
+- [x] Implementation completed for synchronous and asynchronous clients.
+- [x] Tests added or updated for every local acceptance criterion.
+- [x] Relevant Ruff, mypy, unit, documentation, sample, workflow, and package checks passed.
+- [x] Codex self-review completed against the approved contract and shared Host Link semantics.
+- [x] Corrected Python sync and async public-API live acceptance passed against the independently prepared KV-X500 bit pattern.
+- [x] User documentation, API reference, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete in HostLink Python.
+
+Verification evidence: the repository gate passed all 392 tests and 58
+subtests. Ruff lint/format, mypy, high-level documentation coverage, public API
+docstring coverage, user-sample validation, release-workflow validation, and
+the package-content/isolated-consumer check passed on the final source state.
+Direct sync/async vectors cover short and zero-padded zero, `2`, `13`, maximum,
+mixed order, empty, whitespace-only, signed, overflow, non-decimal,
+over-five-digit, extra-field shape, session retirement,
+close/re-registration, failed registration, scalar RD, and MBS/MBR isolation.
+The decisive raw live vector remains recorded in
+`D:\APP\live-kvx500-20260802\node_mwr_user_pattern_readback_result.json`.
+After the exact guarded Python program was completed, compiled, reviewed, and
+separately approved, both sync and async public APIs read `R5000`–`R5015`,
+calculated `13`, sent bare `MWS R5000`, and returned preserved monitor string
+`00013`. Evidence:
+`D:\APP\live-kvx500-20260802\python_mwr_semantic_acceptance_result.json`.
+The later complete `HL-KVX500-01` read-only batch also exercised the same mixed
+registration through both public clients. Direct results were
+`[0, 0, "0000", 0, 0, 13]`; MWR preserved the positionally corresponding
+fields as `["00000", "+00000", "0000", "0000000000", "+0000000000",
+"00013"]`. Thus the bare final `R5000` field decoded as packed value `13`,
+not as one scalar bit, while the five explicit formats retained their own
+decoders. Sync and async each completed 12 requests with TX 163 and RX 139
+bytes. The result file and hashes are recorded under `LIVE-HL-003` above.
+
+Self-review finding classification:
+
+- Accepted and corrected: bare direct-bit MWS metadata used the empty-format
+  strict-bit decoder even though the PLC returns a packed unsigned word.
+- Accepted and corrected by `LIVE-HL-004-WIRE-GRAMMAR`: mapping the field to
+  generic `.U` would also accept over-five-digit leading-zero spellings; a
+  distinct internal monitor format now enforces the approved wire grammar.
+- Rejected by the approved wire contract: appending `.U` to the registration
+  would decode correctly but would alter the required bare PLC command.
+- Accepted and corrected: direct tests did not cover mixed field order, the
+  full unsigned boundary, malformed response retirement, or stale metadata for
+  both client variants.
+- Duplicate findings: none. Deferred implementation findings: none.
+
+### LIVE-HL-004-WIRE-GRAMMAR — Packed direct-bit MWR field grammar
+
+Decision status: approved by the maintainer on 2026-08-02 and implemented in
+HostLink Python.
+
+Implementation scope: only the internal monitor metadata and decoder for bare
+direct-bit MWS positions. Explicit `.U` monitor fields retain their existing
+numeric grammar, and no wire token or public type changes.
+
+Target contract: one bare direct-bit MWR field is exactly one through five
+ASCII decimal digits, leading zeros are optional, and its parsed value is
+`0..65535`. Empty, whitespace-only, signed, non-decimal, over-five-digit, and
+overflowing fields are malformed semantic responses and retire the transport.
+
+Compatibility impact: the approved packed values and existing `list[str]`
+representation remain unchanged. Previously accepted noncanonical values with
+more than five leading-zero digits are now rejected as protocol errors.
+
+Machine-verifiable acceptance criteria:
+
+1. `0`, `2`, `13`, `00000`, `00002`, `00013`, and `65535` are accepted and
+   returned with their original spelling.
+2. Empty, whitespace-only, `-1`, `+2`, `65536`, `000000`, non-decimal, and
+   extra-field responses are rejected and retire sync/async transports.
+3. Bare `MWS R5000` wire output, mixed field order, public `list[str]` type,
+   scalar RD, and MBS/MBR behavior remain unchanged.
+
+- [x] Distinct internal monitor metadata and validator implemented.
+- [x] Sync and async grammar/retirement tests cover every acceptance vector.
+- [x] Relevant full tests, static checks, documentation checks, and package checks passed.
+- [x] Codex self-review verified grammar isolation, exact wire, return representation, and retirement.
+- [x] Documentation, changelog, and migration record agree.
+- [x] Final acceptance criteria verified and the subdecision marked complete in HostLink Python.
+
+## Final non-live disposition recheck — `HL-001`, `HL-003`, and `HL-PY-003`
+
+Final source-state targeted checks passed on 2026-08-02 without PLC communication.
+
+- `HL-001`: sync and async
+  `test_*_tcp_rejects_two_nonempty_responses_in_one_receive` plus
+  `test_*_tcp_pre_send_unowned_input_sends_nothing_and_retires_connection`
+  passed 4/4. They prove deterministic extra-line rejection, transport
+  retirement, zero later send, and no response reassignment.
+- `HL-003`:
+  `test_special_family_float32_typed_named_and_poll_reject_before_fifo`
+  passed all five parameter rows. `Z:F` and every other ineligible family are
+  rejected before FIFO or transport while the ordinary-word Float32 contract
+  remains independently covered.
+- `HL-PY-003`:
+  `test_async_close_invalidates_and_disposes_late_{tcp,udp}_connection_candidate`
+  and
+  `test_async_{tcp,udp}_connect_cancellation_closes_late_candidate_once_across_repeated_close`
+  passed 4/4. The externally blocked connection factories return candidates
+  only after close/cancellation; generation validation prevents publication,
+  disposes each late candidate once, and leaves every client transport field
+  empty.
+
+Exact commands were `.\.venv\Scripts\python.exe -m pytest -q` with the named
+node IDs in `tests/test_overhaul_contract.py` and
+`tests/test_transport_recovery.py`.
+
+- [x] `HL-001` deterministic non-live disposition reverified on the final source state.
+- [x] `HL-003` deterministic non-live disposition reverified on the final source state.
+- [x] `HL-PY-003` deterministic close-generation disposition reverified on the final source state.

@@ -98,7 +98,7 @@ class _DirectBitAsyncClient(AsyncHostLinkClient):
         command = payload.rstrip(b"\r").decode("ascii")
         self.commands.append(command)
         if command == "RD R000.U":
-            return (" ".join("1" if bit in {0, 3, 15} else "0" for bit in range(16)) + "\r").encode()
+            return b"32777\r"
         if command in {"WR R000.U 32777", "WR R000.U 32769"}:
             return b"OK\r"
         raise AssertionError(f"unexpected command: {command}")
@@ -155,36 +155,89 @@ class _ScriptedSyncClient(HostLinkClient):
 
     def _exchange(self, payload: bytes, **_: object) -> bytes:
         command = payload.rstrip(b"\r").decode("ascii")
-        counts = {"RD R000.U": 16, "RD R000.D": 32, "RD DM0.U": 1}
+        counts = {"RD R000.U": 1, "RD R000.D": 1, "RD DM0.U": 1}
         return (" ".join("0" for _ in range(counts[command])) + "\r").encode("ascii")
 
 
 def test_sync_response_shape_mismatch_invalidates_session() -> None:
-    client = _MalformedSyncClient()
+    client = _MalformedSyncClient(b"0000 0000\r")
     with pytest.raises(HostLinkProtocolError, match="expected 1, received 2"):
-        client.read("DM0", data_format=".U")
+        client.read("R0", data_format=".H")
     assert client._sock is None
     assert client.fake_socket.closed
 
 
 @pytest.mark.asyncio
 async def test_async_response_shape_mismatch_invalidates_session() -> None:
-    client = _MalformedAsyncClient()
+    client = _MalformedAsyncClient(b"0000 0000\r")
     with pytest.raises(HostLinkProtocolError, match="expected 1, received 2"):
-        await client.read("DM0", data_format=".U")
+        await client.read("R0", data_format=".H")
     assert client._reader is None
 
 
+@pytest.mark.parametrize(
+    ("data_format", "response", "expected"),
+    [
+        (".U", "0 0 65535", [0, 0, 65535]),
+        (".S", "1 -32768 32767", [1, -32768, 32767]),
+        (".H", "0 a FFFF", [0, "000A", "FFFF"]),
+        (".D", "1 0 4294967295", [1, 0, 4294967295]),
+        (".L", "0 -2147483648 2147483647", [0, -2147483648, 2147483647]),
+    ],
+)
+def test_timer_counter_status_is_raw_and_format_applies_only_to_values(
+    data_format: str,
+    response: str,
+    expected: list[int | str],
+) -> None:
+    assert (
+        HostLinkClient._decode_read_response(
+            response,
+            data_format,
+            3,
+            timer_counter_composite=True,
+        )
+        == expected
+    )
+
+
 def test_timer_counter_status_must_be_exactly_zero_or_one() -> None:
-    assert HostLinkClient._decode_read_response("0 10 20", ".D", 3, timer_counter_composite=True) == [0, 10, 20]
-    assert HostLinkClient._decode_read_response("1 10 20", ".D", 3, timer_counter_composite=True) == [1, 10, 20]
-    for response in ("2 10 20", "-1 10 20"):
+    for response in ("2 10 20", "-1 10 20", "0000 10 20", "ON 10 20"):
         with pytest.raises(HostLinkProtocolError):
             HostLinkClient._decode_read_response(response, ".L", 3, timer_counter_composite=True)
 
     client = _MalformedSyncClient(b"2 10 20\r")
     with pytest.raises(HostLinkProtocolError, match="status"):
         client.read("T0", data_format=".D")
+    assert client._sock is None
+    assert client.fake_socket.closed
+
+
+@pytest.mark.parametrize(
+    ("data_format", "response"),
+    [
+        (".H", b"0 1\r"),
+        (".H", b"0 1 2 3\r"),
+        (".U", b"0 -1 0\r"),
+        (".U", b"0 0 65536\r"),
+        (".S", b"0 -32769 0\r"),
+        (".S", b"0 0 32768\r"),
+        (".H", b"0 G 2\r"),
+        (".H", b"0 1 G\r"),
+        (".H", b"0 10000 0000\r"),
+        (".D", b"0 4294967296 0\r"),
+        (".D", b"0 0 -1\r"),
+        (".L", b"0 -2147483649 0\r"),
+        (".L", b"0 0 2147483648\r"),
+    ],
+)
+def test_sync_invalid_timer_counter_shape_or_value_invalidates_session(
+    data_format: str,
+    response: bytes,
+) -> None:
+    client = _MalformedSyncClient(response)
+    with pytest.raises(HostLinkProtocolError):
+        client.read("T0", data_format=data_format)
     assert client._sock is None
     assert client.fake_socket.closed
 
@@ -199,8 +252,8 @@ async def test_async_invalid_timer_counter_status_invalidates_session() -> None:
 
 def test_single_read_token_count_follows_device_and_format() -> None:
     client = _ScriptedSyncClient()
-    assert len(client.read("R0", data_format=".U")) == 16  # type: ignore[arg-type]
-    assert len(client.read("R0", data_format=".D")) == 32  # type: ignore[arg-type]
+    assert client.read("R0", data_format=".U") == 0
+    assert client.read("R0", data_format=".D") == 0
     assert client.read("DM0", data_format=".U") == 0
 
 
@@ -234,7 +287,7 @@ async def test_read_named_splits_merged_ranges_at_command_limit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_direct_bit_word_helpers_pack_tokens() -> None:
+async def test_direct_bit_word_helpers_accept_one_packed_scalar_token() -> None:
     client = _DirectBitAsyncClient()
     assert await read_typed(client, "R0", "U") == 0x8009
     assert await read_named(client, ["R0.0", "R0.3", "R0.F"]) == {
