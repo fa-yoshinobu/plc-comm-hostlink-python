@@ -78,12 +78,15 @@ async def main() -> None:
     async with await open_and_connect(options) as client:
         test_address = "DM100"
         original = await read_typed(client, test_address, "U")
+        write_confirmed = False
         try:
             await write_typed(client, test_address, "U", 1234)
+            write_confirmed = True
             readback = await read_typed(client, test_address, "U")
             print(f"{test_address} = {readback}")
         finally:
-            await write_typed(client, test_address, "U", original)
+            if write_confirmed:
+                await write_typed(client, test_address, "U", original)
 
 
 if __name__ == "__main__":
@@ -91,6 +94,11 @@ if __name__ == "__main__":
 ```
 
 Only write to a test address that is safe for your machine and program.
+The example restores the saved value after a confirmed write, including when
+readback fails. If the write result is outcome-unknown, it deliberately avoids
+a blind restore or retry: reopen the client, inspect `DM100`, and reconcile the
+actual value explicitly. If restoration fails, also inspect and reconcile the
+register manually; do not assume that the saved value was restored.
 
 ## Confirm success
 
@@ -98,7 +106,8 @@ Only write to a test address that is safe for your machine and program.
 2. The connection opens without a timeout.
 3. The first read prints a value for `DM0`.
 4. The write example prints the value written to `DM100`.
-5. The `finally` block restores the original test-register value.
+5. The `finally` block restores a confirmed write; an outcome-unknown write is
+   reconciled explicitly instead of being retried blindly.
 
 ## If it does not work
 

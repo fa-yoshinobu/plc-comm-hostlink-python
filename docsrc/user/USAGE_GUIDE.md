@@ -194,19 +194,27 @@ async def main() -> None:
     async with await open_and_connect(options) as client:
         address = "DM100"
         original = await read_typed(client, address, "U")
+        write_confirmed = False
         try:
             await write_typed(client, address, "U", 42)
+            write_confirmed = True
             readback = await read_typed(client, address, "U")
             print(f"{address} readback = {readback}")
         finally:
-            await write_typed(client, address, "U", original)
+            if write_confirmed:
+                await write_typed(client, address, "U", original)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-This is a matched read/write/readback pattern. Keep it on a test address until you know the register is safe for your machine.
+This is a matched read/write/readback pattern. Keep it on a test address until
+you know the register is safe for your machine. The example restores only a
+confirmed write. If the write result is outcome-unknown, reopen the client,
+inspect the register, and reconcile it explicitly instead of retrying or
+restoring blindly. If restoration fails, inspect and reconcile the register
+manually; do not assume that the saved value was restored.
 
 ## Named read collection
 
@@ -443,28 +451,47 @@ from hostlink import (
 async def main() -> None:
     options = HostLinkConnectionOptions(host="192.168.250.100", plc_profile="keyence:kv-8000", port=8501, transport="tcp")
     async with await open_and_connect(options) as client:
-        buffer_words = await read_expansion_unit_buffer(
-            client,
-            unit_no=0,
-            address=0,
-            count=4,
-            data_format="U",
-        )
-        await write_expansion_unit_buffer(
+        original = await read_expansion_unit_buffer(
             client,
             unit_no=0,
             address=10,
-            values=[1, 2, 3, 4],
+            count=4,
             data_format="U",
         )
-        print(f"Read {len(buffer_words)} expansion buffer values.")
+        write_confirmed = False
+        try:
+            await write_expansion_unit_buffer(
+                client,
+                unit_no=0,
+                address=10,
+                values=[1, 2, 3, 4],
+                data_format="U",
+            )
+            write_confirmed = True
+            readback = await read_expansion_unit_buffer(
+                client,
+                unit_no=0,
+                address=10,
+                count=4,
+                data_format="U",
+            )
+            print(f"Read back {len(readback)} expansion buffer values.")
+        finally:
+            if write_confirmed:
+                await write_expansion_unit_buffer(
+                    client,
+                    unit_no=0,
+                    address=10,
+                    values=original,
+                    data_format="U",
+                )
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Expansion unit buffer methods access module buffer memory by unit number, buffer address, count, and data format.
+Expansion unit buffer methods access module buffer memory by unit number, buffer address, count, and data format. Use only a configured unit and buffer range reserved for controlled testing. The example attempts to restore the original values after a confirmed write; a restoration failure requires explicit state reconciliation. If the write outcome is unknown, inspect and reconcile the module state explicitly instead of retrying or restoring blindly.
 
 ## Runnable samples
 

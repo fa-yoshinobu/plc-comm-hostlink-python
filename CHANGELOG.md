@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Docs: Changed controlled register and expansion-buffer write examples to save and attempt restoration after confirmed writes and to require explicit reconciliation after an outcome-unknown result.
+- Tests: Added getting-started/usage fence compilation and cleanup-contract checks for controlled writes.
 - Library: **Breaking:** Float32 parsing, formatting, typed access, named reads, and polling now accept only canonical ordinary `.U` word families (`DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `CM`, `VM`, `D`, `E`, `F`); native 32-bit `Z`, direct-bit, and special-response families such as `R`, `T`, `C`, and `AT` fail before FIFO admission and transport.
 - Library: **Breaking:** Semantic `.H` reads now return exactly four uppercase hexadecimal digits, and MWR validates every returned token against the ordered formats registered by MWS.
 - Library: **Breaking:** Every UDP operation uses a fresh request-owned socket and source endpoint while the client remains logically connected. Firewalls and peers must return each response to that request's source port.
