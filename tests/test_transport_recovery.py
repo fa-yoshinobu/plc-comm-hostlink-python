@@ -305,6 +305,7 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
     )
     try:
         client.connect()
+        first_socket = client._sock
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
             client.send_raw("RD DM0.U")
         assert client._sock is None
@@ -313,8 +314,8 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
         assert client.traffic_stats().rx_bytes == 0
 
         client.timeout = 1.0
-        client.connect()
         assert client.send_raw("RD DM1.U") == b"SECOND"
+        assert client._sock is not first_socket
         assert client.traffic_stats().request_count == 2
         assert client.traffic_stats().rx_bytes == len(b"SECOND\r")
     finally:
@@ -325,7 +326,7 @@ def test_sync_udp_timeout_discards_delayed_response() -> None:
     assert server_error == []
 
 
-def test_sync_udp_successful_requests_use_distinct_ports_and_discard_duplicates() -> None:
+def test_sync_udp_successful_requests_reuse_one_local_endpoint() -> None:
     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server.bind(("127.0.0.1", 0))
     server.settimeout(2.0)
@@ -340,7 +341,6 @@ def test_sync_udp_successful_requests_use_distinct_ports_and_discard_duplicates(
             server.sendto(b"FIRST\r", first_address)
             _, second_address = server.recvfrom(4096)
             addresses.append(second_address)
-            server.sendto(b"STALE\r", first_address)
             server.sendto(b"SECOND\r", second_address)
         except BaseException as exc:  # pragma: no cover - surfaced below
             server_error.append(exc)
@@ -362,8 +362,46 @@ def test_sync_udp_successful_requests_use_distinct_ports_and_discard_duplicates(
         client.close()
         thread.join(timeout=3.0)
         server.close()
-    assert addresses[0] != addresses[1]
+    assert addresses[0] == addresses[1]
     assert server_error == []
+
+
+def test_sync_udp_pre_send_unowned_datagram_discards_socket_and_uses_a_fresh_socket() -> None:
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind(("127.0.0.1", 0))
+    server.settimeout(2.0)
+    port = server.getsockname()[1]
+
+    def serve() -> None:
+        _, first_address = server.recvfrom(4096)
+        server.sendto(b"FIRST\r", first_address)
+        time.sleep(0.02)
+        server.sendto(b"UNOWNED\r", first_address)
+        _, second_address = server.recvfrom(4096)
+        server.sendto(b"SECOND\r", second_address)
+
+    thread = threading.Thread(target=serve)
+    thread.start()
+    client = HostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="udp",
+        timeout=1.0,
+    )
+    try:
+        client.connect()
+        assert client.send_raw("FIRST") == b"FIRST"
+        first_socket = client._sock
+        time.sleep(0.05)
+        with pytest.raises(HostLinkProtocolError, match="unowned UDP"):
+            client.send_raw("SECOND")
+        assert client.send_raw("SECOND") == b"SECOND"
+        assert client._sock is not first_socket
+    finally:
+        client.close()
+        thread.join(timeout=3.0)
+        server.close()
 
 
 def test_sync_udp_connected_generation_filters_wrong_source_endpoint() -> None:
@@ -444,7 +482,6 @@ def test_sync_udp_active_close_reports_state_changing_outcome_unknown() -> None:
     assert isinstance(outcome[0], HostLinkOutcomeUnknownError)
     assert outcome[0].reason is HostLinkFailureReason.CLOSED  # type: ignore[union-attr]
     assert client._sock is None
-    assert client._udp_previous_sock is None
     assert not client._udp_logically_connected
 
 
@@ -525,7 +562,24 @@ class _DuplicateUdpServer(asyncio.DatagramProtocol):
         if len(self.addresses) == 1:
             self.transport.sendto(b"FIRST\r", address)
         else:
-            self.transport.sendto(b"STALE\r", self.addresses[0])
+            self.transport.sendto(b"SECOND\r", address)
+
+
+class _DelayedDuplicateUdpServer(asyncio.DatagramProtocol):
+    def __init__(self) -> None:
+        self.transport: asyncio.DatagramTransport | None = None
+        self.addresses: list[tuple[str | Any, int]] = []
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        self.transport = transport  # type: ignore[assignment]
+
+    def datagram_received(self, data: bytes, address: tuple[str | Any, int]) -> None:
+        assert self.transport is not None
+        self.addresses.append(address)
+        if len(self.addresses) == 1:
+            self.transport.sendto(b"FIRST\r", address)
+            asyncio.get_running_loop().call_later(0.02, self.transport.sendto, b"UNOWNED\r", address)
+        else:
             self.transport.sendto(b"SECOND\r", address)
 
 
@@ -571,21 +625,22 @@ async def test_async_udp_timeout_discards_delayed_response() -> None:
     )
     try:
         await client.connect()
+        first_transport = client._udp_transport
         with pytest.raises(HostLinkConnectionError, match="Timeout"):
             await client.send_raw("RD DM0.U")
         assert client._udp_transport is None
 
         client.timeout = 1.0
-        await client.connect()
         assert await client.send_raw("RD DM1.U") == b"SECOND"
         assert protocol.count == 2
+        assert client._udp_transport is not first_transport
     finally:
         await client.close()
         transport.close()
 
 
 @pytest.mark.asyncio
-async def test_async_udp_successful_requests_use_distinct_ports_and_discard_duplicates() -> None:
+async def test_async_udp_successful_requests_reuse_one_local_endpoint() -> None:
     loop = asyncio.get_running_loop()
     transport, protocol = await loop.create_datagram_endpoint(
         _DuplicateUdpServer,
@@ -603,7 +658,36 @@ async def test_async_udp_successful_requests_use_distinct_ports_and_discard_dupl
         await client.connect()
         assert await client.send_raw("FIRST") == b"FIRST"
         assert await client.send_raw("SECOND") == b"SECOND"
-        assert protocol.addresses[0] != protocol.addresses[1]
+        assert protocol.addresses[0] == protocol.addresses[1]
+    finally:
+        await client.close()
+        transport.close()
+
+
+@pytest.mark.asyncio
+async def test_async_udp_pre_send_unowned_datagram_discards_endpoint_and_recreates() -> None:
+    loop = asyncio.get_running_loop()
+    transport, protocol = await loop.create_datagram_endpoint(
+        _DelayedDuplicateUdpServer,
+        local_addr=("127.0.0.1", 0),
+    )
+    port = transport.get_extra_info("sockname")[1]
+    client = AsyncHostLinkClient(
+        "127.0.0.1",
+        plc_profile="keyence:kv-8000",
+        port=port,
+        transport="udp",
+        timeout=1.0,
+    )
+    try:
+        await client.connect()
+        assert await client.send_raw("FIRST") == b"FIRST"
+        first_transport = client._udp_transport
+        await asyncio.sleep(0.05)
+        with pytest.raises(HostLinkProtocolError, match="unowned UDP"):
+            await client.send_raw("SECOND")
+        assert await client.send_raw("SECOND") == b"SECOND"
+        assert client._udp_transport is not first_transport
     finally:
         await client.close()
         transport.close()
@@ -656,7 +740,6 @@ async def test_async_udp_active_close_reports_state_changing_outcome_unknown() -
             await operation
         assert raised.value.reason is HostLinkFailureReason.CLOSED
         assert client._udp_transport is None
-        assert client._udp_previous_transport is None
         assert not client._udp_logically_connected
     finally:
         await client.close()

@@ -365,42 +365,36 @@ async def test_async_udp_connect_cancellation_closes_late_candidate_once_across_
     assert client._udp_protocol is None
 
 
-def test_sync_udp_successor_bind_failure_closes_candidate_and_predecessor() -> None:
+def test_sync_udp_replacement_creation_failure_keeps_resolved_endpoint() -> None:
     client = HostLinkClient(
         "127.0.0.1",
         port=8501,
         transport="udp",
         plc_profile="keyence:kv-8000",
     )
-    predecessor = _FakeDatagramTransport()
     candidate = _FailingUdpSocket()
     client._udp_logically_connected = True
     client._udp_remote_endpoint = ("127.0.0.1", 8501)
-    client._udp_previous_sock = predecessor  # type: ignore[assignment]
 
     with patch("hostlink.client.socket.socket", return_value=candidate):
         with pytest.raises(HostLinkTransportError, match="communication failed"):
             client.send_raw("RD DM0.U")
 
     assert candidate.close_count == 1
-    assert predecessor.close_count == 1
-    assert not client._udp_logically_connected
+    assert client._udp_logically_connected
+    assert client._udp_remote_endpoint == ("127.0.0.1", 8501)
 
 
 @pytest.mark.asyncio
-async def test_async_udp_successor_bind_failure_closes_predecessor_generation() -> None:
+async def test_async_udp_replacement_creation_failure_keeps_resolved_endpoint() -> None:
     client = AsyncHostLinkClient(
         "127.0.0.1",
         port=8501,
         transport="udp",
         plc_profile="keyence:kv-8000",
     )
-    predecessor = _FakeDatagramTransport()
-    predecessor_protocol = _FakeUdpProtocolOwner()
     client._udp_logically_connected = True
     client._udp_remote_endpoint = ("127.0.0.1", 8501)
-    client._udp_previous_transport = predecessor
-    client._udp_previous_protocol = predecessor_protocol  # type: ignore[assignment]
     loop = asyncio.get_running_loop()
 
     async def fail_bind(*_args: object, **_kwargs: object) -> tuple[object, object]:
@@ -410,9 +404,8 @@ async def test_async_udp_successor_bind_failure_closes_predecessor_generation() 
         with pytest.raises(HostLinkTransportError, match="communication failed"):
             await client.send_raw("RD DM0.U")
 
-    assert predecessor.close_count == 1
-    assert predecessor_protocol.cancel_count == 1
-    assert not client._udp_logically_connected
+    assert client._udp_logically_connected
+    assert client._udp_remote_endpoint == ("127.0.0.1", 8501)
 
 
 def test_raw_command_preserves_error_and_non_ascii_response_bytes() -> None:

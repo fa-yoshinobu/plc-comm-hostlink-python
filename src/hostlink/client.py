@@ -64,7 +64,7 @@ from .protocol import (
 
 ABSOLUTE_RESPONSE_CAP = 65_536
 UDP_RECEIVE_BUFFER_SIZE = ABSOLUTE_RESPONSE_CAP + 2
-ABSOLUTE_REQUEST_BODY_CAP = 65_536
+ABSOLUTE_REQUEST_BODY_CAP = 65_506
 ABSOLUTE_REQUEST_FRAME_CAP = ABSOLUTE_REQUEST_BODY_CAP + 1
 _ASYNC_TIMEOUT_ERRORS = (TimeoutError, asyncio.TimeoutError)
 
@@ -257,11 +257,14 @@ def _normalize_ipv4_host(host: object, *, name: str = "host") -> str:
     normalized = host.strip()
     if not normalized:
         raise ValueError(f"{name} must not be empty")
-    literal_text = normalized[1:-1] if normalized.startswith("[") and normalized.endswith("]") else normalized
+    is_bracketed = normalized.startswith("[") and normalized.endswith("]")
+    literal_text = normalized[1:-1] if is_bracketed else normalized
     try:
         literal = ip_address(literal_text)
     except ValueError:
         return normalized
+    if is_bracketed and literal.version == 4:
+        raise ValueError(f"{name} must not use brackets around an IPv4 address")
     if literal.version != 4:
         raise ValueError(f"{name} must be an IPv4 address or a hostname that resolves to IPv4")
     return literal_text
@@ -629,9 +632,7 @@ class HostLinkBase:
             values = parse_data_tokens(tokens)
         elif timer_counter_composite:
             if tokens[0] not in {"0", "1"}:
-                raise HostLinkProtocolError(
-                    f"Timer/counter response status {tokens[0]!r} is invalid; expected 0 or 1"
-                )
+                raise HostLinkProtocolError(f"Timer/counter response status {tokens[0]!r} is invalid; expected 0 or 1")
             status = int(tokens[0])
             values = [status, *parse_data_tokens(tokens[1:], data_format=data_format)]
         else:
@@ -966,7 +967,6 @@ class HostLinkClient(HostLinkBase):
         self.timeout = _validated_timeout("timeout", timeout)
         self.connect_timeout = _validated_timeout("connect_timeout", connect_timeout)
         self._sock: socket.socket | None = None
-        self._udp_previous_sock: socket.socket | None = None
         self._udp_remote_endpoint: tuple[str, int] | None = None
         self._udp_logically_connected = False
         self._rx_buffer = b""
@@ -984,7 +984,7 @@ class HostLinkClient(HostLinkBase):
     def _check_decode_deadline(self, *, state_changing: bool) -> None:
         if self._last_exchange_deadline is None or time.monotonic() <= self._last_exchange_deadline:
             return
-        self._close_unlocked()
+        self._retire_failed_transport()
         error = HostLinkTimeoutError("Timeout: transaction deadline expired during response decoding")
         if state_changing:
             self._raise_outcome_unknown(error)
@@ -1054,20 +1054,16 @@ class HostLinkClient(HostLinkBase):
         self._monitor_bit_count = 0
         self._monitor_word_formats = ()
         sock = self._sock
-        previous_udp_sock = self._udp_previous_sock
         self._sock = None
-        self._udp_previous_sock = None
         self._udp_remote_endpoint = None
         self._udp_logically_connected = False
         self._rx_buffer = b""
-        for owned_sock in (sock, previous_udp_sock):
-            if owned_sock is None:
-                continue
+        if sock is not None:
             try:
-                owned_sock.shutdown(socket.SHUT_RDWR)
+                sock.shutdown(socket.SHUT_RDWR)
             except (AttributeError, OSError):
                 pass
-            owned_sock.close()
+            sock.close()
 
     def _prepare_udp_request_socket(self, *, deadline: float) -> socket.socket:
         if self._sock is not None:
@@ -1075,33 +1071,44 @@ class HostLinkClient(HostLinkBase):
         if not self._udp_logically_connected or self._udp_remote_endpoint is None:
             raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
 
-        previous = self._udp_previous_sock
         candidate = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             candidate.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
             candidate.connect(self._udp_remote_endpoint)
-            if previous is not None and candidate.getsockname() == previous.getsockname():
-                raise HostLinkTransportError("UDP request socket reused the predecessor local endpoint")
 
             def adopt() -> None:
                 self._sock = candidate
-                self._udp_previous_sock = None
 
             self._lock.adopt_if_current(adopt)
         except BaseException:
             _close_socket_quietly(candidate)
             raise
-
-        if previous is not None:
-            _close_socket_quietly(previous)
         return candidate
 
     def _retain_successful_udp_socket(self, sock: socket.socket) -> None:
         def retain() -> None:
-            self._sock = None
-            self._udp_previous_sock = sock
+            self._sock = sock
 
         self._lock.adopt_if_current(retain)
+
+    def _discard_udp_request_socket(self) -> None:
+        sock = self._sock
+        self._sock = None
+        if sock is not None:
+            _close_socket_quietly(sock)
+
+    def _retire_failed_transport(self) -> None:
+        if self.transport == "udp":
+            self._discard_udp_request_socket()
+        else:
+            self._close_unlocked()
+
+    def _reject_unowned_udp_input(self, sock: socket.socket) -> None:
+        if not isinstance(sock, socket.socket):
+            return
+        readable, _, _ = select.select([sock], [], [], 0)
+        if readable:
+            raise HostLinkProtocolError("Received an unowned UDP response outside the active request")
 
     def _reject_unowned_tcp_input(self, sock: socket.socket) -> None:
         self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
@@ -1169,7 +1176,7 @@ class HostLinkClient(HostLinkBase):
             return result
         except HostLinkProtocolError as exc:
             self._check_decode_deadline(state_changing=state_changing)
-            self._close_unlocked()
+            self._retire_failed_transport()
             if state_changing:
                 self._raise_outcome_unknown(exc)
             raise
@@ -1190,7 +1197,7 @@ class HostLinkClient(HostLinkBase):
                 return result
             except HostLinkProtocolError:
                 self._check_decode_deadline(state_changing=False)
-                self._close_unlocked()
+                self._retire_failed_transport()
                 raise
             except HostLinkError:
                 self._check_decode_deadline(state_changing=False)
@@ -1211,7 +1218,7 @@ class HostLinkClient(HostLinkBase):
                 return result
             except HostLinkProtocolError:
                 self._check_decode_deadline(state_changing=False)
-                self._close_unlocked()
+                self._retire_failed_transport()
                 raise
 
     def _expect_ok(self, body: str) -> None:
@@ -1221,7 +1228,7 @@ class HostLinkClient(HostLinkBase):
     def _expect_ok_unlocked(self, body: str) -> None:
         response = self._send_decoded_unlocked(body, maximum_response_body=2, state_changing=True)
         if response != "OK":
-            self._close_unlocked()
+            self._retire_failed_transport()
             error = HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
             self._raise_outcome_unknown(error)
 
@@ -1244,7 +1251,6 @@ class HostLinkClient(HostLinkBase):
         exchange_complete = False
         may_have_sent = False
         try:
-            self._fire_trace(HostLinkTraceDirection.SEND, payload)
             timeout = _validated_timeout("timeout", self.timeout)
             deadline = time.monotonic() + timeout
             self._last_exchange_deadline = deadline
@@ -1254,6 +1260,9 @@ class HostLinkClient(HostLinkBase):
                 raise HostLinkNotConnectedError("Client is not connected; call connect() before sending a command")
             if self.transport == "tcp":
                 self._reject_unowned_tcp_input(sock)
+            else:
+                self._reject_unowned_udp_input(sock)
+            self._fire_trace(HostLinkTraceDirection.SEND, payload)
             sock.settimeout(_remaining_timeout(deadline, clock=time.monotonic))
             may_have_sent = True
             sock.sendall(payload)
@@ -1265,6 +1274,7 @@ class HostLinkClient(HostLinkBase):
                 self._validate_response_cap(response, maximum_response_body)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
+                self._reject_unowned_udp_input(sock)
                 self._rx_bytes += len(response)
             else:
                 response = self._recv_tcp_line(
@@ -1320,9 +1330,10 @@ class HostLinkClient(HostLinkBase):
         finally:
             if not exchange_complete:
                 # Host Link responses do not carry a transaction ID. Discard
-                # the whole transport so a late response cannot satisfy the
-                # next request, including when the transport is UDP.
-                self._close_unlocked()
+                # the failed request transport so a late response cannot
+                # satisfy the next request. UDP retains only the resolved peer
+                # and creates a fresh socket for the next admitted request.
+                self._retire_failed_transport()
 
     def _recv_tcp_line(
         self,
@@ -1598,8 +1609,6 @@ class AsyncHostLinkClient(HostLinkBase):
         self._writer: asyncio.StreamWriter | None = None
         self._udp_transport: asyncio.DatagramTransport | None = None
         self._udp_protocol: _HostLinkUDPProtocol | None = None
-        self._udp_previous_transport: asyncio.DatagramTransport | None = None
-        self._udp_previous_protocol: _HostLinkUDPProtocol | None = None
         self._udp_remote_endpoint: tuple[str, int] | None = None
         self._udp_logically_connected = False
         self._rx_buffer = b""
@@ -1622,7 +1631,7 @@ class AsyncHostLinkClient(HostLinkBase):
     async def _check_decode_deadline(self, *, state_changing: bool) -> None:
         if self._last_exchange_deadline is None or asyncio.get_running_loop().time() <= self._last_exchange_deadline:
             return
-        await self._close_unlocked()
+        await self._retire_failed_transport()
         error = HostLinkTimeoutError("Timeout: transaction deadline expired during response decoding")
         if state_changing:
             self._raise_outcome_unknown(error)
@@ -1755,23 +1764,15 @@ class AsyncHostLinkClient(HostLinkBase):
         self._rx_buffer = b""
         udp_transport = self._udp_transport
         udp_protocol = self._udp_protocol
-        previous_udp_transport = self._udp_previous_transport
-        previous_udp_protocol = self._udp_previous_protocol
         self._udp_transport = None
         self._udp_protocol = None
-        self._udp_previous_transport = None
-        self._udp_previous_protocol = None
         self._udp_remote_endpoint = None
         self._udp_logically_connected = False
 
         if udp_protocol is not None:
             udp_protocol.cancel_pending_response()
-        if previous_udp_protocol is not None:
-            previous_udp_protocol.cancel_pending_response()
         if udp_transport is not None:
             udp_transport.close()
-        if previous_udp_transport is not None:
-            previous_udp_transport.close()
         if writer is not None:
             writer.close()
 
@@ -1798,25 +1799,12 @@ class AsyncHostLinkClient(HostLinkBase):
             assert candidate is not None
             if self._lock.active_was_invalidated():
                 raise HostLinkClosedError("Client closed while preparing the UDP request socket")
-            previous_transport = self._udp_previous_transport
-            previous_protocol = self._udp_previous_protocol
-            if previous_transport is not None and candidate.get_extra_info(
-                "sockname"
-            ) == previous_transport.get_extra_info("sockname"):
-                raise HostLinkTransportError("UDP request socket reused the predecessor local endpoint")
             self._udp_transport = candidate
             self._udp_protocol = protocol
-            self._udp_previous_transport = None
-            self._udp_previous_protocol = None
         except BaseException:
             if candidate is not None:
                 candidate.close()
             raise
-
-        if previous_protocol is not None:
-            previous_protocol.cancel_pending_response()
-        if previous_transport is not None:
-            previous_transport.close()
         return candidate, protocol
 
     def _retain_successful_udp_endpoint(
@@ -1827,10 +1815,24 @@ class AsyncHostLinkClient(HostLinkBase):
         if self._lock.active_was_invalidated():
             raise HostLinkClosedError("Client closed before the UDP response was accepted")
         protocol.cancel_pending_response()
+        self._udp_transport = transport
+        self._udp_protocol = protocol
+
+    async def _discard_udp_request_endpoint(self) -> None:
+        transport = self._udp_transport
+        protocol = self._udp_protocol
         self._udp_transport = None
         self._udp_protocol = None
-        self._udp_previous_transport = transport
-        self._udp_previous_protocol = protocol
+        if protocol is not None:
+            protocol.cancel_pending_response()
+        if transport is not None:
+            transport.close()
+
+    async def _retire_failed_transport(self) -> None:
+        if self.transport == "udp":
+            await self._discard_udp_request_endpoint()
+        else:
+            await self._close_unlocked()
 
     async def _reject_unowned_tcp_input(self) -> None:
         self._rx_buffer = self._rx_buffer.lstrip(b"\r\n")
@@ -1890,7 +1892,7 @@ class AsyncHostLinkClient(HostLinkBase):
             return result
         except HostLinkProtocolError as exc:
             await self._check_decode_deadline(state_changing=state_changing)
-            await self._close_unlocked()
+            await self._retire_failed_transport()
             if state_changing:
                 self._raise_outcome_unknown(exc)
             raise
@@ -1911,7 +1913,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 return result
             except HostLinkProtocolError:
                 await self._check_decode_deadline(state_changing=False)
-                await self._close_unlocked()
+                await self._retire_failed_transport()
                 raise
             except HostLinkError:
                 await self._check_decode_deadline(state_changing=False)
@@ -1932,7 +1934,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 return result
             except HostLinkProtocolError:
                 await self._check_decode_deadline(state_changing=False)
-                await self._close_unlocked()
+                await self._retire_failed_transport()
                 raise
 
     async def _expect_ok(self, body: str) -> None:
@@ -1942,7 +1944,7 @@ class AsyncHostLinkClient(HostLinkBase):
     async def _expect_ok_unlocked(self, body: str) -> None:
         response = await self._send_decoded_unlocked(body, maximum_response_body=2, state_changing=True)
         if response != "OK":
-            await self._close_unlocked()
+            await self._retire_failed_transport()
             error = HostLinkProtocolError(f"Expected 'OK' but received {response!r} for command {body!r}")
             self._raise_outcome_unknown(error)
 
@@ -2007,6 +2009,7 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._validate_response_cap(response, maximum_response_body)
                 if not response or response[-1] not in (10, 13):
                     raise HostLinkProtocolError("UDP response is missing the required CR/LF terminator")
+                udp_protocol.reject_unowned_response()
                 self._rx_bytes += len(response)
                 if self._lock.active_was_invalidated():
                     raise HostLinkClosedError("Client closed before the response was accepted")
@@ -2064,9 +2067,10 @@ class AsyncHostLinkClient(HostLinkBase):
             raise transport_error from exc
         finally:
             if not exchange_complete:
-                # This also runs for CancelledError, which intentionally is
-                # not translated into a library exception.
-                await self._close_unlocked()
+                # Retire the failed request transport. UDP retains only its
+                # resolved peer so the next admitted request can create one
+                # fresh socket without repeating DNS resolution.
+                await self._retire_failed_transport()
 
     async def _recv_tcp_line(self, *, maximum_response_body: int = ABSOLUTE_RESPONSE_CAP) -> bytes:
         if self._reader is None:
@@ -2309,6 +2313,8 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
     def __init__(self) -> None:
         self.transport: asyncio.DatagramTransport | None = None
         self._future: asyncio.Future[bytes] | None = None
+        self._unowned_datagram = False
+        self._unowned_error: Exception | None = None
 
     def connection_made(self, transport: asyncio.BaseTransport) -> None:
         self.transport = cast(asyncio.DatagramTransport, transport)
@@ -2316,12 +2322,17 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data: bytes, addr: tuple[str | Any, int]) -> None:
         if self._future and not self._future.done():
             self._future.set_result(data)
+        else:
+            self._unowned_datagram = True
 
     def error_received(self, exc: Exception) -> None:
         if self._future and not self._future.done():
             self._future.set_exception(exc)
+        else:
+            self._unowned_error = exc
 
     def prepare_response(self) -> None:
+        self.reject_unowned_response()
         self.cancel_pending_response()
         self._future = asyncio.get_running_loop().create_future()
 
@@ -2336,3 +2347,14 @@ class _HostLinkUDPProtocol(asyncio.DatagramProtocol):
         if self._future is not None and not self._future.done():
             self._future.cancel()
         self._future = None
+
+    def reject_unowned_response(self) -> None:
+        """Reject datagrams or endpoint errors that no active request owns."""
+
+        if self._unowned_error is not None:
+            error = self._unowned_error
+            self._unowned_error = None
+            raise HostLinkTransportError("UDP endpoint reported an unowned communication error") from error
+        if self._unowned_datagram:
+            self._unowned_datagram = False
+            raise HostLinkProtocolError("Received an unowned UDP response outside the active request")

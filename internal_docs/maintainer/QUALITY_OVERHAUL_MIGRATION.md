@@ -300,8 +300,9 @@ Scope: package exports, helpers, samples, and documentation.
 
 Target contract: public block read/write helpers remain single-request. The sole
 automatic multi-request exception is the approved read-only `read_named`/`poll`
-aggregate, which preserves caller order, keeps entries indivisible, owns one
-FIFO turn, documents non-atomic timing, and returns no partial result.
+aggregate, which preserves public result order, optimizes wire order, keeps
+entries indivisible, owns one FIFO turn, documents non-atomic timing, and
+returns no partial result.
 
 Compatibility impact: all public `*chunked` helpers are removed without aliases.
 
@@ -637,3 +638,233 @@ Self-review disposition:
 - Rejected: a second Windows-specific copy of the loopback tests would diverge
   from the Linux full gate. Exact existing test node IDs remain authoritative.
 - Duplicate findings: none. Deferred findings: none.
+
+## REAUDIT-004 — Reject bracketed IPv4 input
+
+Implementation scope: sync/async client construction, shared connection
+options, deterministic constructor tests, user API/usage documentation, and
+migration notes.
+
+Target state: sync/async clients and `HostLinkConnectionOptions` reject an IPv4
+literal enclosed in brackets before DNS, socket creation, connection, or send.
+IPv4 callers migrate from `[127.0.0.1]` to `127.0.0.1`; existing hostname and
+IPv6 handling is unchanged.
+
+Compatibility impact: breaking only for callers that incorrectly supplied an
+IPv4 literal in URI-only bracket syntax. They must remove the brackets.
+
+Acceptance criteria:
+
+1. Sync and async client construction rejects bracketed IPv4 locally.
+2. Connection options reject the same input locally.
+3. Unbracketed IPv4, valid hostnames, and existing IPv6 rejection remain unchanged.
+4. No live PLC check is required because this is deterministic pre-transport validation.
+
+- [x] Implementation completed in this repository.
+- [x] Tests cover client and connection-options rejection before transport.
+- [x] Ruff, mypy, documentation checks, sample checks, and all 335 tests passed.
+- [x] Codex self-review found no unresolved implementation or cross-language conflict.
+- [x] Live PLC verification is not required for deterministic constructor validation.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: `run_ci.bat` passed on Windows with Python 3.14.3,
+including Ruff lint/format, mypy, documentation/sample/workflow checks, and all
+335 tests. No live PLC communication was performed.
+
+## REAUDIT-007 — Ruff source formatting
+
+Implementation scope: the pre-existing non-compliant layout in
+`src/hostlink/client.py`; runtime behavior and public API are unchanged.
+
+Target state: every tracked Python file satisfies the repository's Ruff format
+check without changing runtime behavior for the formatting-only correction.
+
+Acceptance criterion: `python -m ruff format --check src tests` succeeds and
+the correction changes only source layout.
+
+Compatibility impact: none.
+
+- [x] Formatting-only implementation completed in this repository.
+- [x] Ruff formatting check is the machine-verifiable acceptance test.
+- [x] The complete repository CI passed.
+- [x] Codex self-review confirmed the correction changes only source layout.
+- [x] Live PLC verification is not required for formatting-only work.
+- [x] Changelog agrees with the correction; no migration or API documentation is required.
+- [x] Final acceptance criterion verified and the item marked complete.
+
+## REAUDIT-008 — Raw request frame capacity
+
+Implementation scope: the shared sync/async TCP/UDP raw-request builder,
+boundary tests, user API/usage documentation, and migration notes.
+
+Target state: sync/async TCP and UDP raw command bodies accept at most 65,506
+ASCII bytes. The terminating CR produces a maximum complete frame of 65,507
+bytes. Larger input fails before connection-state checks or transport work.
+
+Compatibility impact: breaking for maintainer-only `send_raw` callers whose
+body is 65,507 through 65,536 ASCII bytes. Those bodies must be reduced or
+split into supported command-specific operations.
+
+Acceptance criteria:
+
+1. A 65,506-byte body produces one 65,507-byte frame.
+2. A 65,507-byte body is rejected without calling the exchange layer.
+3. The boundary is transport-independent and does not relax smaller command-specific limits.
+4. No live PLC check is required because frame construction and pre-send rejection are deterministic.
+
+- [x] Implementation completed in this repository.
+- [x] Boundary tests cover exact maximum framing and pre-exchange rejection.
+- [x] Ruff, mypy, documentation checks, sample checks, and all 335 tests passed.
+- [x] Codex self-review confirmed the shared builder covers sync/async and TCP/UDP.
+- [x] Live PLC verification is not required for deterministic pre-send framing.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+Verification evidence: the exact accepted body produces a 65,507-byte frame;
+the next byte is rejected before the test exchange layer records a frame. The
+complete `run_ci.bat` gate passed on the final working-tree source state.
+
+## PERF-001 — Optimize normal named-read wire plans
+
+Decision status: implemented in HostLink Python on 2026-08-02.
+
+Implementation scope: `read_named` request planning and the plan reused by
+`poll`. Target contract: complete preflight precedes transport; requests are
+grouped by device type in first-occurrence order, sorted by address within each
+group, and compatible contiguous or overlapping ranges are merged up to the
+request limit. Public dictionary keys remain in caller order. A multi-request
+result is non-atomic and is published only after every segment succeeds.
+
+Compatibility impact: wire order may differ from input order and fewer PLC
+round trips can occur. Public key/value association and result order remain
+unchanged. This supersedes the former one-request-or-reject record only for
+normal HostLink named reads and PERF-008C polling.
+
+Machine-verifiable acceptance criteria:
+
+1. Interleaved device types do not split one mergeable device-type range.
+2. Descending and overlapping compatible inputs produce the minimum plan under the point limit.
+3. Full validation occurs before FIFO admission or send.
+4. Returned values map to the original keys in caller order, with no partial result on failure.
+
+- [x] Implementation completed in HostLink Python.
+- [x] Tests added or updated for the HostLink Python acceptance criteria.
+- [x] Relevant static, full test, sample, documentation, package/build, and current-worktree source-archive gates passed on this source state.
+- [x] Codex self-review completed for the diff, validation, mapping, errors, FIFO behavior, and cross-language consistency requirements.
+- [x] Live PLC verification is not required for deterministic planning and mapping behavior.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+## PERF-002 — Reuse healthy HostLink UDP sockets
+
+Decision status: implemented in HostLink Python on 2026-08-02.
+
+Implementation scope: synchronous and asynchronous UDP lifecycle. Target
+contract: one connected socket and local endpoint is reused after complete valid
+responses. Timeout, cancellation, transport/protocol failure, malformed or
+extra input, and detected pre-send unowned datagrams discard it. The next
+request creates a socket from the cached numeric IPv4 endpoint without DNS.
+State-changing post-send failures remain outcome-unknown and are never retried;
+explicit close prevents further communication. The accepted residual limitation
+is that a late duplicate arriving between the pre-send check and send cannot be
+distinguished because Host Link has no request identifier.
+
+Compatibility impact: healthy requests retain one local port instead of using
+one port per request. An abnormal exchange can change the port used by the next
+request. Non-compliant delayed duplicate responses retain the documented
+residual misassociation risk.
+
+Machine-verifiable acceptance criteria:
+
+1. Consecutive successful requests reuse the same sync/async socket and endpoint.
+2. Every observable abnormal-input path discards the current socket.
+3. A later request creates a fresh socket without DNS and never retries the failed request.
+4. Close disposes the socket and makes later communication fail.
+
+- [x] Implementation completed in HostLink Python.
+- [x] Deterministic sync/async reuse, delayed-unowned-input, failure, replacement, and close tests added or updated.
+- [x] Relevant static, full test, sample, documentation, package/build, and current-worktree source-archive gates passed on this source state.
+- [x] Codex self-review completed for sync/async lifecycle, outcome classification, and cross-language consistency requirements.
+- [x] Live PLC verification is not required for the deterministic transport lifecycle contract.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+## PERF-008B — Own one FIFO turn for a named-read aggregate
+
+Decision status: implemented in HostLink Python on 2026-08-02.
+
+Implementation scope: normal `read_named`. Target contract: snapshot, parse,
+duplicate, profile, capacity, and request-plan checks complete before FIFO
+admission. One FIFO turn covers every optimized segment through decode and
+all-or-error staging. Pure caller-order result materialization occurs after
+release, so no other wire operation can interleave between segments.
+
+Compatibility impact: a later operation can wait for the complete aggregate,
+but cannot observe or cause segment interleaving. Separate clients remain the
+way to obtain independent latency.
+
+Machine-verifiable acceptance criteria:
+
+1. Invalid input reaches neither FIFO nor transport.
+2. A multi-segment aggregate acquires and releases one turn.
+3. Later wire operations cannot send before the last segment.
+4. Decode/stage failure publishes no partial result and pure materialization is outside the turn.
+
+- [x] Implementation completed in HostLink Python.
+- [x] HostLink Python FIFO, plan-order, mapping, and failure tests added or updated.
+- [x] Relevant static, full test, sample, documentation, package/build, and current-worktree source-archive gates passed on this source state.
+- [x] Codex self-review completed for preflight, FIFO, staging, failure boundaries, and cross-language consistency requirements.
+- [x] Live PLC verification is not required for deterministic FIFO ownership.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+## PERF-008C — Reuse one optimized plan per polling stream
+
+Decision status: implemented in HostLink Python on 2026-08-02.
+
+Implementation scope: `poll`. Target contract: addresses are snapshotted,
+validated, and compiled once before cycles begin. Every cycle reuses that plan,
+owns one FIFO turn for all segments, stages all values, releases the turn, then
+materializes/yields and waits the configured post-cycle interval outside FIFO.
+Failure publishes no partial sample, retries nothing, and terminates with the
+existing structured error.
+
+Compatibility impact: one sample can contain multiple non-atomic PLC reads and
+later same-client operations wait until the cycle completes. The configured
+interval begins after cycle completion; no fixed-rate catch-up is introduced.
+
+Machine-verifiable acceptance criteria:
+
+1. Planning occurs once before the first cycle and invalid input sends nothing.
+2. Every cycle executes the PERF-001 plan in exactly one FIFO turn.
+3. No partial, retried, filled, or previous-value sample is published on failure.
+4. Yield and interval wait occur outside FIFO, permitting another operation between cycles.
+
+- [x] Implementation completed in HostLink Python.
+- [x] HostLink Python plan-reuse and between-cycle FIFO release tests added.
+- [x] Relevant static, full test, sample, documentation, package/build, and current-worktree source-archive gates passed on this source state.
+- [x] Codex self-review completed for plan reuse, cycle, yield, interval behavior, and cross-language consistency requirements.
+- [x] Live PLC verification is not required for deterministic planning and FIFO behavior.
+- [x] User documentation, migration notes, and changelog agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
+## 2026-08-02 performance implementation self-review classification
+
+- Accepted and corrected: named-read wire execution still followed caller order;
+  planning now applies PERF-001 grouping, sorting, merging, and caller-order
+  result remapping before PERF-008B execution.
+- Accepted and corrected: the UDP implementation retained the prior one-socket-
+  per-request isolation design; healthy sync/async endpoints are now reused and
+  every observed abnormal path discards only the UDP request socket while
+  preserving its cached numeric peer.
+- Accepted and corrected: user documentation and docstrings still described
+  fresh UDP ports and caller-order wire requests; they now describe the approved
+  lifecycle, optimized plan, non-atomic result, FIFO, and polling semantics.
+- Rejected by approved contract: eliminating the residual delayed-duplicate
+  window is not possible without restoring per-request endpoint isolation or a
+  protocol request identifier. Observed unowned input is rejected and contained.
+- Duplicate findings: none. Deferred findings: none. The final multi-version
+  repository/package gates and four-implementation consistency review passed;
+  deterministic request-count and lifecycle tests provide the required
+  performance-contract evidence without a separate wall-clock benchmark.

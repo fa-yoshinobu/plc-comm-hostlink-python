@@ -18,7 +18,8 @@ prefer `open_and_connect` plus the high-level helper functions.
 | PLC model and clock | `query_model`, `set_time`, `ModelInfo` |
 | Connection lifecycle | `connect`, `close` |
 
-Both clients are IPv4-only. `connect_timeout` is one absolute connection
+Both clients are IPv4-only and reject bracketed IPv4 input such as
+`[127.0.0.1]`; use `127.0.0.1` instead. `connect_timeout` is one absolute connection
 deadline beginning before IPv4 hostname resolution and ending only after the
 transport is fully configured and adopted. A literal IPv4 address bypasses DNS.
 The clients reject any resolver or socket result completed after the deadline,
@@ -29,12 +30,20 @@ immediately before first send/write through transmission, receive, and
 decoding. Normal operations use arrival FIFO admission. Waiting cancellation
 sends nothing, and `close()` immediately rejects active and queued work. No
 request is retried or resent automatically.
+
+Maintainer `send_raw` accepts at most 65,506 ASCII bytes in the command body;
+the required terminating CR makes the complete request frame at most 65,507
+bytes. Oversized input fails before connection-state or socket work for both
+TCP and UDP.
 For a state-changing request that may have been sent, timeout, cancellation,
 close, transport failure, or malformed confirmation raises
 `HostLinkOutcomeUnknownError` with a machine-readable `HostLinkFailureReason`.
-Each UDP operation owns a fresh socket and source endpoint even though the
-public client remains logically connected. TCP accepts one non-empty response
-line per request; an extra non-empty line retires the transport.
+UDP reuses one connected socket and local endpoint across successful requests.
+Timeout, cancellation, transport or protocol failure, malformed or extra input,
+and a detected pre-send unowned datagram discard that socket. The next request
+creates a fresh socket from the cached numeric IPv4 endpoint without repeating
+DNS. TCP accepts one non-empty response line per request; an extra non-empty
+line retires the transport.
 
 ## Device Operations
 
@@ -101,14 +110,19 @@ an unused configuration error before communication.
 | Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
 
 `read_named` and `poll` require at least one address. They validate the complete
-input before send, preserve caller request order, keep each entry indivisible,
-and may split only necessary read-only work during one FIFO turn. Such a result
-is a logical dictionary, not an atomic PLC-time snapshot; failure returns no
-partial dictionary. Named keys must be semantically unique by device family,
+input before send and keep each entry indivisible. Wire reads are grouped by
+device type in first-occurrence order, sorted by address within each group, and
+merged when compatible contiguous or overlapping spans fit the protocol limit.
+The complete optimized plan owns one FIFO turn, while returned dictionary keys
+remain in caller input order. Such a result is a logical dictionary, not an
+atomic PLC-time snapshot; failure returns no partial dictionary. Named keys must
+be semantically unique by device family,
 numeric address, dtype, bit index, and scalar count. Case and leading-zero
 spelling variants are rejected as duplicates, while distinct dtype views, bit
 indices, and overlapping spans remain valid; returned keys preserve the input
-spelling. Poll intervals must be positive finite numbers and cannot be booleans.
+spelling. `poll` compiles the optimized plan once, reuses it for every cycle,
+and releases the FIFO turn before yielding a sample or waiting for the interval.
+Poll intervals must be positive finite numbers and cannot be booleans.
 The removed `write_bit_in_word` RMW API has no alias.
 
 `parse_address`, `normalize_address`, and `format_address` apply the same

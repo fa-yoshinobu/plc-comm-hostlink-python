@@ -111,9 +111,14 @@ transport is closed, and it cannot connect the client. `timeout` is one absolute
 immediately before the first send/write through send/drain, receive, and
 decoding. Both default to 3 seconds. A synchronous `connect_timeout` value too
 large for the platform wait APIs is rejected before connection work. The
-clients are IPv4-only; IPv6 addresses and transports are not supported. Frames
-always end in CR. Commands never connect lazily: call `connect()`, enter the
+clients are IPv4-only; IPv6 literals and bracketed IPv4 such as `[127.0.0.1]`
+are not supported. Use `127.0.0.1` without brackets. Frames always end in CR.
+Commands never connect lazily: call `connect()`, enter the
 client context, or use `open_and_connect` first.
+
+The maintainer-only `send_raw` command body is limited to 65,506 ASCII bytes;
+with its terminating CR, the complete TCP or UDP request is at most 65,507
+bytes. Oversized input is rejected before connection-state and socket work.
 
 ## Performance notes
 
@@ -129,11 +134,12 @@ Reuse one connected client for repeated reads and writes. Prefer
 many individual `read_typed` calls when one application snapshot can be read as
 one request.
 
-UDP keeps this logical connection state but assigns every admitted operation a
-fresh request-owned socket and source port. The previous socket stays bound
-until its successor has bound a different endpoint, preventing a delayed
-datagram from being reused by the next operation. Network rules must allow the
-PLC to reply to each request's source port.
+UDP keeps this logical connection state and reuses one connected socket and
+source port across successful operations. Timeout, cancellation, transport or
+protocol failure, malformed or extra input, and a detected pre-send unowned
+datagram discard that socket. The next admitted request creates a fresh socket
+from the cached numeric IPv4 endpoint without repeating DNS. Network rules must
+allow the PLC to reply to the current source port.
 
 ## Connection reuse and concurrent requests
 
@@ -245,8 +251,11 @@ words, double words, floats, comments, and bit-in-word values. Mixed,
 non-contiguous, or oversized sets can require multiple sequential read-only PLC
 requests, so the returned dictionary is not one instant in PLC time. Every
 entry is validated before the first send, individual entries are never split,
-requests retain caller declaration order, and the aggregate holds one FIFO
-turn. Failure returns no partial dictionary. This automatic splitting applies
+and the aggregate holds one FIFO turn. On the wire, reads are grouped by device
+type in first-occurrence order, sorted by address within each group, and merged
+when compatible contiguous or overlapping spans fit the protocol limit. The
+returned dictionary still retains caller declaration order. Failure returns no
+partial dictionary. This automatic splitting applies
 only to `read_named`/`poll`; state-changing multi-request work is not synthesized.
 When the collection contains `:COMMENT`, `comment_encoding` is required and is
 validated before any request is sent.
@@ -317,9 +326,12 @@ if __name__ == "__main__":
 ```
 
 `poll` requires a non-empty address list and yields one logical dictionary on
-each interval until cancellation or until your loop exits. The same
-non-atomic, potentially multi-request behavior as `read_named` applies. The
-interval must be a positive finite number; zero, negative values, infinities,
+each interval until cancellation or until your loop exits. It compiles the same
+optimized, potentially multi-request plan as `read_named` once before the first
+cycle and reuses it for every cycle. Each cycle owns one FIFO turn, stages the
+complete result, releases the turn, then yields and waits for the interval. The
+result remains non-atomic across multiple PLC requests. The interval must be a
+positive finite number; zero, negative values, infinities,
 NaN, booleans, and strings are rejected before the first read result or PLC
 request.
 

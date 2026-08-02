@@ -17,18 +17,19 @@ from hostlink import (
     HostLinkOutcomeUnknownError,
     HostLinkProtocolError,
     HostLinkTimeoutError,
+    poll,
     read_named,
 )
 from hostlink.client import ABSOLUTE_REQUEST_BODY_CAP
 
 
 class _RecordingRawClient(HostLinkClient):
-    def __init__(self) -> None:
+    def __init__(self, transport: str = "tcp") -> None:
         super().__init__(
             "127.0.0.1",
             plc_profile="keyence:kv-8000",
             port=8501,
-            transport="tcp",
+            transport=transport,
         )
         self.frames: list[bytes] = []
 
@@ -37,13 +38,44 @@ class _RecordingRawClient(HostLinkClient):
         return b"OK\r"
 
 
-def test_request_body_capacity_accepts_exact_max_and_rejects_max_plus_one_before_send() -> None:
-    client = _RecordingRawClient()
+class _RecordingAsyncRawClient(AsyncHostLinkClient):
+    def __init__(self, transport: str) -> None:
+        super().__init__(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=8501,
+            transport=transport,
+        )
+        self.frames: list[bytes] = []
+
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
+        self.frames.append(payload)
+        return b"OK\r"
+
+
+@pytest.mark.parametrize("transport", ["tcp", "udp"])
+def test_request_body_capacity_accepts_exact_max_and_rejects_max_plus_one_before_send(transport: str) -> None:
+    assert ABSOLUTE_REQUEST_BODY_CAP == 65_506
+    client = _RecordingRawClient(transport)
     client.send_raw("R" * ABSOLUTE_REQUEST_BODY_CAP)
     assert client.frames == [b"R" * ABSOLUTE_REQUEST_BODY_CAP + b"\r"]
+    assert len(client.frames[0]) == 65_507
 
     with pytest.raises(HostLinkProtocolError, match="exceeds"):
         client.send_raw("R" * (ABSOLUTE_REQUEST_BODY_CAP + 1))
+    assert len(client.frames) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transport", ["tcp", "udp"])
+async def test_async_request_body_capacity_matches_sync_contract(transport: str) -> None:
+    client = _RecordingAsyncRawClient(transport)
+    await client.send_raw("R" * ABSOLUTE_REQUEST_BODY_CAP)
+    assert client.frames == [b"R" * ABSOLUTE_REQUEST_BODY_CAP + b"\r"]
+    assert len(client.frames[0]) == 65_507
+
+    with pytest.raises(HostLinkProtocolError, match="exceeds"):
+        await client.send_raw("R" * (ABSOLUTE_REQUEST_BODY_CAP + 1))
     assert len(client.frames) == 1
 
 
@@ -319,7 +351,7 @@ class _NamedFifoClient(AsyncHostLinkClient):
 
 
 @pytest.mark.asyncio
-async def test_read_named_uses_one_fifo_turn_and_preserves_declared_request_order() -> None:
+async def test_read_named_uses_one_fifo_turn_for_all_optimized_segments() -> None:
     client = _NamedFifoClient()
     aggregate = asyncio.create_task(
         read_named(
@@ -348,7 +380,53 @@ async def test_read_named_preserves_order_across_device_types() -> None:
         comment_encoding=HostLinkCommentEncoding.UTF8,
     )
     assert result == {"DM0:U": 10, "R0:BIT": True, "DM2:COMMENT": "COMMENT"}
-    assert client.commands == ["RD DM0.U", "RD R000", "RDC DM2"]
+    assert client.commands == ["RD DM0.U", "RDC DM2", "RD R000"]
+
+
+class _OptimizedNamedClient(AsyncHostLinkClient):
+    def __init__(self) -> None:
+        super().__init__(
+            "127.0.0.1",
+            plc_profile="keyence:kv-8000",
+            port=8501,
+            transport="tcp",
+        )
+        self.commands: list[str] = []
+
+    async def _exchange(self, payload: bytes, **_: object) -> bytes:
+        command = payload.rstrip(b"\r").decode("ascii")
+        self.commands.append(command)
+        return {
+            "RDS DM10.U 2": b"100 65535\r",
+            "RD MR000": b"1\r",
+            "RD DM9.U": b"9\r",
+        }[command]
+
+
+@pytest.mark.asyncio
+async def test_read_named_groups_device_types_sorts_addresses_and_preserves_result_order() -> None:
+    client = _OptimizedNamedClient()
+    addresses = ["DM11:S", "MR0:BIT", "DM10:U"]
+
+    result = await read_named(client, addresses)
+
+    assert list(result) == addresses
+    assert result == {"DM11:S": -1, "MR0:BIT": True, "DM10:U": 100}
+    assert client.commands == ["RDS DM10.U 2", "RD MR000"]
+
+
+@pytest.mark.asyncio
+async def test_poll_reuses_optimized_plan_and_releases_fifo_between_cycles() -> None:
+    client = _OptimizedNamedClient()
+    stream = poll(client, ["DM11:S", "MR0:BIT", "DM10:U"], interval=0.001)
+
+    first = await anext(stream)
+    competing = await client.read("DM9", data_format=".U")
+    await stream.aclose()
+
+    assert first == {"DM11:S": -1, "MR0:BIT": True, "DM10:U": 100}
+    assert competing == 9
+    assert client.commands == ["RDS DM10.U 2", "RD MR000", "RD DM9.U"]
 
 
 @pytest.mark.asyncio

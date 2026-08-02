@@ -17,11 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: **Breaking:** Reject bracketed IPv4 host input such as `[127.0.0.1]` before DNS or socket work; use `127.0.0.1` instead.
+- Library: **Breaking:** Limit every raw ASCII request body to 65,506 bytes so the terminating CR produces a maximum 65,507-byte frame for both TCP and UDP.
+- CI: Restored Ruff formatting compliance for all tracked Python source.
 - Docs: Changed controlled register and expansion-buffer write examples to save and attempt restoration after confirmed writes and to require explicit reconciliation after an outcome-unknown result.
 - Tests: Added getting-started/usage fence compilation and cleanup-contract checks for controlled writes.
 - Library: **Breaking:** Float32 parsing, formatting, typed access, named reads, and polling now accept only canonical ordinary `.U` word families (`DM`, `EM`, `FM`, `ZF`, `W`, `TM`, `CM`, `VM`, `D`, `E`, `F`); native 32-bit `Z`, direct-bit, and special-response families such as `R`, `T`, `C`, and `AT` fail before FIFO admission and transport.
 - Library: **Breaking:** Semantic `.H` reads now return exactly four uppercase hexadecimal digits, and MWR validates every returned token against the ordered formats registered by MWS.
-- Library: **Breaking:** Every UDP operation uses a fresh request-owned socket and source endpoint while the client remains logically connected. Firewalls and peers must return each response to that request's source port.
+- Library: UDP now reuses one connected socket and local endpoint across successful requests. Timeout, cancellation, transport/protocol failure, malformed or extra input, and detected pre-send unowned datagrams discard that socket; the next request creates a fresh socket from the cached numeric IPv4 endpoint without repeating DNS.
 - Library: TCP accepts exactly one non-empty response per request; an extra response is a protocol error and retires the transport instead of becoming the next command's result.
 - Library: Async TCP/UDP connection candidates completed after `close()`, cancellation, or timeout are discarded and closed exactly once before they can publish connected state.
 - Library: **Breaking:** Timer/counter composite response status must be exactly `0` or `1`; any other numeric status is an invalid response and retires the connection.
@@ -42,19 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration
 
+- Remove brackets from IPv4 host input. Reduce raw request bodies longer than 65,506 ASCII bytes or use command-specific operations whose protocol contract permits multiple requests.
 - Pass `HostLinkCommentEncoding.UTF8` or `.CP932` to `read_comments`; pass `comment_encoding` when `read_named` or `poll` contains `:COMMENT`. Use `read_comment_bytes` when the application cannot assert the payload encoding.
 - Pass actual integers to bank, count, unit, address, mode, and bit-index parameters. Keep `PROGRAM` and `RUN` only where the mode API explicitly documents those string forms.
 - Replace `write_bit_in_word` with a PLC-side atomic bit operation or an application/PLC ownership design for the complete word.
 - Catch the specific Host Link error type needed by the application. For `HostLinkOutcomeUnknownError`, inspect `reason`, reconcile PLC state explicitly, and do not blindly retry.
-- Move Float32 data from `Z:F` to an ordinary word family or access Z through its supported integer representation. Expect semantic hexadecimal reads such as `A` to be returned as `000A`, and allow a changing UDP source port for each operation.
+- Move Float32 data from `Z:F` to an ordinary word family or access Z through its supported integer representation. Expect semantic hexadecimal reads such as `A` to be returned as `000A`. Allow the UDP source port to change only after an exchange invalidates the reused socket.
 
 ### Fixed
 
 - Library: `RDC` comment decoding no longer guesses a codec. UTF-8 and the portable strict CP932/Windows-31J repertoire decode consistently across runtimes, ambiguous bytes follow only the caller selection, malformed or runtime-private bytes never fall back or use replacement, and raw comment payload bytes are available without losing trailing padding.
 - Library: Reject Float32 writes to direct bit devices before transport, require exact `0`/`1` operating-mode responses, reject non-positive or non-finite poll intervals, and calculate `R`/`MR`/`LR`/`CR` catalog bounds through banked-bit logical indexes.
 - Library: Normal sync/async clients now use arrival FIFO admission; waiting async cancellation sends nothing, and `close()` immediately rejects active and queued work. One absolute request deadline covers transmit, drain, receive, and decode, while connection establishment has a separate deadline.
-- Library: `read_named`/`poll` now preflight the complete caller-ordered input, keep entries indivisible, hold one FIFO turn, and split only necessary read-only work. Multi-request results remain non-atomic and never return a partial dictionary after failure.
-- Library: Enforce the 65,536-byte request-body and response-body boundaries before transport/acceptance, retain native failure causes, never automatically resend after a possible send, and keep all transports IPv4-only.
+- Library: `read_named`/`poll` now preflight the complete input, group wire reads by first-occurring device type, sort each group by address, merge compatible contiguous or overlapping spans up to protocol limits, and hold one FIFO turn. Public result keys remain in caller order; multi-request results remain non-atomic and never return a partial dictionary after failure. Polling compiles this plan once and reuses it for every cycle.
+- Library: Enforce the 65,506-byte request-body and 65,536-byte response-body boundaries before transport/acceptance, retain native failure causes, never automatically resend after a possible send, and keep all transports IPv4-only.
 - Samples: Correct the dtype-bearing normalization examples, validate every runnable sample, and make `basic_test.py` read-only unless a controlled write-test device is explicitly selected; write tests restore the original value.
 - CI: Include tests and fixtures in GitHub source archives and execute the complete non-hardware and package-consumer gates from the extracted archive.
 - CI: Package validation now installs the built wheel into a fresh isolated virtual environment and checks public imports, signatures, docstrings, version identity, and installed origin without checkout or `PYTHONPATH` access.

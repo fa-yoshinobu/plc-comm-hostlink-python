@@ -309,3 +309,23 @@ def test_ipv6_literal_is_rejected_before_any_connection_work(
             plc_profile="keyence:kv-8000",
         )
     assert not socket_created
+
+
+@pytest.mark.parametrize("client_type", [HostLinkClient, AsyncHostLinkClient])
+@pytest.mark.parametrize("host", ["[127.0.0.1]", "[192.0.2.1]"])
+def test_bracketed_ipv4_is_rejected_before_any_connection_work(
+    monkeypatch: pytest.MonkeyPatch,
+    client_type: type[HostLinkClient] | type[AsyncHostLinkClient],
+    host: str,
+) -> None:
+    socket_created = False
+
+    def create_socket(*_args: object, **_kwargs: object) -> _FakeSocket:
+        nonlocal socket_created
+        socket_created = True
+        return _FakeSocket()
+
+    monkeypatch.setattr("hostlink.client.socket.socket", create_socket)
+    with pytest.raises(ValueError, match="brackets"):
+        client_type(host, port=8501, transport="tcp", plc_profile="keyence:kv-8000")
+    assert not socket_created

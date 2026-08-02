@@ -132,6 +132,15 @@ class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HostLinkProtocolError):
             HostLinkConnectionOptions("127.0.0.1", plc_profile="KV-8000", port=8501, transport="tcp")
 
+    def test_connection_options_reject_bracketed_ipv4(self) -> None:
+        with self.assertRaisesRegex(ValueError, "brackets"):
+            HostLinkConnectionOptions(
+                "[127.0.0.1]",
+                plc_profile="keyence:kv-8000",
+                port=8501,
+                transport="tcp",
+            )
+
     async def test_open_and_connect_accepts_options(self) -> None:
         options = HostLinkConnectionOptions(
             "127.0.0.1",

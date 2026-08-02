@@ -14,6 +14,7 @@ import re
 import struct
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import KW_ONLY, dataclass
+from ipaddress import ip_address
 from typing import TYPE_CHECKING, cast
 
 from .device import (
@@ -115,6 +116,15 @@ class HostLinkConnectionOptions:
         object.__setattr__(self, "plc_profile", normalize_plc_profile(self.plc_profile))
         if not isinstance(self.host, str) or not self.host.strip():
             raise ValueError("host is required and must be a non-empty string")
+        normalized_host = self.host.strip()
+        if normalized_host.startswith("[") and normalized_host.endswith("]"):
+            try:
+                bracketed_literal = ip_address(normalized_host[1:-1])
+            except ValueError:
+                pass
+            else:
+                if bracketed_literal.version == 4:
+                    raise ValueError("host must not use brackets around an IPv4 address")
         if type(self.port) is not int or not 1 <= self.port <= 65535:
             raise ValueError("port is required and must be an integer in the range 1..65535")
         if not isinstance(self.transport, str) or self.transport.strip().lower() not in {"tcp", "udp"}:
@@ -133,7 +143,7 @@ class HostLinkConnectionOptions:
             or self.connect_timeout <= 0
         ):
             raise ValueError("connect_timeout must be a positive finite number")
-        object.__setattr__(self, "host", self.host.strip())
+        object.__setattr__(self, "host", normalized_host)
         object.__setattr__(self, "transport", self.transport.strip().lower())
 
 
@@ -530,11 +540,12 @@ async def read_named(
     format. Bits 0-9 can be written as decimal digits; bits 10-15 must be written as
     ``A``-``F``. For example, bit 12 is ``"DM100.C"``, not ``"DM100.12"``.
 
-    The entire input is validated before admission. Compatible adjacent entries
-    are merged, while necessary read-only requests are split without splitting
-    an individual entry. All requests run in caller order during one FIFO turn.
-    A multi-request result is not one atomic PLC-time observation, and an error returns
-    no partial dictionary.
+    The entire input is validated before admission. Wire reads are grouped by
+    device type in first-occurrence order, sorted by address within each group,
+    and compatible contiguous or overlapping spans are merged up to request
+    limits without splitting an individual entry. All requests run during one
+    FIFO turn. Public keys remain in caller order. A multi-request result is not
+    one atomic PLC-time observation, and an error returns no partial dictionary.
 
     Keys must be semantically unique after device family, numeric address,
     dtype, bit index, and scalar count are normalized. Spelling variants are
@@ -574,8 +585,9 @@ async def poll(
     """Continuously yield read results for the specified addresses.
 
     Address parsing and return values follow the same rules as
-    :func:`read_named`. If the address set can be batched, the compiled read
-    plan is reused on every iteration.
+    :func:`read_named`. The optimized read plan is compiled once and reused on
+    every iteration. Each complete cycle owns one FIFO turn; yielding the sample
+    and waiting for the post-cycle interval occur after releasing that turn.
 
     Args:
         client: Connected asynchronous Host Link client.
@@ -664,6 +676,7 @@ def _validate_address_semantics(address: str, device: DeviceAddress, dtype: str)
 
 def _compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan:
     requests_in_input_order: list[_ReadPlanRequest] = []
+    requests_by_device_type: dict[str, list[_ReadPlanRequest]] = {}
     semantic_keys: set[tuple[str, int, str, int | None, int]] = set()
     for index, address in enumerate(addresses):
         request = _parse_read_named_request(address, index)
@@ -682,58 +695,67 @@ def _compile_read_named_plan(addresses: list[str]) -> _CompiledReadNamedPlan:
             raise ValueError(f"Named read address {address!r} is semantically duplicated.")
         semantic_keys.add(semantic_key)
         requests_in_input_order.append(request)
+        requests_by_device_type.setdefault(request.base_address.device_type, []).append(request)
 
     segments: list[_ReadPlanSegment] = []
-    pending: list[_ReadPlanRequest] = []
-    current_start: DeviceAddress | None = None
-    current_start_number = 0
-    current_end_exclusive = 0
-    current_mode = ""
-
-    def flush() -> None:
-        nonlocal pending, current_start, current_start_number, current_end_exclusive, current_mode
-        if current_start is not None:
-            segments.append(
-                _ReadPlanSegment(
-                    start_address=current_start,
-                    start_number=current_start_number,
-                    count=current_end_exclusive - current_start_number,
-                    mode=current_mode,
-                    requests=tuple(pending),
-                )
-            )
-        pending = []
-        current_start = None
+    for bucket in requests_by_device_type.values():
+        sorted_requests = sorted(
+            bucket,
+            key=lambda request: (
+                _read_plan_number(request),
+                -_get_word_width(request.kind),
+                request.index,
+            ),
+        )
+        pending: list[_ReadPlanRequest] = []
+        current_start: DeviceAddress | None = None
         current_start_number = 0
         current_end_exclusive = 0
         current_mode = ""
 
-    for request in requests_in_input_order:
-        request_mode = _read_plan_mode(request)
-        request_start = _read_plan_number(request)
-        request_end_exclusive = request_start + _get_word_width(request.kind)
-        mergeable = request_mode in {"WORDS", "DIRECT_BITS"}
-        segment_limit = _read_plan_segment_limit(request.base_address.device_type, request_mode)
-        can_append = (
-            mergeable
-            and current_start is not None
-            and current_mode == request_mode
-            and current_start.device_type == request.base_address.device_type
-            and current_start_number <= request_start <= current_end_exclusive
-            and request_end_exclusive - current_start_number <= segment_limit
-        )
-        if not can_append:
-            flush()
-            current_start = DeviceAddress(request.base_address.device_type, request.base_address.number, "")
-            current_start_number = request_start
-            current_end_exclusive = request_end_exclusive
-            current_mode = request_mode
-        elif request_end_exclusive > current_end_exclusive:
-            current_end_exclusive = request_end_exclusive
-        pending.append(request)
-        if not mergeable:
-            flush()
-    flush()
+        def flush() -> None:
+            nonlocal pending, current_start, current_start_number, current_end_exclusive, current_mode
+            if current_start is not None:
+                segments.append(
+                    _ReadPlanSegment(
+                        start_address=current_start,
+                        start_number=current_start_number,
+                        count=current_end_exclusive - current_start_number,
+                        mode=current_mode,
+                        requests=tuple(pending),
+                    )
+                )
+            pending = []
+            current_start = None
+            current_start_number = 0
+            current_end_exclusive = 0
+            current_mode = ""
+
+        for request in sorted_requests:
+            request_mode = _read_plan_mode(request)
+            request_start = _read_plan_number(request)
+            request_end_exclusive = request_start + _get_word_width(request.kind)
+            mergeable = request_mode in {"WORDS", "DIRECT_BITS"}
+            segment_limit = _read_plan_segment_limit(request.base_address.device_type, request_mode)
+            can_append = (
+                mergeable
+                and current_start is not None
+                and current_mode == request_mode
+                and current_start_number <= request_start <= current_end_exclusive
+                and request_end_exclusive - current_start_number <= segment_limit
+            )
+            if not can_append:
+                flush()
+                current_start = DeviceAddress(request.base_address.device_type, request.base_address.number, "")
+                current_start_number = request_start
+                current_end_exclusive = request_end_exclusive
+                current_mode = request_mode
+            elif request_end_exclusive > current_end_exclusive:
+                current_end_exclusive = request_end_exclusive
+            pending.append(request)
+            if not mergeable:
+                flush()
+        flush()
 
     return _CompiledReadNamedPlan(
         requests_in_input_order=tuple(requests_in_input_order),
