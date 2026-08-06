@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plc-comm-kv-hostlink"
-version = "3.2.1"
+version = "4.0.0"
 description = "Python library for KEYENCE KV series Host Link (Upper Link) communication."
 authors = [{ name = "fa-yoshinobu" }]
 license = "MIT"

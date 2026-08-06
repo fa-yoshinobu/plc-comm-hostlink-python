@@ -315,10 +315,45 @@ request observes the PLC at a different time.
 ## Bit in word
 
 The `.n` notation used by `read_named` reads hexadecimal bit indexes from `0`
-through `F`; `.A` means bit 10. The former public read-modify-write
-`write_bit_in_word` API was removed because it could lose concurrent PLC or
-multi-client updates. Use a PLC-side atomic bit operation or redesign word
-ownership; the library does not provide a compatibility alias.
+through `F`; `.A` means bit 10. Use the explicit client method when a
+client-side read-modify-write is the intended policy:
+
+```python
+client.write_bit_in_word("DM50", 10, True)
+await async_client.write_bit_in_word("DM50", 10, True)
+```
+
+The helper form `await write_bit_in_word(async_client, "DM50", 10, True)` has
+the same contract. The value must be an actual `bool`, the index is `0..15`,
+and the target must be an ordinary 16-bit word device. Invalid plans fail
+before FIFO admission. After activation, one absolute transaction deadline
+covers exactly one word read followed by one word write in one FIFO turn; queue
+wait is outside that deadline. The write is sent even when the bit is already
+in the requested state. There is no fallback, resend, success readback, or
+implicit named-write behavior.
+
+This operation is not PLC-atomic. PLC logic or another connection can change
+the word between requests and that change can be lost. Use PLC-side logic, a
+handshake, or exclusive ownership of the complete word when that matters.
+Async cancellation before the write starts sends no write. Failure after write
+transmission may have started is outcome-unknown: do not retry automatically;
+reopen and reconcile PLC state. A complete PLC error is definitive and does
+not by itself retire a healthy connection.
+
+Expansion-unit buffer memory uses its own explicit route-specific method:
+
+```python
+client.write_bit_in_expansion_unit_buffer(1, 100, 3, True)
+await async_client.write_bit_in_expansion_unit_buffer(1, 100, 3, True)
+```
+
+The async helper form
+`await write_bit_in_expansion_unit_buffer(async_client, 1, 100, 3, True)`
+has the same contract. Both requests remain on the selected unit/address and
+one `.U` word: exactly one `URD` point followed by one `UWR` point. The ordinary
+device and expansion-unit routes never fall back to one another. The same
+shared-deadline, cancellation, outcome-unknown, no-readback, and
+non-PLC-atomic rules apply.
 
 ## Polling
 

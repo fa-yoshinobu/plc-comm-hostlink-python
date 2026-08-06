@@ -295,7 +295,7 @@ async def test_direct_bit_word_helpers_accept_one_packed_scalar_token() -> None:
         "R0.3": True,
         "R0.F": True,
     }
-    assert not hasattr(client, "write_bit_in_word")
+    assert hasattr(client, "write_bit_in_word")
 
 
 def test_e2e_smoke_uses_current_public_constructor_and_raw_contract() -> None:

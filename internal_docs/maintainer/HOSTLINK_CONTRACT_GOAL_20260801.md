@@ -6,6 +6,12 @@ helper layer. Deterministic local transport fixtures are sufficient evidence;
 no live PLC communication is required because these items govern local
 admission, validation, timeout, framing, error, and aggregation behavior.
 
+The `write_bit_in_word` removal portion of this historical record was
+superseded on 2026-08-07 by GOAL-BIT-002 in
+`D:\APP\cross_library_bit_write_contract_goal_20260807.md`. The explicit
+Boolean-only two-request helper is restored; all unrelated criteria below
+remain unchanged.
+
 ## HL-CONTRACT-001 — Exact transport capacity boundaries
 
 ### Implementation scope

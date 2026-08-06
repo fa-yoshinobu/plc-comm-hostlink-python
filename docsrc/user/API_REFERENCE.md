@@ -119,6 +119,8 @@ an unused configuration error before communication.
 | Typed values | `read_typed`, `write_typed` |
 | Timer/counter composite reads | `TimerCounterValue`, `read_timer_counter`, `read_timer`, `read_counter` |
 | Named read collections and polling | `read_named`, `poll` |
+| Explicit bit-in-word write | `HostLinkClient.write_bit_in_word`, `AsyncHostLinkClient.write_bit_in_word`, `write_bit_in_word` |
+| Expansion-buffer bit write | `HostLinkClient.write_bit_in_expansion_unit_buffer`, `AsyncHostLinkClient.write_bit_in_expansion_unit_buffer`, `write_bit_in_expansion_unit_buffer` |
 | Word/dword reads | `read_words`, `read_dwords` |
 | Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
 
@@ -136,7 +138,14 @@ indices, and overlapping spans remain valid; returned keys preserve the input
 spelling. `poll` compiles the optimized plan once, reuses it for every cycle,
 and releases the FIFO turn before yielding a sample or waiting for the interval.
 Poll intervals must be positive finite numbers and cannot be booleans.
-The removed `write_bit_in_word` RMW API has no alias.
+`write_bit_in_word` is an explicit Boolean-only, 16-bit word read-modify-write.
+It validates the complete plan before FIFO admission, retains one client turn,
+and uses one absolute deadline for its one read and one write after activation.
+It always sends the write after a successful read, performs no retry or
+readback, and is not PLC-atomic against PLC logic or another connection.
+`write_bit_in_expansion_unit_buffer` applies the same contract to exactly one
+`.U` word on the existing URD/UWR unit/address route. The selected route is
+immutable across both requests and never falls back to an ordinary device.
 
 `parse_address`, `normalize_address`, and `format_address` apply the same
 device/data-type compatibility rules. Formatting a `HostLinkAddress` validates

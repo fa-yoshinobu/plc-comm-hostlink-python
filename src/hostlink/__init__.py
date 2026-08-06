@@ -16,12 +16,14 @@ from :mod:`hostlink.utils`:
 - :func:`read_timer`
 - :func:`read_counter`
 - :func:`write_typed`
+- :func:`write_bit_in_word`
 - :func:`read_comments`
 - :func:`read_comment_bytes`
 - :func:`read_words_single_request`
 - :func:`read_dwords_single_request`
 - :func:`read_expansion_unit_buffer`
 - :func:`write_expansion_unit_buffer`
+- :func:`write_bit_in_expansion_unit_buffer`
 - :func:`read_named`
 - :func:`poll`
 
@@ -30,7 +32,7 @@ workflows, but the helpers above are the recommended entry points for normal
 application code and generated user documentation.
 """
 
-__version__ = "3.2.1"
+__version__ = "4.0.0"
 
 from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTrafficStats, ModelInfo
 from .device_ranges import (
@@ -87,6 +89,8 @@ from .utils import (
     read_words,
     read_words_single_request,
     try_parse_address,
+    write_bit_in_expansion_unit_buffer,
+    write_bit_in_word,
     write_dwords_single_request,
     write_expansion_unit_buffer,
     write_typed,
@@ -146,6 +150,8 @@ __all__ = [
     "read_expansion_unit_buffer",
     "try_parse_address",
     "write_dwords_single_request",
+    "write_bit_in_word",
+    "write_bit_in_expansion_unit_buffer",
     "write_expansion_unit_buffer",
     "write_typed",
     "write_words_single_request",

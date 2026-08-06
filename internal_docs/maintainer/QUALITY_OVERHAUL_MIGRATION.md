@@ -1,5 +1,21 @@
 # HostLink Python quality-overhaul contract and migration
 
+## Superseding decision: explicit word-bit write (2026-08-07)
+
+Earlier removal decisions below remain historical evidence but no longer
+describe the target surface. Sync/async client methods and the async
+`write_bit_in_word` helper are restored for every Host Link device family whose
+canonical default representation and `WR` command both provide one complete
+16-bit `.U` word. The device text is immutable across the read and write; there
+is no alternate route, fallback, resend, or readback. GOAL-BIT-002 in
+`D:\APP\cross_library_bit_write_contract_goal_20260807.md` is authoritative.
+
+GOAL-HOSTLINK-EXPANSION-RMW-001 extends that contract to the existing URD/UWR
+route through sync/async client methods and the async
+`write_bit_in_expansion_unit_buffer` helper. Unit, address, and `.U` format are
+immutable across both requests; ordinary and expansion routes never fall back
+to one another.
+
 Branch: `quality/2026-07-overhaul`  
 Authoritative approvals: archived workspace record `omittable_configuration_decisions_20260711.md`
 Related findings: B-18 through B-29 in archived workspace record `library_bug_consistency_review_20260710.md`

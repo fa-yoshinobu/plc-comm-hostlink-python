@@ -817,11 +817,9 @@ class HostLinkBase:
     @staticmethod
     def _format_value(value: int | str, data_format: str) -> str:
         if data_format == "":
-            if isinstance(value, bool):
+            if type(value) is bool:
                 return "1" if value else "0"
-            if type(value) is int and value in {0, 1}:
-                return str(value)
-            raise HostLinkProtocolError(f"BIT value must be bool or integer 0/1, got {value!r}")
+            raise HostLinkProtocolError(f"BIT value must be bool, got {value!r}")
         limits = {
             ".U": (0, 0xFFFF),
             ".S": (-0x8000, 0x7FFF),
@@ -1211,6 +1209,7 @@ class HostLinkClient(HostLinkBase):
         self._rx_bytes = 0
         self._last_rx_frame_length = 0
         self._last_exchange_deadline: float | None = None
+        self._aggregate_deadline: float | None = None
 
     def traffic_stats(self) -> HostLinkTrafficStats:
         """Return an immutable lifetime traffic-counter snapshot."""
@@ -1514,8 +1513,10 @@ class HostLinkClient(HostLinkBase):
         exchange_complete = False
         may_have_sent = False
         try:
-            timeout = _validated_timeout("timeout", self.timeout)
-            deadline = time.monotonic() + timeout
+            deadline = self._aggregate_deadline
+            if deadline is None:
+                timeout = _validated_timeout("timeout", self.timeout)
+                deadline = time.monotonic() + timeout
             self._last_exchange_deadline = deadline
             if self.transport == "udp":
                 sock = self._prepare_udp_request_socket(deadline=deadline)
@@ -1719,6 +1720,50 @@ class HostLinkClient(HostLinkBase):
 
         self._expect_ok(self._build_write_command(device, value, data_format))
 
+    def write_bit_in_word(self, device: str, bit_index: int, value: bool) -> None:
+        """Set or clear one bit through an explicit 16-bit read-modify-write.
+
+        The complete target, index, and Boolean value are validated before
+        FIFO admission. After activation, one local FIFO turn and one absolute
+        transaction deadline cover exactly one read and one write, even when
+        the bit already has the requested value. There is no fallback, retry,
+        or success readback. The operation is not PLC-atomic: another
+        connection or PLC logic can change the word between requests and that
+        change can be lost. Use PLC-side coordination when the complete word
+        is shared.
+        """
+
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index!r}")
+        if type(value) is not bool:
+            raise TypeError("value must be bool")
+        address = parse_device(device)
+        if address.suffix or resolve_effective_format(address.device_type, "") != ".U":
+            raise HostLinkProtocolError("write_bit_in_word requires an ordinary 16-bit word device")
+        normalized = address.to_text()
+        read_body, suffix = self._build_read_command(normalized, ".U")
+        self._build_write_command(normalized, 0, ".U")
+
+        with self._lock:
+            prior_deadline = self._aggregate_deadline
+            self._aggregate_deadline = time.monotonic() + _validated_timeout("timeout", self.timeout)
+            try:
+                response = self._send_decoded_unlocked(read_body)
+                try:
+                    result = self._decode_read_response(response, suffix, 1)
+                    self._check_decode_deadline(state_changing=False)
+                except HostLinkProtocolError:
+                    self._retire_failed_transport()
+                    raise
+                if type(result) is not int or not 0 <= result <= 0xFFFF:
+                    self._retire_failed_transport()
+                    raise HostLinkProtocolError(f"Bit-in-word read for {normalized!r} did not return one unsigned word")
+                mask = 1 << bit_index
+                updated = result | mask if value else result & ~mask
+                self._expect_ok_unlocked(self._build_write_command(normalized, updated, ".U"))
+            finally:
+                self._aggregate_deadline = prior_deadline
+
     def write_consecutive(
         self,
         device: str,
@@ -1825,6 +1870,51 @@ class HostLinkClient(HostLinkBase):
 
         self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
 
+    def write_bit_in_expansion_unit_buffer(
+        self,
+        unit_no: int,
+        address: int,
+        bit_index: int,
+        value: bool,
+    ) -> None:
+        """Set or clear one bit through one explicit ``URD``/``UWR`` pair.
+
+        The route is fixed to ``unit_no`` and ``address`` and the format is one
+        unsigned 16-bit word. Validation finishes before FIFO admission. One
+        absolute deadline covers the read and write after activation. The
+        operation is not PLC-atomic and performs no fallback, retry, or
+        success readback.
+        """
+
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index!r}")
+        if type(value) is not bool:
+            raise TypeError("value must be bool")
+        read_body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, 1, "U")
+        self._build_write_expansion_unit_buffer_command(unit_no, address, [0xFFFF], "U")
+
+        with self._lock:
+            prior_deadline = self._aggregate_deadline
+            self._aggregate_deadline = time.monotonic() + _validated_timeout("timeout", self.timeout)
+            try:
+                response = self._send_decoded_unlocked(read_body)
+                try:
+                    result = self._decode_expansion_unit_buffer_response(response, suffix, 1)
+                    self._check_decode_deadline(state_changing=False)
+                except HostLinkProtocolError:
+                    self._retire_failed_transport()
+                    raise
+                current = result[0]
+                if type(current) is not int or not 0 <= current <= 0xFFFF:
+                    self._retire_failed_transport()
+                    raise HostLinkProtocolError("Expansion-unit bit read did not return one unsigned word")
+                mask = 1 << bit_index
+                updated = current | mask if value else current & ~mask
+                write_body = self._build_write_expansion_unit_buffer_command(unit_no, address, [updated], "U")
+                self._expect_ok_unlocked(write_body)
+            finally:
+                self._aggregate_deadline = prior_deadline
+
 
 class AsyncHostLinkClient(HostLinkBase):
     """Asynchronous client for KEYENCE KV Host Link protocol."""
@@ -1860,6 +1950,7 @@ class AsyncHostLinkClient(HostLinkBase):
         self._rx_bytes = 0
         self._last_rx_frame_length = 0
         self._last_exchange_deadline: float | None = None
+        self._aggregate_deadline: float | None = None
 
     def traffic_stats(self) -> HostLinkTrafficStats:
         """Return an immutable lifetime traffic-counter snapshot."""
@@ -2215,8 +2306,10 @@ class AsyncHostLinkClient(HostLinkBase):
                     raise HostLinkNotConnectedError("Not connected")
                 await self._reject_unowned_tcp_input()
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
-                timeout = _validated_timeout("timeout", self.timeout)
-                deadline = loop.time() + timeout
+                deadline = self._aggregate_deadline
+                if deadline is None:
+                    timeout = _validated_timeout("timeout", self.timeout)
+                    deadline = loop.time() + timeout
                 self._last_exchange_deadline = deadline
                 may_have_sent = True
                 self._writer.write(payload)
@@ -2235,8 +2328,10 @@ class AsyncHostLinkClient(HostLinkBase):
                 self._fire_trace(HostLinkTraceDirection.RECEIVE, response)
                 return response
             else:
-                timeout = _validated_timeout("timeout", self.timeout)
-                deadline = loop.time() + timeout
+                deadline = self._aggregate_deadline
+                if deadline is None:
+                    timeout = _validated_timeout("timeout", self.timeout)
+                    deadline = loop.time() + timeout
                 self._last_exchange_deadline = deadline
                 udp_transport, udp_protocol = await self._prepare_udp_request_endpoint(deadline=deadline)
                 self._fire_trace(HostLinkTraceDirection.SEND, payload)
@@ -2426,6 +2521,51 @@ class AsyncHostLinkClient(HostLinkBase):
 
         await self._expect_ok(self._build_write_command(device, value, data_format))
 
+    async def write_bit_in_word(self, device: str, bit_index: int, value: bool) -> None:
+        """Set or clear one bit through an explicit 16-bit read-modify-write.
+
+        The complete target, index, and Boolean value are validated before
+        FIFO admission. After activation, one local FIFO turn and one absolute
+        transaction deadline cover exactly one read and one write, even when
+        the bit already has the requested value. There is no fallback, retry,
+        or success readback. The operation is not PLC-atomic: another
+        connection or PLC logic can change the word between requests and that
+        change can be lost. Use PLC-side coordination when the complete word
+        is shared.
+        """
+
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index!r}")
+        if type(value) is not bool:
+            raise TypeError("value must be bool")
+        address = parse_device(device)
+        if address.suffix or resolve_effective_format(address.device_type, "") != ".U":
+            raise HostLinkProtocolError("write_bit_in_word requires an ordinary 16-bit word device")
+        normalized = address.to_text()
+        read_body, suffix = self._build_read_command(normalized, ".U")
+        self._build_write_command(normalized, 0, ".U")
+
+        async with self._lock:
+            loop = asyncio.get_running_loop()
+            prior_deadline = self._aggregate_deadline
+            self._aggregate_deadline = loop.time() + _validated_timeout("timeout", self.timeout)
+            try:
+                response = await self._send_decoded_unlocked(read_body)
+                try:
+                    result = self._decode_read_response(response, suffix, 1)
+                    await self._check_decode_deadline(state_changing=False)
+                except HostLinkProtocolError:
+                    await self._retire_failed_transport()
+                    raise
+                if type(result) is not int or not 0 <= result <= 0xFFFF:
+                    await self._retire_failed_transport()
+                    raise HostLinkProtocolError(f"Bit-in-word read for {normalized!r} did not return one unsigned word")
+                mask = 1 << bit_index
+                updated = result | mask if value else result & ~mask
+                await self._expect_ok_unlocked(self._build_write_command(normalized, updated, ".U"))
+            finally:
+                self._aggregate_deadline = prior_deadline
+
     async def write_consecutive(
         self,
         device: str,
@@ -2531,6 +2671,52 @@ class AsyncHostLinkClient(HostLinkBase):
         """Write an expansion unit buffer range with ``UWR``."""
 
         await self._expect_ok(self._build_write_expansion_unit_buffer_command(unit_no, address, values, data_format))
+
+    async def write_bit_in_expansion_unit_buffer(
+        self,
+        unit_no: int,
+        address: int,
+        bit_index: int,
+        value: bool,
+    ) -> None:
+        """Set or clear one bit through one explicit ``URD``/``UWR`` pair.
+
+        The route is fixed to ``unit_no`` and ``address`` and the format is one
+        unsigned 16-bit word. Validation finishes before FIFO admission. One
+        absolute deadline covers the read and write after activation. The
+        operation is not PLC-atomic and performs no fallback, retry, or
+        success readback.
+        """
+
+        if type(bit_index) is not int or not 0 <= bit_index <= 15:
+            raise ValueError(f"bit_index must be 0-15, got {bit_index!r}")
+        if type(value) is not bool:
+            raise TypeError("value must be bool")
+        read_body, suffix = self._build_read_expansion_unit_buffer_command(unit_no, address, 1, "U")
+        self._build_write_expansion_unit_buffer_command(unit_no, address, [0xFFFF], "U")
+
+        async with self._lock:
+            loop = asyncio.get_running_loop()
+            prior_deadline = self._aggregate_deadline
+            self._aggregate_deadline = loop.time() + _validated_timeout("timeout", self.timeout)
+            try:
+                response = await self._send_decoded_unlocked(read_body)
+                try:
+                    result = self._decode_expansion_unit_buffer_response(response, suffix, 1)
+                    await self._check_decode_deadline(state_changing=False)
+                except HostLinkProtocolError:
+                    await self._retire_failed_transport()
+                    raise
+                current = result[0]
+                if type(current) is not int or not 0 <= current <= 0xFFFF:
+                    await self._retire_failed_transport()
+                    raise HostLinkProtocolError("Expansion-unit bit read did not return one unsigned word")
+                mask = 1 << bit_index
+                updated = current | mask if value else current & ~mask
+                write_body = self._build_write_expansion_unit_buffer_command(unit_no, address, [updated], "U")
+                await self._expect_ok_unlocked(write_body)
+            finally:
+                self._aggregate_deadline = prior_deadline
 
 
 class _HostLinkUDPProtocol(asyncio.DatagramProtocol):

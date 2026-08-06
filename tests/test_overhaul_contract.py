@@ -42,11 +42,13 @@ class _RecordingClient(HostLinkClient):
             plc_profile="keyence:kv-8000",
         )
         self.frames: list[bytes] = []
+        self.deadlines: list[float | None] = []
         self.responses = list(responses or [])
         self.retired = False
 
     def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.frames.append(payload)
+        self.deadlines.append(self._aggregate_deadline)
         return self.responses.pop(0) if self.responses else b"OK\r"
 
     def _close_unlocked(self) -> None:
@@ -63,11 +65,13 @@ class _AsyncRecordingClient(AsyncHostLinkClient):
             plc_profile="keyence:kv-8000",
         )
         self.frames: list[bytes] = []
+        self.deadlines: list[float | None] = []
         self.responses = list(responses or [])
         self.retired = False
 
     async def _exchange(self, payload: bytes, **_: object) -> bytes:
         self.frames.append(payload)
+        self.deadlines.append(self._aggregate_deadline)
         return self.responses.pop(0) if self.responses else b"OK\r"
 
     async def _close_unlocked(self) -> None:
@@ -926,9 +930,128 @@ def test_removed_public_options_helpers_and_trace_types_are_absent() -> None:
         "write_dwords_chunked",
         "HostLinkTraceDirection",
         "HostLinkTraceFrame",
-        "write_bit_in_word",
     ):
         assert not hasattr(hostlink, name)
+    assert hasattr(hostlink, "write_bit_in_word")
+
+
+def test_write_bit_in_word_covers_every_existing_complete_word_route_without_fallback() -> None:
+    devices = ("DM0", "EM0", "FM0", "ZF0", "W0", "TM0", "Z0", "CM0", "VM0", "D0", "E0", "F0")
+    client = _RecordingClient([item for _ in devices for item in (b"0\r", b"OK\r")])
+
+    for device in devices:
+        client.write_bit_in_word(device, 0, False)
+
+    assert client.frames == [
+        frame for device in devices for frame in (f"RD {device}.U\r".encode(), f"WR {device}.U 0\r".encode())
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_write_bit_in_word_covers_every_existing_complete_word_route_without_fallback() -> None:
+    devices = ("DM0", "EM0", "FM0", "ZF0", "W0", "TM0", "Z0", "CM0", "VM0", "D0", "E0", "F0")
+    client = _AsyncRecordingClient([item for _ in devices for item in (b"0\r", b"OK\r")])
+
+    for device in devices:
+        await client.write_bit_in_word(device, 0, False)
+
+    assert client.frames == [
+        frame for device in devices for frame in (f"RD {device}.U\r".encode(), f"WR {device}.U 0\r".encode())
+    ]
+
+
+@pytest.mark.parametrize("device", ["R0", "T0", "AT0", "DM0.U"])
+def test_write_bit_in_word_rejects_non_complete_u16_routes_before_transport(device: str) -> None:
+    client = _RecordingClient()
+
+    with pytest.raises((HostLinkProtocolError, ValueError)):
+        client.write_bit_in_word(device, 0, True)
+
+    assert client.frames == []
+
+
+@pytest.mark.parametrize(
+    ("value", "read_value", "expected_write"),
+    [
+        (True, b"0\r", b"UWR 01 100.U 1 8\r"),
+        (True, b"8\r", b"UWR 01 100.U 1 8\r"),
+        (False, b"8\r", b"UWR 01 100.U 1 0\r"),
+    ],
+)
+def test_write_bit_in_expansion_unit_buffer_uses_one_route_and_deadline(
+    value: bool,
+    read_value: bytes,
+    expected_write: bytes,
+) -> None:
+    client = _RecordingClient([read_value, b"OK\r"])
+
+    client.write_bit_in_expansion_unit_buffer(1, 100, 3, value)
+
+    assert client.frames == [b"URD 01 100.U 1\r", expected_write]
+    assert client.deadlines[0] is not None
+    assert client.deadlines[0] == client.deadlines[1]
+
+
+@pytest.mark.asyncio
+async def test_async_write_bit_in_expansion_unit_buffer_uses_one_route_and_deadline() -> None:
+    client = _AsyncRecordingClient([b"0\r", b"OK\r"])
+
+    await hostlink.write_bit_in_expansion_unit_buffer(client, 1, 100, 3, True)
+
+    assert client.frames == [b"URD 01 100.U 1\r", b"UWR 01 100.U 1 8\r"]
+    assert client.deadlines[0] is not None
+    assert client.deadlines[0] == client.deadlines[1]
+
+
+@pytest.mark.parametrize(
+    ("unit_no", "address", "bit_index", "value"),
+    [
+        (-1, 0, 0, True),
+        (49, 0, 0, True),
+        (0, -1, 0, True),
+        (0, 60_000, 0, True),
+        (0, 0, -1, True),
+        (0, 0, 16, True),
+        (0, 0, 0, 1),
+    ],
+)
+def test_write_bit_in_expansion_unit_buffer_rejects_invalid_plan_before_transport(
+    unit_no: int,
+    address: int,
+    bit_index: int,
+    value: object,
+) -> None:
+    client = _RecordingClient()
+
+    with pytest.raises((HostLinkProtocolError, TypeError, ValueError)):
+        client.write_bit_in_expansion_unit_buffer(unit_no, address, bit_index, value)  # type: ignore[arg-type]
+
+    assert client.frames == []
+
+
+def test_write_bit_in_expansion_unit_buffer_malformed_read_sends_no_write_and_retires() -> None:
+    client = _RecordingClient([b"NOT_A_WORD\r"])
+
+    with pytest.raises(HostLinkProtocolError):
+        client.write_bit_in_expansion_unit_buffer(1, 100, 3, True)
+
+    assert client.frames == [b"URD 01 100.U 1\r"]
+    assert client.retired
+
+
+def test_write_bit_in_expansion_unit_buffer_plc_write_error_is_definitive_and_reusable() -> None:
+    client = _RecordingClient([b"0\r", b"E1\r", b"7\r"])
+
+    with pytest.raises(HostLinkError):
+        client.write_bit_in_expansion_unit_buffer(1, 100, 0, True)
+
+    assert not client.retired
+    assert client.read("DM1", data_format="U") == 7
+    assert client.frames == [
+        b"URD 01 100.U 1\r",
+        b"UWR 01 100.U 1 1\r",
+        b"RD DM1.U\r",
+    ]
 
 
 @pytest.mark.asyncio

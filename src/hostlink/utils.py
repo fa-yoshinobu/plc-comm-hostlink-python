@@ -488,13 +488,27 @@ def _parse_bool_token(token: int | str) -> bool:
 
 
 def _parse_bit_write_value(value: int | float | bool | str) -> bool:
-    if isinstance(value, bool):
+    if type(value) is bool:
         return value
-    if isinstance(value, int) and value in {0, 1}:
-        return value == 1
-    if isinstance(value, str):
-        return _parse_bool_token(value)
-    raise HostLinkProtocolError(f"Invalid BIT write value: {value!r}. Use bool, 0/1, OFF/ON, or FALSE/TRUE.")
+    raise HostLinkProtocolError(f"Invalid BIT write value: {value!r}. Use bool.")
+
+
+async def write_bit_in_word(
+    client: AsyncHostLinkClient,
+    device: str,
+    bit_index: int,
+    value: bool,
+) -> None:
+    """Set or clear one bit through an explicit 16-bit read-modify-write.
+
+    The complete plan is validated before FIFO admission. One local FIFO turn
+    and one absolute deadline then cover exactly one read and one write, even
+    when the requested state is unchanged. This operation is not PLC-atomic:
+    PLC logic or a different connection can update the word between requests,
+    and that update can be lost. It performs no fallback, retry, or readback.
+    """
+
+    await client.write_bit_in_word(device, bit_index, value)
 
 
 async def read_named(
@@ -1138,6 +1152,24 @@ async def write_expansion_unit_buffer(
     """
 
     await client.write_expansion_unit_buffer(unit_no, address, values, data_format=data_format)
+
+
+async def write_bit_in_expansion_unit_buffer(
+    client: AsyncHostLinkClient,
+    unit_no: int,
+    address: int,
+    bit_index: int,
+    value: bool,
+) -> None:
+    """Set or clear one expansion-buffer bit through explicit URD/UWR.
+
+    The client validates the complete immutable unit/address route before FIFO
+    admission and retains one turn and one absolute deadline across exactly
+    one unsigned-word read and one write. This operation is not PLC-atomic and
+    performs no fallback, retry, or success readback.
+    """
+
+    await client.write_bit_in_expansion_unit_buffer(unit_no, address, bit_index, value)
 
 
 async def read_words(

@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-08-07
+
+- Release: Bumped Python package metadata to `4.0.0` for the approved breaking-contract release.
+- Library: Restored explicit Boolean-only sync, async, and helper `write_bit_in_word` operations for ordinary 16-bit word devices. Each validates the complete plan before FIFO admission, always performs one word read followed by one word write in one client turn, and uses one absolute deadline for both requests after activation. The operation is intentionally not PLC-atomic and performs no write fallback, retry, or success readback.
+- Library: Added sync, async, and helper `write_bit_in_expansion_unit_buffer` operations for the existing URD/UWR route. They fix the route to one unit/address and `.U` word, use the same Boolean-only preflight, FIFO, absolute-deadline, non-PLC-atomic, and outcome-unknown contract, and never fall back to another route.
+- Docs: Documented the bit-in-word write concurrency, cancellation, timeout, and outcome-unknown contract and the required migration from manual read/write sequences.
+
 - Library: Bare direct-bit `MWS` targets remain suffix-free on the wire, while their corresponding `MWR` fields are now validated as packed unsigned 16-bit values using exactly one through five ASCII decimal digits and numeric range `0..65535`. Leading zeros are optional; empty or whitespace-only, signed, non-decimal, over-five-digit, and overflowing fields retire the transport. The existing `list[str]` return representation is unchanged; scalar `RD` and `MBS`/`MBR` remain strict bit operations.
 - Tests: Added sync/async live-vector, mixed-registration, invalid-response retirement, and reconnect/stale-monitor-metadata coverage for bare direct-bit `MWS`/`MWR`.
 - Library: Timer/counter composite responses keep the structural status as the PLC-semantic integer `0` or `1`; the selected `.U`, `.S`, `.H`, `.D`, or `.L` format applies only to current and preset values. Public signatures and Python return types are unchanged.
