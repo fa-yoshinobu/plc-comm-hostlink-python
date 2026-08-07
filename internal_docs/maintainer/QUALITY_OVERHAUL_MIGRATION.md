@@ -1270,3 +1270,37 @@ node IDs in `tests/test_overhaul_contract.py` and
 - [x] `HL-001` deterministic non-live disposition reverified on the final source state.
 - [x] `HL-003` deterministic non-live disposition reverified on the final source state.
 - [x] `HL-PY-003` deterministic close-generation disposition reverified on the final source state.
+
+## HL-PY-004 — Counted single bit-in-word aggregate read
+
+Decision status: approved by the maintainer on 2026-08-07.
+
+Implementation scope: Python `read_named` and `poll` planning for one otherwise
+unmerged bit-in-word point on an optimizable ordinary word-device family.
+Ordinary public `read` and non-optimizable individual routes are unchanged.
+
+Target contract: the aggregate planner sends `RDS <device>.U 1`, matching the
+.NET, Node.js, and Rust Host Link implementations. It performs exactly one
+request and returns the same Boolean value as before.
+
+Compatibility impact: the Python aggregate request gains the explicit counted
+read command and count token. There is no public API, result, connection, or
+round-trip-count change; callers that assert the former aggregate `RD` bytes
+must update that wire expectation.
+
+Machine-verifiable acceptance criteria:
+
+1. A sole `DM100.A` named read sends exactly `RDS DM100.U 1` and resolves the
+   selected bit to `bool`.
+2. `poll` reuses the same compiled counted request for every cycle.
+3. Ordinary `read("DM100", data_format=".U")` continues to send `RD DM100.U`.
+4. The published cross-language Host Link wire contract reports the same
+   single-point aggregate request for Python, .NET, Node.js, and Rust.
+
+- [x] Python aggregate implementation completed.
+- [x] A focused wire/result regression test was added.
+- [x] Relevant static, full unit, package-build, and cross-language checks passed.
+- [x] Codex self-review completed against the approved contract.
+- [x] No live-PLC check is required because exact request/response behavior is covered by the mock wire contract.
+- [x] Changelog and maintainer migration record agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.

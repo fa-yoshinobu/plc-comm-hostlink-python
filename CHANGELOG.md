@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: `read_named` and `poll` now use the counted `RDS ... 1` wire form for an otherwise unmerged single bit-in-word segment, matching the .NET, Node.js, and Rust Host Link implementations. Ordinary single-value `read` continues to use `RD`; the aggregate still performs one request and returns the same public value.
+
 ## [4.0.0] - 2026-08-07
 
 - Release: Bumped Python package metadata to `4.0.0` for the approved breaking-contract release.

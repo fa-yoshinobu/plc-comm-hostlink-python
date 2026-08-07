@@ -823,7 +823,7 @@ def _preflight_read_named_plan(client: AsyncHostLinkClient, plan: _CompiledReadN
         if segment.mode == "WORDS":
             if len(segment.requests) == 1:
                 if request.kind == "BIT_IN_WORD":
-                    client._build_read_command(base, ".U")
+                    client._build_read_consecutive_command("RDS", base, 1, ".U")
                 elif request.kind == "F":
                     client._build_read_consecutive_command("RDS", base, 2, ".U")
                 else:
@@ -890,8 +890,7 @@ async def _execute_read_named_plan(
                     request = segment.requests[0]
                     base = request.base_address.to_text()
                     if request.kind == "BIT_IN_WORD":
-                        raw = await client.read(base, data_format=".U")
-                        values = raw if isinstance(raw, list) else [raw]
+                        values = await client.read_consecutive(base, 1, data_format=".U")
                         resolved[request.index] = bool((int(values[0]) >> request.bit_index) & 1)
                     else:
                         resolved[request.index] = await read_typed(client, base, request.kind)

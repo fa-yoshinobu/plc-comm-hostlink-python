@@ -4,6 +4,46 @@ Current active TODOs only.
 
 ## Current Status
 
+## HL-PY-004 — Unify the single bit-in-word aggregate read command
+
+### Implementation scope
+
+- Python `read_named` and `poll` plans containing one otherwise unmerged
+  bit-in-word point on an optimizable ordinary word-device family
+
+### Target contract
+
+Send `RDS <device>.U 1` for that aggregate segment, matching the .NET,
+Node.js, and Rust Host Link implementations. Ordinary single-value `read`
+continues to use `RD`; the aggregate still performs one request and returns the
+same Boolean value.
+
+### Compatibility impact
+
+Only the Python aggregate wire command changes from `RD` to the explicit
+counted `RDS ... 1` form. Public API signatures, values, connections, and
+round-trip count do not change.
+
+### Acceptance criteria
+
+1. A sole `DM100.A` named read sends exactly `RDS DM100.U 1` and returns the
+   selected bit as `bool`.
+2. `poll` reuses the same counted request on every cycle.
+3. Ordinary `read("DM100", data_format=".U")` still sends `RD DM100.U`.
+4. Host Link cross-verification observes the same aggregate frame in Python,
+   .NET, Node.js, and Rust.
+
+### Completion checklist
+
+- [x] Python implementation completed.
+- [x] Named-read and poll regression tests added.
+- [x] Python static checks and full unit suite passed.
+- [x] Host Link cross-language verification passed against the corrected Python source.
+- [x] Codex self-review completed against the approved contract and cross-language consistency requirements.
+- [x] Live-PLC verification is not required for this exact mock wire-contract correction.
+- [x] Changelog and maintainer migration record agree with the implementation.
+- [x] Final acceptance criteria verified and the item marked complete.
+
 The approved overhaul items, including `HL-EVAL-TODO-006` and
 `HL-CONTRACT-001` through `HL-CONTRACT-005`, are implemented in the working
 tree. Final cross-runtime verification for the comment-decoding contract is

@@ -432,6 +432,26 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "explicit bit index"):
             await read_named(self.client, ["DM100:BIT_IN_WORD"])
 
+    async def test_async_read_named_single_bit_in_word_uses_one_counted_read(self):
+        self.server.responses["RDS DM100.U 1"] = "1024"
+
+        result = await read_named(self.client, ["DM100.A"])
+
+        self.assertEqual(result, {"DM100.A": True})
+        self.assertEqual(self.server.last_received, ["RDS DM100.U 1"])
+
+    async def test_async_poll_single_bit_in_word_reuses_counted_read(self):
+        self.server.responses["RDS DM100.U 1"] = "1024"
+        snapshots = []
+
+        async for snapshot in poll(self.client, ["DM100.A"], interval=0.001):
+            snapshots.append(snapshot)
+            if len(snapshots) == 2:
+                break
+
+        self.assertEqual(snapshots, [{"DM100.A": True}, {"DM100.A": True}])
+        self.assertEqual(self.server.last_received, ["RDS DM100.U 1", "RDS DM100.U 1"])
+
     async def test_async_read_named_batches_bit_bank_direct_bits_across_display_bank_boundary(self):
         self.server.responses["RDS CR3614 4"] = "0 1 0 1"
 
