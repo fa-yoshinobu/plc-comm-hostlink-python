@@ -12,6 +12,7 @@ import asyncio
 import math
 import re
 import struct
+import warnings
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import KW_ONLY, dataclass
 from ipaddress import ip_address
@@ -29,6 +30,8 @@ from .device import (
     normalize_suffix,
     parse_device,
     parse_device_text,
+    validate_device_count,
+    validate_device_span,
 )
 from .errors import HostLinkProtocolError
 from .protocol import HostLinkCommentEncoding, require_comment_encoding
@@ -328,7 +331,7 @@ async def read_typed(
             raise HostLinkProtocolError(
                 f"Float32 reads require an ordinary word-device family; {addr.device_type!r} is not eligible."
             )
-        lo_word, hi_word = await read_words(client, device, 2)
+        lo_word, hi_word = await read_words_single_request(client, device, 2)
         return _words_to_float32(lo_word, hi_word)
 
     fmt = f".{key}"
@@ -895,7 +898,7 @@ async def _execute_read_named_plan(
                     else:
                         resolved[request.index] = await read_typed(client, base, request.kind)
                 else:
-                    words = await read_words(client, segment.start_address.to_text(), segment.count)
+                    words = await read_words_single_request(client, segment.start_address.to_text(), segment.count)
                     for request in segment.requests:
                         offset = _read_plan_number(request) - segment.start_number
                         resolved[request.index] = _resolve_planned_value(words, offset, request.kind, request.bit_index)
@@ -1019,6 +1022,44 @@ def normalize_address(address: str) -> str:
     """
 
     return parse_address(address).text
+
+
+async def read_bits_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    count: int,
+) -> list[bool]:
+    """Read contiguous direct-bit devices using exactly one PLC request."""
+
+    address = parse_device(device)
+    if address.suffix:
+        raise HostLinkProtocolError("device must be a base direct-bit address without a data-format suffix")
+    if address.device_type not in _DIRECT_BIT_DEVICE_TYPES:
+        raise HostLinkProtocolError("bit reads require a direct bit device")
+    normalized_count = _require_exact_integer(count, 1, 1000, "bit count")
+    validate_device_count(address.device_type, "", normalized_count)
+    validate_device_span(address.device_type, address.number, "", normalized_count)
+    values = await client.read_consecutive(device, normalized_count, data_format=None)
+    return [_parse_bool_token(value) for value in values]
+
+
+async def write_bits_single_request(
+    client: AsyncHostLinkClient,
+    device: str,
+    values: list[bool],
+) -> None:
+    """Write contiguous direct-bit devices using exactly one PLC request."""
+
+    address = parse_device(device)
+    if address.suffix:
+        raise HostLinkProtocolError("device must be a base direct-bit address without a data-format suffix")
+    if address.device_type not in _DIRECT_BIT_DEVICE_TYPES:
+        raise HostLinkProtocolError("bit writes require a direct bit device")
+    snapshot = [_parse_bit_write_value(value) for value in values]
+    _require_exact_integer(len(snapshot), 1, 1000, "bit count")
+    validate_device_count(address.device_type, "", len(snapshot))
+    validate_device_span(address.device_type, address.number, "", len(snapshot))
+    await client.write_consecutive(device, snapshot, data_format=None)
 
 
 async def read_words_single_request(
@@ -1176,7 +1217,7 @@ async def read_words(
     device: str,
     count: int,
 ) -> list[int]:
-    """Read contiguous 16-bit unsigned words starting at ``device``.
+    """Deprecated compatibility alias for :func:`read_words_single_request`.
 
     This helper wraps the low-level consecutive read and converts the PLC reply
     to Python ``int`` values.
@@ -1189,6 +1230,11 @@ async def read_words(
     Returns:
         A list of unsigned word values in PLC order.
     """
+    warnings.warn(
+        "read_words is deprecated; use read_words_single_request",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return await read_words_single_request(client, device, count)
 
 
@@ -1237,7 +1283,7 @@ async def open_and_connect(options: HostLinkConnectionOptions) -> AsyncHostLinkC
         )
         client = await open_and_connect(options)
         async with client:
-            values = await read_words(client, "DM100", 10)
+            values = await read_words_single_request(client, "DM100", 10)
     """
     from .client import AsyncHostLinkClient
 

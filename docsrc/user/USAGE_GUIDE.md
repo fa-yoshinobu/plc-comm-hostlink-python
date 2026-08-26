@@ -16,8 +16,12 @@
 | `write_typed` | Write one typed value. |
 | `read_named` | Read a mixed named collection by address strings. |
 | `poll` | Read repeated named results on a fixed interval. |
+| `read_bits_single_request` | Read contiguous direct bits in one PLC request. |
+| `write_bits_single_request` | Write contiguous direct bits in one PLC request. |
 | `read_words_single_request` | Read contiguous 16-bit words in one PLC request. |
 | `read_dwords_single_request` | Read contiguous 32-bit values in one PLC request. |
+| `write_words_single_request` | Write contiguous 16-bit words in one PLC request. |
+| `write_dwords_single_request` | Write contiguous 32-bit values in one PLC request. |
 | `read_timer_counter` | Read timer or counter status, current value, and preset. |
 | `read_timer` | Read a timer as status, current value, and preset. |
 | `read_counter` | Read a counter as status, current value, and preset. |
@@ -26,6 +30,12 @@
 | `read_comment_bytes` | Read undecoded PLC device-comment payload bytes. |
 | `read_expansion_unit_buffer` | Read expansion unit buffer memory. |
 | `write_expansion_unit_buffer` | Write expansion unit buffer memory. |
+
+The `single_request` helpers either send exactly one PLC request or reject the
+complete input before sending. Bit helpers accept only direct bit device
+families and Boolean values, with 1 through 1,000 points subject to the device
+range. `read_words` is a deprecated compatibility alias; migrate to
+`read_words_single_request`.
 
 ## API reference summary
 

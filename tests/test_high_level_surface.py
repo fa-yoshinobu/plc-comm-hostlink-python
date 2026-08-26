@@ -11,10 +11,13 @@ from hostlink import (
     normalize_address,
     open_and_connect,
     parse_address,
+    read_bits_single_request,
     read_dwords_single_request,
     read_expansion_unit_buffer,
+    read_words,
     read_words_single_request,
     try_parse_address,
+    write_bits_single_request,
     write_dwords_single_request,
     write_expansion_unit_buffer,
     write_words_single_request,
@@ -181,6 +184,40 @@ class TestHighLevelSurface(unittest.IsolatedAsyncioTestCase):
         values = await read_words_single_request(client, "DM0", 3)
         self.assertEqual(values, [1, 2, 3])
         client.read_consecutive.assert_awaited_once_with("DM0", 3, data_format=".U")
+
+    async def test_bit_single_request_helpers_send_once(self) -> None:
+        client = AsyncMock()
+        client.read_consecutive.return_value = [0, 1, "1"]
+
+        self.assertEqual(await read_bits_single_request(client, "R5000", 3), [False, True, True])
+        client.read_consecutive.assert_awaited_once_with("R5000", 3, data_format=None)
+
+        await write_bits_single_request(client, "R5000", [False, True, True])
+        client.write_consecutive.assert_awaited_once_with("R5000", [False, True, True], data_format=None)
+
+    async def test_bit_single_request_helpers_reject_before_send(self) -> None:
+        client = AsyncMock()
+
+        for device, count in (("DM0", 1), ("R5000.U", 1), ("R5000", 0), ("R5000", 1001)):
+            with self.subTest(operation="read", device=device, count=count):
+                with self.assertRaises((HostLinkProtocolError, ValueError)):
+                    await read_bits_single_request(client, device, count)
+        for device, values in (("DM0", [True]), ("R5000.U", [True]), ("R5000", []), ("R5000", [1])):
+            with self.subTest(operation="write", device=device, values=values):
+                with self.assertRaises((HostLinkProtocolError, ValueError)):
+                    await write_bits_single_request(client, device, values)  # type: ignore[arg-type]
+
+        client.read_consecutive.assert_not_awaited()
+        client.write_consecutive.assert_not_awaited()
+
+    async def test_read_words_deprecated_alias_delegates_once(self) -> None:
+        client = AsyncMock()
+        client.read_consecutive.return_value = [1]
+
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(await read_words(client, "DM0", 1), [1])
+
+        client.read_consecutive.assert_awaited_once_with("DM0", 1, data_format=".U")
 
     async def test_read_dwords_single_request(self) -> None:
         client = AsyncMock()

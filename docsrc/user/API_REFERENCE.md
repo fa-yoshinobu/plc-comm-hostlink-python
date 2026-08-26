@@ -121,8 +121,9 @@ an unused configuration error before communication.
 | Named read collections and polling | `read_named`, `poll` |
 | Explicit bit-in-word write | `HostLinkClient.write_bit_in_word`, `AsyncHostLinkClient.write_bit_in_word`, `write_bit_in_word` |
 | Expansion-buffer bit write | `HostLinkClient.write_bit_in_expansion_unit_buffer`, `AsyncHostLinkClient.write_bit_in_expansion_unit_buffer`, `write_bit_in_expansion_unit_buffer` |
-| Word/dword reads | `read_words`, `read_dwords` |
-| Single-request reads/writes | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
+| Deprecated word-read alias | `read_words` (use `read_words_single_request`) |
+| Single-request bit read/write | `read_bits_single_request`, `write_bits_single_request` |
+| Single-request word/dword read/write | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
 
 `read_named` and `poll` require at least one address. They validate the complete
 input before send and keep each entry indivisible. Wire reads are grouped by
@@ -197,12 +198,12 @@ The package exports these public names from `hostlink.__all__`:
 `normalize_address`, `normalize_plc_profile`, `open_and_connect`,
 `parse_address`, `poll`, `plc_profile_descriptors`, `profile_from_name`,
 `read_comment_bytes`, `read_comments`,
-`read_counter`, `read_dwords`,
+`read_bits_single_request`, `read_counter`, `read_dwords`,
 `read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,
 `read_timer_counter`, `read_typed`, `read_words`,
 `read_words_single_request`, `try_parse_address`,
-`write_dwords_single_request`,
+`write_bits_single_request`, `write_dwords_single_request`,
 `write_expansion_unit_buffer`, `write_typed`,
 `write_words_single_request`.
 

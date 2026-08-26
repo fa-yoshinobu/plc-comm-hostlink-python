@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Library: Added canonical `read_bits_single_request` and `write_bits_single_request` high-level helpers for direct bit families. They accept 1 through 1,000 Boolean points and either issue exactly one RDS/WRS request or reject the complete operation before send.
+- Library: Deprecated the high-level `read_words` compatibility alias in favor of `read_words_single_request`; the alias delegates directly and remains available for one compatibility release.
+- Docs: Documented the canonical bit/word single-request names and migration from `read_words`.
 - Library: `read_named` and `poll` now use the counted `RDS ... 1` wire form for an otherwise unmerged single bit-in-word segment, matching the .NET, Node.js, and Rust Host Link implementations. Ordinary single-value `read` continues to use `RD`; the aggregate still performs one request and returns the same public value.
 
 ## [4.0.0] - 2026-08-07
