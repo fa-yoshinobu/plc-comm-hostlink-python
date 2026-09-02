@@ -14,7 +14,7 @@ prefer `open_and_connect` plus the high-level helper functions.
 | --- | --- |
 | Open a ready-to-use serialized connection | `open_and_connect`, `HostLinkConnectionOptions` |
 | Low-level sync/async clients | `HostLinkClient`, `AsyncHostLinkClient` |
-| PLC mode and error control | `change_mode`, `clear_error`, `check_error_no`, `confirm_operating_mode` |
+| PLC mode and error control | `change_mode`, `clear_error`, `read_error_number`, `confirm_operating_mode` |
 | PLC model and clock | `query_model`, `set_time`, `ModelInfo` |
 | Connection lifecycle | `connect`, `close` |
 
@@ -53,9 +53,9 @@ line retires the transport.
 | Consecutive device read/write | `read_consecutive`, `write_consecutive` |
 | Legacy consecutive read/write | `read_consecutive_legacy`, `write_consecutive_legacy` |
 | Forced bit/device control | `forced_set`, `forced_reset`, `forced_set_consecutive`, `forced_reset_consecutive` |
-| Timer/counter set-value writes | `write_set_value`, `write_set_value_consecutive` |
+| Timer/counter preset writes | `write_timer_counter_preset`, `write_timer_counter_preset_consecutive` |
 | Monitor registration/cycle | `register_monitor_bits`, `register_monitor_words`, `read_monitor_bits`, `read_monitor_words` |
-| Comment text reads | `read_comments`, `HostLinkCommentEncoding` |
+| Comment text reads | `read_comment`, `HostLinkCommentEncoding` |
 | Comment raw-byte reads | `read_comment_bytes` |
 | Data bank switching | `switch_bank` |
 | Expansion unit buffer access | `read_expansion_unit_buffer`, `write_expansion_unit_buffer` |
@@ -98,15 +98,19 @@ the existing public string representation, so PLC field `00013` returns
 `["00013"]`. Bare scalar `RD` and `MBS`/`MBR` remain strict bit operations and
 accept only `0`, `1`, `OFF`, or `ON` per field.
 
-`read_comments(device, encoding)` requires
-`HostLinkCommentEncoding.UTF8` or `HostLinkCommentEncoding.CP932`; it never
+The KEYENCE manual does not specify the `RDC` character encoding, and there is
+no PLC-project character-encoding setting. Do not assume that every PLC
+returns UTF-8.
+`read_comment(device, encoding)` requires `HostLinkCommentEncoding.UTF8` or
+`HostLinkCommentEncoding.CP932`; it never
 detects, falls back, or selects a codec from the PLC profile. `CP932` is the
 Windows-31J compatibility selection for KEYENCE “Shift_JIS” terminology. Its
 portable strict repertoire preserves ASCII code points, accepts mapped
 half-width and double-byte Windows-31J characters, and rejects malformed,
 unmapped, or vendor-private single bytes `80`, `A0`, and `FD` through `FF`.
-`read_comment_bytes(device)` returns the undecoded `RDC` body with CR/LF
-framing removed and trailing ASCII padding preserved. A named collection that
+`read_comment_bytes(device)` performs no codec conversion and returns the
+exact `RDC` payload bytes with CR/LF framing removed and trailing ASCII padding
+preserved. A named collection that
 contains `:COMMENT` likewise requires its explicit `comment_encoding`.
 Passing `comment_encoding` to a collection without `:COMMENT` is rejected as
 an unused configuration error before communication.
@@ -119,9 +123,11 @@ an unused configuration error before communication.
 | Typed values | `read_typed`, `write_typed` |
 | Timer/counter composite reads | `TimerCounterValue`, `read_timer_counter`, `read_timer`, `read_counter` |
 | Named read collections and polling | `read_named`, `poll` |
+| Named one-request write | `write_named` |
 | Explicit bit-in-word write | `HostLinkClient.write_bit_in_word`, `AsyncHostLinkClient.write_bit_in_word`, `write_bit_in_word` |
 | Expansion-buffer bit write | `HostLinkClient.write_bit_in_expansion_unit_buffer`, `AsyncHostLinkClient.write_bit_in_expansion_unit_buffer`, `write_bit_in_expansion_unit_buffer` |
-| Deprecated word-read alias | `read_words` (use `read_words_single_request`) |
+| Deprecated read aliases | `read_words`, `read_dwords`, `read_comments` |
+| Deprecated client aliases | `check_error_no`, `write_set_value`, `write_set_value_consecutive` |
 | Single-request bit read/write | `read_bits_single_request`, `write_bits_single_request` |
 | Single-request word/dword read/write | `read_words_single_request`, `read_dwords_single_request`, `write_words_single_request`, `write_dwords_single_request` |
 
@@ -139,6 +145,11 @@ indices, and overlapping spans remain valid; returned keys preserve the input
 spelling. `poll` compiles the optimized plan once, reuses it for every cycle,
 and releases the FIFO turn before yielding a sample or waiting for the interval.
 Poll intervals must be positive finite numbers and cannot be booleans.
+`write_named` also requires a non-empty mapping and preserves insertion order.
+It snapshots and validates every update before sending, then issues exactly one
+compatible `WR`, `WRS`, or `WSS`. It rejects gaps, reverse order, mixed
+device/dtype groups, duplicates, request-limit overflow, and bit-in-word
+read-modify-write instead of splitting the operation.
 `write_bit_in_word` is an explicit Boolean-only, 16-bit word read-modify-write.
 It validates the complete plan before FIFO admission, retains one client turn,
 and uses one absolute deadline for its one read and one write after activation.
@@ -197,14 +208,14 @@ The package exports these public names from `hostlink.__all__`:
 `device_range_catalog_for_plc_profile`, `display_name`, `format_address`,
 `normalize_address`, `normalize_plc_profile`, `open_and_connect`,
 `parse_address`, `poll`, `plc_profile_descriptors`, `profile_from_name`,
-`read_comment_bytes`, `read_comments`,
+`read_comment`, `read_comment_bytes`, `read_comments`,
 `read_bits_single_request`, `read_counter`, `read_dwords`,
 `read_dwords_single_request`,
 `read_expansion_unit_buffer`, `read_named`, `read_timer`,
 `read_timer_counter`, `read_typed`, `read_words`,
 `read_words_single_request`, `try_parse_address`,
 `write_bits_single_request`, `write_dwords_single_request`,
-`write_expansion_unit_buffer`, `write_typed`,
+`write_expansion_unit_buffer`, `write_named`, `write_typed`,
 `write_words_single_request`.
 
 ## Generated API Details

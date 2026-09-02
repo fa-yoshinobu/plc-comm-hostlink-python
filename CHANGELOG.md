@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-02
+
+- Release: Bumped Python package metadata to `4.2.0` for the approved additive Host Link API unification.
+- Library: Added canonical `read_comment`, `read_error_number`, `write_timer_counter_preset`, and `write_timer_counter_preset_consecutive` names. The former names are deprecated direct-forwarding aliases for one compatibility release and are scheduled for removal in the next major release; inputs, results, exceptions, and wire commands are unchanged.
+- Library: Deprecated `read_dwords` in favor of the existing `read_dwords_single_request` canonical name under the same one-release migration policy.
+- Library: Added async `write_named`, which snapshots and preflights the complete insertion-ordered update mapping and sends exactly one compatible `WR`, `WRS`, or `WSS` request. It rejects multi-request, partial-send, and bit-in-word read-modify-write plans before communication.
+- Docs: Updated normal usage and API reference entries to canonical names, documented the deprecated-name migration table, and clarified that the KEYENCE manual does not specify the `RDC` character encoding or provide a PLC-project encoding setting.
+- Samples: Updated maintained smoke and full-pattern validation scripts to use the canonical client names.
+- Tests: Added exact canonical/alias wire-equivalence and one-request named-write acceptance/rejection coverage.
+
 ## [4.1.0] - 2026-08-27
 
 - Release: Bumped Python package metadata to `4.1.0` for the additive canonical single-request APIs.

@@ -9,6 +9,7 @@ import select
 import socket
 import threading
 import time
+import warnings
 from collections import OrderedDict, deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -1645,10 +1646,20 @@ class HostLinkClient(HostLinkBase):
 
         self._expect_ok(self._build_clear_error_command())
 
-    def check_error_no(self) -> str:
+    def read_error_number(self) -> str:
         """Read the current PLC error number as raw response text."""
 
         return self._send_decoded(self._build_check_error_no_command())
+
+    def check_error_no(self) -> str:
+        """Deprecated compatibility alias for :meth:`read_error_number`."""
+
+        warnings.warn(
+            "check_error_no is deprecated; use read_error_number",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.read_error_number()
 
     def query_model(self) -> ModelInfo:
         """Query the PLC model code and mapped model name."""
@@ -1786,10 +1797,31 @@ class HostLinkClient(HostLinkBase):
 
         self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
-    def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        """Write one timer or counter preset/current value with ``WS``."""
+    def write_timer_counter_preset(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Write one timer or counter preset value with ``WS``."""
 
         self._expect_ok(self._build_write_set_value_command(device, value, data_format))
+
+    def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Deprecated compatibility alias for :meth:`write_timer_counter_preset`."""
+
+        warnings.warn(
+            "write_set_value is deprecated; use write_timer_counter_preset",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.write_timer_counter_preset(device, value, data_format=data_format)
+
+    def write_timer_counter_preset_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
+        """Write consecutive timer or counter preset values with ``WSS``."""
+
+        self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     def write_set_value_consecutive(
         self,
@@ -1798,9 +1830,14 @@ class HostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        """Write consecutive timer or counter values with ``WSS``."""
+        """Deprecated alias for :meth:`write_timer_counter_preset_consecutive`."""
 
-        self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
+        warnings.warn(
+            "write_set_value_consecutive is deprecated; use write_timer_counter_preset_consecutive",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.write_timer_counter_preset_consecutive(device, values, data_format=data_format)
 
     def register_monitor_bits(self, *devices: str) -> None:
         """Register bit devices for later monitor reads."""
@@ -1834,7 +1871,7 @@ class HostLinkClient(HostLinkBase):
 
         return self._send_comment_payload(self._build_read_comments_command(device), lambda payload: payload)
 
-    def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+    def read_comment(self, device: str, encoding: HostLinkCommentEncoding) -> str:
         """Read PLC comment text using exactly the selected encoding."""
 
         selected = require_comment_encoding(encoding)
@@ -1842,6 +1879,16 @@ class HostLinkClient(HostLinkBase):
             self._build_read_comments_command(device),
             lambda payload: decode_comment_response(payload, selected),
         )
+
+    def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+        """Deprecated compatibility alias for :meth:`read_comment`."""
+
+        warnings.warn(
+            "read_comments is deprecated; use read_comment",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.read_comment(device, encoding)
 
     def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""
@@ -2444,10 +2491,20 @@ class AsyncHostLinkClient(HostLinkBase):
 
         await self._expect_ok(self._build_clear_error_command())
 
-    async def check_error_no(self) -> str:
+    async def read_error_number(self) -> str:
         """Read the current PLC error number as raw response text."""
 
         return await self._send_decoded(self._build_check_error_no_command())
+
+    async def check_error_no(self) -> str:
+        """Deprecated compatibility alias for :meth:`read_error_number`."""
+
+        warnings.warn(
+            "check_error_no is deprecated; use read_error_number",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self.read_error_number()
 
     async def query_model(self) -> ModelInfo:
         """Query the PLC model code and mapped model name."""
@@ -2588,10 +2645,33 @@ class AsyncHostLinkClient(HostLinkBase):
 
         await self._expect_ok(self._build_write_consecutive_command("WRE", device, values, data_format))
 
-    async def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
-        """Write one timer or counter preset/current value with ``WS``."""
+    async def write_timer_counter_preset(
+        self, device: str, value: int | str, *, data_format: str | None = None
+    ) -> None:
+        """Write one timer or counter preset value with ``WS``."""
 
         await self._expect_ok(self._build_write_set_value_command(device, value, data_format))
+
+    async def write_set_value(self, device: str, value: int | str, *, data_format: str | None = None) -> None:
+        """Deprecated compatibility alias for :meth:`write_timer_counter_preset`."""
+
+        warnings.warn(
+            "write_set_value is deprecated; use write_timer_counter_preset",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        await self.write_timer_counter_preset(device, value, data_format=data_format)
+
+    async def write_timer_counter_preset_consecutive(
+        self,
+        device: str,
+        values: Sequence[int | str],
+        *,
+        data_format: str | None = None,
+    ) -> None:
+        """Write consecutive timer or counter preset values with ``WSS``."""
+
+        await self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
 
     async def write_set_value_consecutive(
         self,
@@ -2600,9 +2680,14 @@ class AsyncHostLinkClient(HostLinkBase):
         *,
         data_format: str | None = None,
     ) -> None:
-        """Write consecutive timer or counter values with ``WSS``."""
+        """Deprecated alias for :meth:`write_timer_counter_preset_consecutive`."""
 
-        await self._expect_ok(self._build_write_set_value_consecutive_command(device, values, data_format))
+        warnings.warn(
+            "write_set_value_consecutive is deprecated; use write_timer_counter_preset_consecutive",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        await self.write_timer_counter_preset_consecutive(device, values, data_format=data_format)
 
     async def register_monitor_bits(self, *devices: str) -> None:
         """Register bit devices for later monitor reads."""
@@ -2636,7 +2721,7 @@ class AsyncHostLinkClient(HostLinkBase):
 
         return await self._send_comment_payload(self._build_read_comments_command(device), lambda payload: payload)
 
-    async def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+    async def read_comment(self, device: str, encoding: HostLinkCommentEncoding) -> str:
         """Read PLC comment text using exactly the selected encoding."""
 
         selected = require_comment_encoding(encoding)
@@ -2644,6 +2729,16 @@ class AsyncHostLinkClient(HostLinkBase):
             self._build_read_comments_command(device),
             lambda payload: decode_comment_response(payload, selected),
         )
+
+    async def read_comments(self, device: str, encoding: HostLinkCommentEncoding) -> str:
+        """Deprecated compatibility alias for :meth:`read_comment`."""
+
+        warnings.warn(
+            "read_comments is deprecated; use read_comment",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self.read_comment(device, encoding)
 
     async def switch_bank(self, bank_no: int) -> None:
         """Switch the active Host Link bank number."""

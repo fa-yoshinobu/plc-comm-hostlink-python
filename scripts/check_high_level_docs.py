@@ -16,12 +16,14 @@ REQUIRED_FUNCTIONS = {
     "format_address": ("Args:", "Returns:"),
     "read_typed": ("Args:", "Returns:", "Examples:"),
     "write_typed": ("Args:", "Examples:"),
+    "read_comment": ("Args:", "Returns:"),
     "read_named": ("Args:", "Returns:", "Examples:"),
+    "write_named": ("Args:",),
     "poll": ("Args:", "Yields:", "Usage::"),
     "read_expansion_unit_buffer": ("Args:", "Returns:", "Examples:"),
     "write_expansion_unit_buffer": ("Args:", "Examples:"),
     "read_words": ("Args:", "Returns:"),
-    "read_dwords": ("Args:", "Returns:"),
+    "read_dwords_single_request": ("Args:", "Returns:"),
     "open_and_connect": ("Args:", "Returns:", "Usage::"),
 }
 

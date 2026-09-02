@@ -58,13 +58,13 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_wss_timer_counter_count_limit_enforced(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.write_set_value_consecutive("T0", [0] * 121)
+            plc.write_timer_counter_preset_consecutive("T0", [0] * 121)
         self.assertEqual(plc.sent_frames, [])
 
     def test_ws_only_accepts_t_or_c(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.write_set_value("TC0", 100)
+            plc.write_timer_counter_preset("TC0", 100)
 
     def test_mbs_rejects_word_device(self) -> None:
         plc = FakeHostLinkClient()
@@ -92,12 +92,12 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
     def test_rdc_rejects_unsupported_device_type(self) -> None:
         plc = FakeHostLinkClient()
         with self.assertRaises(HostLinkProtocolError):
-            plc.read_comments("VB0", HostLinkCommentEncoding.UTF8)
+            plc.read_comment("VB0", HostLinkCommentEncoding.UTF8)
 
     def test_rdc_accepts_xym_alias_device_types(self) -> None:
         plc = FakeHostLinkClient()
         plc.queue("DM COMMENT                      ")
-        self.assertEqual(plc.read_comments("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
+        self.assertEqual(plc.read_comment("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
         self.assertEqual(plc.sent_frames[-1], b"RDC D10\r")
 
     def test_urd_32bit_count_limit_enforced(self) -> None:
@@ -185,9 +185,9 @@ class HostLinkSpecComplianceTest(unittest.TestCase):
         self.assertEqual(plc.read("DM65534", data_format=".D"), 1)
         self.assertEqual(plc.sent_frames, [b"RD DM65534.D\r"])
 
-    def test_write_set_value_accepts_native_32bit_device_end(self) -> None:
+    def test_write_timer_counter_preset_accepts_native_32bit_device_end(self) -> None:
         plc = FakeHostLinkClient()
-        plc.write_set_value("T3999", 100, data_format=".D")
+        plc.write_timer_counter_preset("T3999", 100, data_format=".D")
         self.assertEqual(plc.sent_frames[-1], b"WS T3999.D 100\r")
 
     def test_forced_commands_use_manual_device_sets_and_xym_aliases(self) -> None:

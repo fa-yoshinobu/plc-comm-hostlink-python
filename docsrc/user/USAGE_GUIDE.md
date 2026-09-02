@@ -15,6 +15,7 @@
 | `read_typed` | Read one typed value. |
 | `write_typed` | Write one typed value. |
 | `read_named` | Read a mixed named collection by address strings. |
+| `write_named` | Write one compatible named collection in exactly one PLC request. |
 | `poll` | Read repeated named results on a fixed interval. |
 | `read_bits_single_request` | Read contiguous direct bits in one PLC request. |
 | `write_bits_single_request` | Write contiguous direct bits in one PLC request. |
@@ -26,7 +27,7 @@
 | `read_timer` | Read a timer as status, current value, and preset. |
 | `read_counter` | Read a counter as status, current value, and preset. |
 | `HostLinkCommentEncoding` | Select the exact codec for a device-comment text read. |
-| `read_comments` | Read and explicitly decode a PLC device comment label. |
+| `read_comment` | Read and explicitly decode one PLC device comment label. |
 | `read_comment_bytes` | Read undecoded PLC device-comment payload bytes. |
 | `read_expansion_unit_buffer` | Read expansion unit buffer memory. |
 | `write_expansion_unit_buffer` | Write expansion unit buffer memory. |
@@ -36,6 +37,22 @@ complete input before sending. Bit helpers accept only direct bit device
 families and Boolean values, with 1 through 1,000 points subject to the device
 range. `read_words` is a deprecated compatibility alias; migrate to
 `read_words_single_request`.
+
+### API name migration
+
+Use the canonical names below in new code. The former names remain deprecated
+direct-forwarding aliases for this compatibility release and are removed in
+the next major release. Inputs, results, exceptions, and Host Link commands are
+unchanged.
+
+| Former name | Canonical name |
+| --- | --- |
+| `read_dwords` | `read_dwords_single_request` |
+| `read_comments` | `read_comment` |
+| `HostLinkClient.check_error_no` | `HostLinkClient.read_error_number` |
+| `AsyncHostLinkClient.check_error_no` | `AsyncHostLinkClient.read_error_number` |
+| `write_set_value` | `write_timer_counter_preset` |
+| `write_set_value_consecutive` | `write_timer_counter_preset_consecutive` |
 
 ## API reference summary
 
@@ -57,8 +74,9 @@ from hostlink import (
     read_typed,
     write_typed,
     read_comment_bytes,
-    read_comments,
+    read_comment,
     read_named,
+    write_named,
     poll,
 )
 from hostlink.errors import (
@@ -293,6 +311,24 @@ key distinct. Different dtype views of the same word, different bit indices,
 and overlapping multiword spans are valid. Result keys preserve the original
 input strings.
 
+## Named write collection
+
+```python
+from hostlink import write_named
+
+await write_named(client, {"DM100:U": 123, "DM101:U": 456})
+await write_named(client, {"R115:BIT": True, "R200:BIT": False})
+await write_named(client, {"T10:D": 1000, "T11:D": 2000})
+```
+
+`write_named` snapshots and validates the complete mapping before sending. It
+accepts the update only when it fits one compatible contiguous `WR`, `WRS`, or
+`WSS` request. It never splits state-changing work and never returns partial
+success. Mixed device families or dtypes, gaps, reverse order, semantic
+duplicates, range/count-limit violations, and bit-in-word read-modify-write
+targets are rejected before communication. Use `",count"` with a sequence for
+one explicit range, for example `{"DM300:U,3": [1, 2, 3]}`.
+
 ## Block reads
 
 ```python
@@ -505,19 +541,27 @@ invalid response and retires the connection. Status remains the integer `0` or
 `["0000", "270F", "270F"]`. `read_timer` accepts timer devices, and
 `read_counter` accepts counter devices.
 
+Use the canonical client methods for preset writes:
+
+```python
+await client.write_timer_counter_preset("T100", 1000, data_format=".D")
+await client.write_timer_counter_preset_consecutive("C200", [10, 20], data_format=".D")
+```
+
 > **Caution:** Timer/Counter preset writes (`WS`/`WSS`) only supported on KV-8000/7000-series. Other models return error `E1`.
 
 ## Device comments
 
-`RDC` does not identify the payload codec. Select it explicitly; the library
-does not guess from the PLC profile and does not try another codec when the
-selected decoder fails.
+The KEYENCE manual does not specify the `RDC` payload character encoding, and
+there is no PLC-project character-encoding setting. Do not assume UTF-8.
+Select `HostLinkCommentEncoding` explicitly; the library does not guess from
+the PLC profile and does not try another codec when the selected decoder fails.
 
 ```python
-from hostlink import HostLinkCommentEncoding, read_comment_bytes, read_comments
+from hostlink import HostLinkCommentEncoding, read_comment, read_comment_bytes
 
-utf8_label = await read_comments(client, "DM0", HostLinkCommentEncoding.UTF8)
-cp932_label = await read_comments(client, "DM1", HostLinkCommentEncoding.CP932)
+utf8_label = await read_comment(client, "DM0", HostLinkCommentEncoding.UTF8)
+cp932_label = await read_comment(client, "DM1", HostLinkCommentEncoding.CP932)
 raw_payload = await read_comment_bytes(client, "DM2")
 ```
 
@@ -528,8 +572,9 @@ codec. Across supported runtimes, ASCII bytes keep their exact code points,
 mapped Windows-31J characters are accepted, and malformed, unmapped, or
 vendor-private single bytes `80`, `A0`, and `FD` through `FF` are rejected.
 Text reads remove trailing ASCII space padding before strict decoding.
-Raw reads remove only CR/LF framing and preserve the exact payload, including
-trailing spaces. Invalid bytes raise `HostLinkProtocolError`; there is no
+Raw reads perform no codec conversion, remove only CR/LF framing, and preserve
+the exact payload, including trailing spaces. Invalid bytes raise
+`HostLinkProtocolError`; there is no
 replacement, automatic fallback, or `AUTO` selection.
 
 ## Expansion unit buffer

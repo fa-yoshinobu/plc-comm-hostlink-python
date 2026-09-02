@@ -84,9 +84,12 @@ def decode_comment_response(raw: bytes, encoding: HostLinkCommentEncoding) -> st
     """Decode one comment response using exactly the caller-selected codec.
 
     Normal Host Link responses are ASCII, but PLC comments often contain
-    localized text. Host Link comment padding is trailing ASCII space bytes.
-    Remove only those bytes before decoding so other whitespace remains. No
-    codec detection, fallback, or replacement is performed.
+    localized text. The KEYENCE manual does not specify the ``RDC`` character
+    encoding, and there is no PLC-project character-encoding setting. UTF-8
+    must therefore not be assumed universally. Host Link comment padding is
+    trailing ASCII space bytes. Remove only those bytes before decoding so
+    other whitespace remains. Only the caller-supplied ``encoding`` is used;
+    no codec detection, fallback, or replacement is performed.
     """
 
     selected = require_comment_encoding(encoding)

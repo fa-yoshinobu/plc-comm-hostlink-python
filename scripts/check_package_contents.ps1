@@ -108,8 +108,10 @@ expected = (
     "read_typed",
     "write_typed",
     "read_named",
+    "write_named",
     "poll",
     "HostLinkCommentEncoding",
+    "read_comment",
     "read_comment_bytes",
     "read_comments",
     "read_expansion_unit_buffer",
@@ -125,6 +127,17 @@ for name in expected:
     if not inspect.getdoc(value):
         raise SystemExit(f"public symbol docstring is missing: {name}")
     inspect.signature(value)
+for client_type in (hostlink.HostLinkClient, hostlink.AsyncHostLinkClient):
+    for name in (
+        "read_error_number",
+        "read_comment",
+        "write_timer_counter_preset",
+        "write_timer_counter_preset_consecutive",
+    ):
+        value = getattr(client_type, name)
+        if not inspect.getdoc(value):
+            raise SystemExit(f"public client method docstring is missing: {client_type.__name__}.{name}")
+        inspect.signature(value)
 module_path = Path(hostlink.__file__).resolve()
 environment_root = Path(sys.prefix).resolve()
 if not module_path.is_relative_to(environment_root):

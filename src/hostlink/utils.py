@@ -13,7 +13,7 @@ import math
 import re
 import struct
 import warnings
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import KW_ONLY, dataclass
 from ipaddress import ip_address
 from typing import TYPE_CHECKING, cast
@@ -23,6 +23,7 @@ from .device import (
     DEFAULT_FORMAT_BY_DEVICE_TYPE,
     NATIVE_32BIT_DEVICE_TYPES,
     RDC_DEVICE_TYPES,
+    WR_DEVICE_TYPES,
     DeviceAddress,
     bit_bank_logical_number,
     bit_bank_number_from_logical,
@@ -80,6 +81,27 @@ class _ReadPlanSegment:
 class _CompiledReadNamedPlan:
     requests_in_input_order: tuple[_ReadPlanRequest, ...]
     segments: tuple[_ReadPlanSegment, ...]
+
+
+@dataclass(frozen=True)
+class _NamedWriteEntry:
+    address: str
+    base_address: DeviceAddress
+    dtype: str
+    count: int
+    values: tuple[int | float | bool, ...]
+
+
+@dataclass(frozen=True)
+class _NamedWriteOperation:
+    kind: str
+    device: str
+    values: tuple[int | str | bool, ...]
+    data_format: str | None
+
+
+_NamedWriteScalar = int | float | bool | str
+_NamedWriteValue = _NamedWriteScalar | Sequence[_NamedWriteScalar]
 
 
 @dataclass(frozen=True)
@@ -392,12 +414,17 @@ async def read_counter(client: AsyncHostLinkClient, device: str) -> TimerCounter
     return await read_timer_counter(client, device)
 
 
-async def read_comments(
+async def read_comment(
     client: AsyncHostLinkClient,
     device: str,
     encoding: HostLinkCommentEncoding,
 ) -> str:
     """Read one PLC comment string using exactly the selected codec.
+
+    The KEYENCE manual does not specify the ``RDC`` character encoding, and
+    there is no PLC-project character-encoding setting. The helper never
+    assumes UTF-8 and never auto-detects or retries another codec; it decodes
+    only with the caller-supplied :class:`HostLinkCommentEncoding`.
 
     Args:
         client: Connected asynchronous Host Link client.
@@ -408,7 +435,22 @@ async def read_comments(
         The PLC comment text for ``device``.
     """
 
-    return await client.read_comments(device, require_comment_encoding(encoding))
+    return await client.read_comment(device, require_comment_encoding(encoding))
+
+
+async def read_comments(
+    client: AsyncHostLinkClient,
+    device: str,
+    encoding: HostLinkCommentEncoding,
+) -> str:
+    """Deprecated compatibility alias for :func:`read_comment`."""
+
+    warnings.warn(
+        "read_comments is deprecated; use read_comment",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return await read_comment(client, device, encoding)
 
 
 async def read_comment_bytes(
@@ -575,6 +617,213 @@ async def read_named(
     selected_comment_encoding = _resolve_plan_comment_encoding(plan, comment_encoding)
     _preflight_read_named_plan(client, plan)
     return await _execute_read_named_plan(client, plan, selected_comment_encoding)
+
+
+async def write_named(
+    client: AsyncHostLinkClient,
+    updates: Mapping[str, int | float | bool | str | Sequence[int | float | bool | str]],
+) -> None:
+    """Write one named update set using exactly one Host Link request.
+
+    Every key uses the same explicit dtype notation as :func:`read_named`.
+    A ``,count`` suffix accepts a sequence of exactly that length. The helper
+    snapshots and validates the complete mapping before communication, then
+    sends one ``WR``, ``WRS``, or ``WSS`` request. Incompatible, non-contiguous,
+    reverse-order, or oversized updates are rejected instead of being split.
+    Bit-in-word updates are rejected because they require read-modify-write.
+
+    Args:
+        client: Connected asynchronous Host Link client.
+        updates: Insertion-ordered mapping of typed addresses to values.
+    """
+
+    entries = _snapshot_named_write_entries(updates)
+    operation = _compile_named_write_operation(entries)
+    _preflight_named_write_operation(client, operation)
+    if operation.kind == "single":
+        await client.write(operation.device, operation.values[0], data_format=operation.data_format)
+    elif operation.kind == "set-value":
+        await client.write_timer_counter_preset_consecutive(
+            operation.device,
+            operation.values,
+            data_format=operation.data_format,
+        )
+    else:
+        await client.write_consecutive(operation.device, operation.values, data_format=operation.data_format)
+
+
+def _snapshot_named_write_entries(updates: Mapping[str, _NamedWriteValue]) -> tuple[_NamedWriteEntry, ...]:
+    if not isinstance(updates, Mapping) or not updates:
+        raise ValueError("write_named updates must be a non-empty mapping")
+
+    entries: list[_NamedWriteEntry] = []
+    semantic_keys: set[tuple[str, int, str, int | None, int]] = set()
+    for raw_address, raw_value in tuple(updates.items()):
+        address, count = _split_named_write_count(raw_address)
+        parsed = parse_address(address)
+        base_address = parse_device(parsed.base_device)
+        semantic_key = (base_address.device_type, base_address.number, parsed.dtype, parsed.bit_index, count)
+        if semantic_key in semantic_keys:
+            raise ValueError(f"Named write address {raw_address!r} is semantically duplicated")
+        semantic_keys.add(semantic_key)
+        if parsed.dtype == "BIT_IN_WORD":
+            raise ValueError(
+                f"Named write address {raw_address!r} requires read-modify-write; "
+                "multi-request writes are not supported"
+            )
+        if parsed.dtype == "COMMENT":
+            raise ValueError(f"Named write address {raw_address!r} is read-only")
+        if base_address.device_type not in WR_DEVICE_TYPES:
+            raise ValueError(f"Named write device family {base_address.device_type!r} is read-only")
+
+        values: tuple[int | float | bool, ...]
+        if count == 1:
+            if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes, bytearray)):
+                raise ValueError(f"Named write address {raw_address!r} expects one scalar value")
+            values = (_normalize_named_write_scalar(parsed.dtype, raw_value),)
+        else:
+            if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes, bytearray)):
+                raise ValueError(f"Named write address {raw_address!r} expects a sequence of {count} values")
+            value_snapshot = tuple(raw_value)
+            if len(value_snapshot) != count:
+                raise ValueError(f"Named write address {raw_address!r} expects {count} values")
+            values = tuple(_normalize_named_write_scalar(parsed.dtype, value) for value in value_snapshot)
+        entries.append(_NamedWriteEntry(raw_address, base_address, parsed.dtype, count, values))
+    return tuple(entries)
+
+
+def _split_named_write_count(address: object) -> tuple[str, int]:
+    if not isinstance(address, str) or not address.strip():
+        raise ValueError("write_named address keys must be non-empty strings")
+    text = address.strip()
+    if "," not in text:
+        return text, 1
+    base, separator, count_text = text.rpartition(",")
+    if not separator or "," in base or not count_text.isdigit():
+        raise ValueError(f"Invalid named write count in address {address!r}")
+    count = int(count_text, 10)
+    if count < 1:
+        raise ValueError(f"Named write count must be at least 1 in address {address!r}")
+    return base.strip(), count
+
+
+def _normalize_named_write_scalar(dtype: str, value: object) -> int | float | bool:
+    if dtype == "BIT":
+        return _parse_bit_write_value(value)  # type: ignore[arg-type]
+    if dtype == "H" and isinstance(value, str):
+        text = value.strip()
+        if not re.fullmatch(r"[0-9A-Fa-f]{1,4}", text):
+            raise ValueError(f"Invalid H value {value!r}; use 1..4 hexadecimal digits")
+        return int(text, 16)
+    if dtype == "F":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"Float value must be a finite number, got {value!r}")
+        try:
+            normalized_float = float(value)
+        except OverflowError as exc:
+            raise ValueError(f"Float value is outside the finite float32 range: {value!r}") from exc
+        _float32_to_words(normalized_float)
+        return normalized_float
+    limits = {
+        "U": (0, 0xFFFF),
+        "S": (-0x8000, 0x7FFF),
+        "D": (0, 0xFFFFFFFF),
+        "L": (-0x80000000, 0x7FFFFFFF),
+        "H": (0, 0xFFFF),
+    }.get(dtype)
+    if limits is None or type(value) is not int or not limits[0] <= value <= limits[1]:
+        raise ValueError(f"Invalid {dtype} value {value!r}")
+    return value
+
+
+def _compile_named_write_operation(entries: tuple[_NamedWriteEntry, ...]) -> _NamedWriteOperation:
+    if len(entries) == 1 and entries[0].count > 1:
+        return _compile_named_write_range(entries[0])
+    if any(entry.count != 1 for entry in entries):
+        raise ValueError("write_named must fit one Host Link request")
+
+    first = entries[0]
+    kind, step, data_format = _named_write_batch_spec(first)
+    if kind == "single":
+        if len(entries) != 1:
+            raise ValueError("write_named must fit one Host Link request")
+        return _NamedWriteOperation(
+            "single",
+            first.base_address.to_text(),
+            (cast(int | bool, first.values[0]),),
+            data_format,
+        )
+
+    encoded: list[int | bool] = []
+    expected_number = _named_write_batch_number(first, kind)
+    for entry in entries:
+        entry_kind, entry_step, entry_format = _named_write_batch_spec(entry)
+        number = _named_write_batch_number(entry, entry_kind)
+        if (entry_kind, entry_step, entry_format) != (kind, step, data_format) or number != expected_number:
+            raise ValueError("write_named must fit one compatible contiguous Host Link request")
+        encoded.extend(_encode_named_write_values(entry, kind))
+        expected_number = number + step
+    return _NamedWriteOperation(kind, first.base_address.to_text(), tuple(encoded), data_format)
+
+
+def _compile_named_write_range(entry: _NamedWriteEntry) -> _NamedWriteOperation:
+    if entry.base_address.device_type in {"T", "C"}:
+        return _NamedWriteOperation(
+            "set-value",
+            entry.base_address.to_text(),
+            tuple(cast(int, value) for value in entry.values),
+            f".{entry.dtype}",
+        )
+    if entry.dtype == "F":
+        packed: list[int] = []
+        for value in entry.values:
+            packed.extend(_float32_to_words(cast(float, value)))
+        return _NamedWriteOperation("consecutive", entry.base_address.to_text(), tuple(packed), ".U")
+    data_format = None if entry.dtype == "BIT" else f".{entry.dtype}"
+    return _NamedWriteOperation(
+        "consecutive",
+        entry.base_address.to_text(),
+        tuple(cast(int | bool, value) for value in entry.values),
+        data_format,
+    )
+
+
+def _named_write_batch_spec(entry: _NamedWriteEntry) -> tuple[str, int, str | None]:
+    device_type = entry.base_address.device_type
+    if device_type in {"T", "C"}:
+        return "set-value", 1, f".{entry.dtype}"
+    if device_type in _DIRECT_BIT_DEVICE_TYPES and entry.dtype != "BIT":
+        return "single", 1, f".{entry.dtype}"
+    if entry.dtype == "BIT":
+        return "bit", 1, None
+    if entry.dtype in {"U", "S", "H"} or (device_type in NATIVE_32BIT_DEVICE_TYPES and entry.dtype in {"D", "L"}):
+        return "consecutive", 1, f".{entry.dtype}"
+    return "packed", 2, ".U"
+
+
+def _named_write_batch_number(entry: _NamedWriteEntry, kind: str) -> int:
+    if kind == "bit" and entry.base_address.device_type in BIT_BANK_DEVICE_TYPES:
+        return bit_bank_logical_number(entry.base_address.number)
+    return entry.base_address.number
+
+
+def _encode_named_write_values(entry: _NamedWriteEntry, kind: str) -> tuple[int | bool, ...]:
+    value = entry.values[0]
+    if kind != "packed":
+        return (cast(int | bool, value),)
+    if entry.dtype == "F":
+        return _float32_to_words(cast(float, value))
+    bits = cast(int, value) & 0xFFFFFFFF
+    return bits & 0xFFFF, (bits >> 16) & 0xFFFF
+
+
+def _preflight_named_write_operation(client: AsyncHostLinkClient, operation: _NamedWriteOperation) -> None:
+    if operation.kind == "single":
+        client._build_write_command(operation.device, operation.values[0], operation.data_format)
+    elif operation.kind == "set-value":
+        client._build_write_set_value_consecutive_command(operation.device, operation.values, operation.data_format)
+    else:
+        client._build_write_consecutive_command("WRS", operation.device, operation.values, operation.data_format)
 
 
 async def poll(
@@ -908,7 +1157,7 @@ async def _execute_read_named_plan(
                 if segment.mode == "COMMENT":
                     if comment_encoding is None:
                         raise HostLinkProtocolError("Compiled COMMENT plan is missing its explicit encoding")
-                    resolved[request.index] = await read_comments(client, base, comment_encoding)
+                    resolved[request.index] = await read_comment(client, base, comment_encoding)
                 elif request.kind == "SINGLE_BIT_IN_WORD":
                     bit_index = _require_bit_in_word_index(request.address, request.bit_index)
                     raw = await client.read(base, data_format=".U")
@@ -1085,6 +1334,14 @@ async def read_dwords_single_request(
 
     Adjacent word pairs are combined in low-word, high-word order. The helper
     never silently splits the logical request.
+
+    Args:
+        client: Connected asynchronous Host Link client.
+        device: First word device in the contiguous range.
+        count: Number of 32-bit values to read.
+
+    Returns:
+        Unsigned 32-bit values decoded from adjacent word pairs.
     """
 
     normalized_count = _require_exact_integer(count, 1, 500, "dword count")
@@ -1243,7 +1500,7 @@ async def read_dwords(
     device: str,
     count: int,
 ) -> list[int]:
-    """Read contiguous unsigned 32-bit values starting at ``device``.
+    """Deprecated compatibility alias for :func:`read_dwords_single_request`.
 
     Adjacent word pairs are combined in low-word, high-word order, which
     matches the helper-layer interpretation used by :func:`read_typed` for
@@ -1257,6 +1514,11 @@ async def read_dwords(
     Returns:
         A list of Python ``int`` values.
     """
+    warnings.warn(
+        "read_dwords is deprecated; use read_dwords_single_request",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return await read_dwords_single_request(client, device, count)
 
 

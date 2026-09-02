@@ -2,7 +2,7 @@ import asyncio
 import sys
 from datetime import datetime
 
-from hostlink import AsyncHostLinkClient
+from hostlink import AsyncHostLinkClient, HostLinkCommentEncoding
 from hostlink.errors import HostLinkError
 
 
@@ -16,7 +16,7 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         print(f"  ?K (Model): {info.model} ({info.code})")
         mode = await plc.confirm_operating_mode()
         print(f"  ?M (Mode): {mode}")
-        err = await plc.check_error_no()
+        err = await plc.read_error_number()
         print(f"  ?E (Error): {err}")
         await plc.set_time(datetime.now())  # Current time
         print("  WRT (Time): OK")
@@ -66,8 +66,10 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         print("\n[Group 5: Timer/Counter Set Values]")
         # Note: Writing to T/C set values (WS)
         try:
-            await plc.write_set_value("T0", 500, data_format=".D")
-            await plc.write_set_value_consecutive("T1", [100, 200], data_format=".D")
+            await plc.write_timer_counter_preset("T0", 500, data_format=".D")
+            await plc.write_timer_counter_preset_consecutive(
+                "T1", [100, 200], data_format=".D"
+            )
             print("  WS/WSS T0-T2: OK")
         except HostLinkError as e:
             print(f"  WS/WSS: SKIPPED or Error (Check if T0 exists/writable): {e}")
@@ -85,7 +87,7 @@ async def validate_all_patterns(host, plc_profile, port, transport):
         # 7. Others
         print("\n[Group 7: Advanced / Others]")
         try:
-            comment = await plc.read_comments("DM0")
+            comment = await plc.read_comment("DM0", HostLinkCommentEncoding.UTF8)
             print(f"  RDC (Comment DM0): '{comment}'")
         except Exception:
             print("  RDC: No comment or not supported")

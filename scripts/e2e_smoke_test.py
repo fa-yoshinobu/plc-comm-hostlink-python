@@ -43,7 +43,7 @@ def run(args: argparse.Namespace) -> int:
             mode = plc.confirm_operating_mode()
             _print_ok(f"?M operating_mode={mode}")
 
-            err = plc.check_error_no()
+            err = plc.read_error_number()
             _print_ok(f"?E error_no={err}")
 
             one = plc.read(args.read_device, data_format=args.read_format)

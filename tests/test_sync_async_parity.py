@@ -57,9 +57,9 @@ _PARITY_CASES = [
         lambda client: client.clear_error(),
     ),
     _ParityCase(
-        "check_error_no",
-        lambda client: client.check_error_no(),
-        lambda client: client.check_error_no(),
+        "read_error_number",
+        lambda client: client.read_error_number(),
+        lambda client: client.read_error_number(),
         response=b"000\r\n",
     ),
     _ParityCase(
@@ -144,14 +144,14 @@ _PARITY_CASES = [
         lambda client: client.write_consecutive_legacy("DM100", [100, 200, 300], data_format=".U"),
     ),
     _ParityCase(
-        "write_set_value",
-        lambda client: client.write_set_value("T0", 1000, data_format=".D"),
-        lambda client: client.write_set_value("T0", 1000, data_format=".D"),
+        "write_timer_counter_preset",
+        lambda client: client.write_timer_counter_preset("T0", 1000, data_format=".D"),
+        lambda client: client.write_timer_counter_preset("T0", 1000, data_format=".D"),
     ),
     _ParityCase(
-        "write_set_value_consecutive",
-        lambda client: client.write_set_value_consecutive("C0", [10, 20], data_format=".D"),
-        lambda client: client.write_set_value_consecutive("C0", [10, 20], data_format=".D"),
+        "write_timer_counter_preset_consecutive",
+        lambda client: client.write_timer_counter_preset_consecutive("C0", [10, 20], data_format=".D"),
+        lambda client: client.write_timer_counter_preset_consecutive("C0", [10, 20], data_format=".D"),
     ),
     _ParityCase(
         "register_monitor_bits",
@@ -176,9 +176,9 @@ _PARITY_CASES = [
         response=b"100 200\r\n",
     ),
     _ParityCase(
-        "read_comments",
-        lambda client: client.read_comments("DM150", HostLinkCommentEncoding.UTF8),
-        lambda client: client.read_comments("DM150", HostLinkCommentEncoding.UTF8),
+        "read_comment",
+        lambda client: client.read_comment("DM150", HostLinkCommentEncoding.UTF8),
+        lambda client: client.read_comment("DM150", HostLinkCommentEncoding.UTF8),
         response=b"MAIN COMMENT                    \r\n",
     ),
     _ParityCase(

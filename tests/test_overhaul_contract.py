@@ -759,17 +759,17 @@ def test_comment_trims_only_ascii_space_padding(
     expected: str,
 ) -> None:
     client = _RecordingClient([response])
-    assert client.read_comments("DM0", encoding) == expected
+    assert client.read_comment("DM0", encoding) == expected
 
 
 def test_comment_encoding_is_explicit_and_never_falls_back() -> None:
     ambiguous = b"\xc2\xa2\r"
-    assert _RecordingClient([ambiguous]).read_comments("DM0", HostLinkCommentEncoding.UTF8) == "¢"
-    assert _RecordingClient([ambiguous]).read_comments("DM0", HostLinkCommentEncoding.CP932) == "ﾂ｢"
+    assert _RecordingClient([ambiguous]).read_comment("DM0", HostLinkCommentEncoding.UTF8) == "¢"
+    assert _RecordingClient([ambiguous]).read_comment("DM0", HostLinkCommentEncoding.CP932) == "ﾂ｢"
 
     client = _RecordingClient(["あ".encode("cp932") + b"\r"])
     with pytest.raises(HostLinkProtocolError, match="not valid utf-8"):
-        client.read_comments("DM0", HostLinkCommentEncoding.UTF8)
+        client.read_comment("DM0", HostLinkCommentEncoding.UTF8)
 
 
 @pytest.mark.parametrize(
@@ -785,52 +785,52 @@ def test_comment_malformed_selected_codec_is_rejected_without_replacement(
 ) -> None:
     client = _RecordingClient([payload + b"\r"])
     with pytest.raises(HostLinkProtocolError, match="no fallback codec"):
-        client.read_comments("DM0", encoding)
+        client.read_comment("DM0", encoding)
 
 
 @pytest.mark.parametrize("payload", [b"\x80", b"\xa0", b"\xfd", b"\xfe", b"\xff"])
 def test_cp932_rejects_nonportable_vendor_private_single_bytes(payload: bytes) -> None:
     client = _RecordingClient([payload + b"\r"])
     with pytest.raises(HostLinkProtocolError, match="not valid cp932"):
-        client.read_comments("DM0", HostLinkCommentEncoding.CP932)
+        client.read_comment("DM0", HostLinkCommentEncoding.CP932)
 
 
 def test_cp932_preserves_ascii_controls_and_accepts_windows_31j_extensions() -> None:
     payload = b"\x1a\x1c\x7f\x87\x90\xed\x40\xfa\x4a"
     expected = "\x1a\x1c\x7f" + b"\x87\x90\xed\x40\xfa\x4a".decode("cp932")
-    assert _RecordingClient([payload + b"\r"]).read_comments("DM0", HostLinkCommentEncoding.CP932) == expected
+    assert _RecordingClient([payload + b"\r"]).read_comment("DM0", HostLinkCommentEncoding.CP932) == expected
 
 
 def test_utf8_bom_is_preserved_as_payload_and_is_not_a_cp932_signal() -> None:
     payload = b"\xef\xbb\xbfA"
-    assert _RecordingClient([payload + b"\r"]).read_comments("DM0", HostLinkCommentEncoding.UTF8) == "\ufeffA"
+    assert _RecordingClient([payload + b"\r"]).read_comment("DM0", HostLinkCommentEncoding.UTF8) == "\ufeffA"
     with pytest.raises(HostLinkProtocolError, match="not valid cp932"):
-        _RecordingClient([payload + b"\r"]).read_comments("DM0", HostLinkCommentEncoding.CP932)
+        _RecordingClient([payload + b"\r"]).read_comment("DM0", HostLinkCommentEncoding.CP932)
 
 
 def test_comment_decode_failure_retires_but_plc_error_keeps_sync_connection() -> None:
     malformed = _RecordingClient([b"\x82\r"])
     with pytest.raises(HostLinkProtocolError):
-        malformed.read_comments("DM0", HostLinkCommentEncoding.CP932)
+        malformed.read_comment("DM0", HostLinkCommentEncoding.CP932)
     assert malformed.retired
 
     plc_error = _RecordingClient([b"E1\r", b"TEXT OK  \r"])
     with pytest.raises(HostLinkError, match="E1"):
         plc_error.read_comment_bytes("DM0")
     assert not plc_error.retired
-    assert plc_error.read_comments("DM1", HostLinkCommentEncoding.UTF8) == "TEXT OK"
+    assert plc_error.read_comment("DM1", HostLinkCommentEncoding.UTF8) == "TEXT OK"
 
 
 @pytest.mark.asyncio
 async def test_comment_decode_failure_retires_but_plc_error_keeps_async_connection() -> None:
     malformed = _AsyncRecordingClient([b"\x82\r"])
     with pytest.raises(HostLinkProtocolError):
-        await malformed.read_comments("DM0", HostLinkCommentEncoding.CP932)
+        await malformed.read_comment("DM0", HostLinkCommentEncoding.CP932)
     assert malformed.retired
 
     plc_error = _AsyncRecordingClient([b"E1\r", b"RAW OK  \r"])
     with pytest.raises(HostLinkError, match="E1"):
-        await plc_error.read_comments("DM0", HostLinkCommentEncoding.UTF8)
+        await plc_error.read_comment("DM0", HostLinkCommentEncoding.UTF8)
     assert not plc_error.retired
     assert await plc_error.read_comment_bytes("DM1") == b"RAW OK  "
 
@@ -844,7 +844,7 @@ def test_comment_raw_bytes_preserve_padding_and_encoding() -> None:
 def test_comment_encoding_selection_is_validated_before_send() -> None:
     client = _RecordingClient()
     with pytest.raises(ValueError, match="HostLinkCommentEncoding"):
-        client.read_comments("DM0", "utf-8")  # type: ignore[arg-type]
+        client.read_comment("DM0", "utf-8")  # type: ignore[arg-type]
     assert client.frames == []
 
 

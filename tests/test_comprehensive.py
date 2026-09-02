@@ -14,7 +14,7 @@ from hostlink import (
     HostLinkTrafficStats,
     device_range_catalog_for_plc_profile,
     poll,
-    read_comments,
+    read_comment,
     read_named,
     read_timer_counter,
     read_typed,
@@ -122,7 +122,7 @@ class TestComprehensiveSync(unittest.TestCase):
         self.client.clear_error()
         self.assertEqual(self.server.last_received[-1], "ER")
         self.server.responses["?E"] = "000"
-        self.assertEqual(self.client.check_error_no(), "000")
+        self.assertEqual(self.client.read_error_number(), "000")
         self.server.responses["?K"] = "63"
         info = self.client.query_model()
         self.assertEqual(info.code, "63")
@@ -189,10 +189,10 @@ class TestComprehensiveSync(unittest.TestCase):
         self.client.forced_reset_consecutive("R100", 3)
         self.assertEqual(self.server.last_received[-1], "RSS R100 3")
 
-    def test_write_set_value(self):
-        self.client.write_set_value("T0", 100, data_format=".D")
+    def test_write_timer_counter_preset(self):
+        self.client.write_timer_counter_preset("T0", 100, data_format=".D")
         self.assertEqual(self.server.last_received[-1], "WS T0.D 100")
-        self.client.write_set_value_consecutive("C0", [10, 20], data_format=".D")
+        self.client.write_timer_counter_preset_consecutive("C0", [10, 20], data_format=".D")
         self.assertEqual(self.server.last_received[-1], "WSS C0.D 2 10 20")
 
     def test_monitor(self):
@@ -230,11 +230,11 @@ class TestComprehensiveSync(unittest.TestCase):
         self.client.write_expansion_unit_buffer(1, 200, [789, 1011], data_format=".S")
         self.assertEqual(self.server.last_received[-1], "UWR 01 200.S 2 789 1011")
 
-    def test_read_comments(self):
+    def test_read_comment(self):
         self.server.responses["RDC R000"] = "TEST COMMENT                    "
-        self.assertEqual(self.client.read_comments("R0", HostLinkCommentEncoding.UTF8), "TEST COMMENT")
+        self.assertEqual(self.client.read_comment("R0", HostLinkCommentEncoding.UTF8), "TEST COMMENT")
         self.server.responses["RDC D10"] = "DM COMMENT                      "
-        self.assertEqual(self.client.read_comments("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
+        self.assertEqual(self.client.read_comment("D10", HostLinkCommentEncoding.UTF8), "DM COMMENT")
 
     def test_switch_bank(self):
         self.client.switch_bank(5)
@@ -468,9 +468,9 @@ class TestComprehensiveAsync(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(self.server.last_received, ["RDS CR3614 4"])
 
-    async def test_async_read_comments_helper_and_read_named_comment(self):
+    async def test_async_read_comment_helper_and_read_named_comment(self):
         self.server.responses["RDC DM150"] = "MAIN COMMENT                    "
-        comment = await read_comments(self.client, "DM150", HostLinkCommentEncoding.UTF8)
+        comment = await read_comment(self.client, "DM150", HostLinkCommentEncoding.UTF8)
         self.assertEqual(comment, "MAIN COMMENT")
 
         self.server.last_received.clear()

@@ -17,7 +17,7 @@ from :mod:`hostlink.utils`:
 - :func:`read_counter`
 - :func:`write_typed`
 - :func:`write_bit_in_word`
-- :func:`read_comments`
+- :func:`read_comment`
 - :func:`read_comment_bytes`
 - :func:`read_words_single_request`
 - :func:`read_dwords_single_request`
@@ -25,6 +25,7 @@ from :mod:`hostlink.utils`:
 - :func:`write_expansion_unit_buffer`
 - :func:`write_bit_in_expansion_unit_buffer`
 - :func:`read_named`
+- :func:`write_named`
 - :func:`poll`
 
 The low-level clients remain part of the package for advanced and maintainer
@@ -32,7 +33,7 @@ workflows, but the helpers above are the recommended entry points for normal
 application code and generated user documentation.
 """
 
-__version__ = "4.1.0"
+__version__ = "4.2.0"
 
 from .client import AsyncHostLinkClient, HostLinkClient, HostLinkTrafficStats, ModelInfo
 from .device_ranges import (
@@ -77,6 +78,7 @@ from .utils import (
     parse_address,
     poll,
     read_bits_single_request,
+    read_comment,
     read_comment_bytes,
     read_comments,
     read_counter,
@@ -95,6 +97,7 @@ from .utils import (
     write_bits_single_request,
     write_dwords_single_request,
     write_expansion_unit_buffer,
+    write_named,
     write_typed,
     write_words_single_request,
 )
@@ -139,6 +142,7 @@ __all__ = [
     "parse_address",
     "poll",
     "read_comment_bytes",
+    "read_comment",
     "read_comments",
     "read_counter",
     "read_bits_single_request",
@@ -157,6 +161,7 @@ __all__ = [
     "write_bits_single_request",
     "write_bit_in_expansion_unit_buffer",
     "write_expansion_unit_buffer",
+    "write_named",
     "write_typed",
     "write_words_single_request",
 ]
