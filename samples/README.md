@@ -13,7 +13,7 @@ python samples/high_level_async.py --host 192.168.250.100 --plc-profile keyence:
 ```
 
 ```bash
-python samples/high_level_sync.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --port 8501
+python samples/high_level_sync.py --host 192.168.250.100 --plc-profile keyence:kv-8000 --transport tcp --port 8501
 ```
 
 ```bash
