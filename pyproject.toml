@@ -31,7 +31,7 @@ classifiers = [
 Homepage = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
 Repository = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python"
 Issues = "https://github.com/fa-yoshinobu/plc-comm-hostlink-python/issues"
-Documentation = "https://fa-yoshinobu.github.io/plc-comm-docs-site/hostlink/python/GETTING_STARTED/"
+Documentation = "https://plc-comm-docs-site.fa-labo.com/hostlink/python/GETTING_STARTED/"
 
 [project.optional-dependencies]
 dev = [
